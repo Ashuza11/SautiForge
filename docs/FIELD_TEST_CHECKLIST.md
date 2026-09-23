@@ -1,6 +1,6 @@
 # Physical Android field-test checklist
 
-Record device model, Android version, APK identifier/hash, tester, date, and results. Do not mark the milestone field-ready from emulator or source-only testing.
+Record device model, Android version, APK identifier/SHA-256, workflow run or build source, tester, date, and results. Do not mark the milestone field-ready from CI, emulator, or source-only testing.
 
 - Install the release APK and launch it with airplane mode enabled and no development server.
 - Confirm seeded project/scenarios, then create/edit/archive generic project and scenario records.

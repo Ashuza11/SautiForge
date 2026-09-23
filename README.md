@@ -71,6 +71,17 @@ adb install path/to/sautiforge.apk
 
 An EAS account is a build-time option only; the installed application must work offline and does not require an end-user account.
 
+### GitHub Actions pilot APK
+
+Every relevant push to `main`, or a manual run of **Android pilot APK** under the repository’s Actions tab, runs type-checks and tests, generates the native Android project, builds `:app:assembleRelease`, and uploads an installable APK with a SHA-256 file. Download the `sautiforge-android-pilot-<run>` artifact from the successful workflow run, extract it, verify it, then install it:
+
+```bash
+sha256sum -c sautiforge-*.apk.sha256
+adb install -r sautiforge-*.apk
+```
+
+This pilot artifact uses the generated Android debug signing configuration so it can be installed without storing signing secrets in GitHub. It is not suitable for Play Store or production distribution. Establish protected production signing and key custody before any production release.
+
 ## Data and ethics
 
 - Use pseudonymous speaker codes and collect no unnecessary identifiers.

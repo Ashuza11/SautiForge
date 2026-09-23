@@ -3,6 +3,7 @@
 ## Implemented in source
 
 - Expo SDK 57 TypeScript/Router application and APK build profile.
+- GitHub Actions pilot APK workflow with verification, release assembly, SHA-256, and short-lived downloadable artifacts (execution not yet verified).
 - SQLite schema version 3, migration chain, constraints, seed project, and five editable Kingwana scenarios.
 - Offline projects, scenarios, pseudonymous participants, immutable consent revisions, and resumable sessions.
 - Real foreground audio capture, immediate playback, accept/rerecord/discard, document-storage persistence, and verified database save.
