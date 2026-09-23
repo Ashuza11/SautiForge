@@ -40,6 +40,8 @@ Feature code is grouped under `src/features/<feature>`. Shared database setup li
 7. Delete the temporary source only after both file and row verification pass. On failure, remove the incomplete destination and retain the source take for retry.
 8. Report success only after verification.
 
+At database initialization, document-storage recordings are reconciled against SQLite. Referenced non-empty files are counted as verified; missing references are reported in Settings; zero-byte and unreferenced files are moved into app-private recovery storage rather than treated as successful recordings or silently deleted.
+
 Background recording, automatic uploads, remote authentication, and AI transcription are out of scope for 0.1.
 
 ## Export boundary

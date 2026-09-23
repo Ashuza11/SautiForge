@@ -18,10 +18,12 @@ The first vertical slice includes:
 - Append-only consent revisions, per-use approvals, visible history, and reusable recording/export authorization checks.
 - Consent-linked, resumable collection sessions with device/environment metadata.
 - Real foreground microphone recording, visible timer/indicator, immediate playback, rerecord/discard confirmation, and verified accepted-file persistence in document storage.
-- Dashboard counts, searchable recording library, detail playback, soft archive, status changes, human transcription revision history, and versioned business annotations.
+- Dashboard counts, a recording library filterable by project/participant/scenario/language/date/quality/status, detail playback, soft archive, status changes, human transcription revision history, and versioned business annotations.
+- Startup storage reconciliation that reports missing audio and quarantines zero-byte or unreferenced recording files for recovery.
+- Settings and safety status for microphone permission, free space, versions, offline behavior, backup limits, and the latest storage check.
 - Consent-filtered research ZIP exports with JSON/JSONL/CSV metadata, original audio, SHA-256 manifest, and post-compression verification.
 - A visibly separate sensitive administrative backup and hash/schema/database/audio-verified restore with rollback on failure.
-- Zod runtime validation and automated schema, migration, consent, annotation, recording, and manifest tests.
+- Strict Zod validation for persisted and exported records, plus 43 automated tests across all feature modules including real in-memory SQLite migration/relationship checks.
 - Android APK build profile in `eas.json`.
 
 Recording, ZIP export, and restore have not yet been exercised on the target physical phone. A standalone APK has not yet been produced or installed. The source implementation is therefore **not yet field-ready**.

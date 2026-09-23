@@ -20,6 +20,8 @@ import { SQLiteAnnotationRepository } from '@/features/annotations/data/sqlite-a
 import type { DashboardRepository } from '@/features/dashboard/data/dashboard-repository';
 import { SQLiteDashboardRepository } from '@/features/dashboard/data/sqlite-dashboard-repository';
 import { ExportService } from '@/features/exports/data/export-service';
+import type { SettingsRepository } from '@/features/settings/data/settings-repository';
+import { SQLiteSettingsRepository } from '@/features/settings/data/sqlite-settings-repository';
 
 type Repositories = {
   projects: ProjectRepository;
@@ -32,6 +34,7 @@ type Repositories = {
   annotations: AnnotationRepository;
   dashboard: DashboardRepository;
   exports: ExportService;
+  settings: SettingsRepository;
 };
 
 const RepositoryContext = createContext<Repositories | null>(null);
@@ -51,6 +54,7 @@ export function RepositoryProvider({ children }: PropsWithChildren) {
       annotations: new SQLiteAnnotationRepository(db),
       dashboard: new SQLiteDashboardRepository(db),
       exports: new ExportService(db, consent),
+      settings: new SQLiteSettingsRepository(db),
     };
   }, [db]);
 

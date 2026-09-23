@@ -5,6 +5,7 @@ import type { ConsentRepository } from '@/features/consent/data/consent-reposito
 import type { Scenario } from '@/features/scenarios/domain/scenario';
 import type { CollectionSession } from '@/features/sessions/domain/session';
 import { copyAcceptedTake } from './audio-file-store';
+import { buildRecordingSearchWhere } from './recording-search';
 import type { RecordingRepository, RecordingSearch } from './recording-repository';
 import { recordingMetadataDraftSchema, recordingSchema, type AcceptedTake, type Recording, type RecordingMetadataDraft } from '../domain/recording';
 
@@ -63,23 +64,13 @@ export class SQLiteRecordingRepository implements RecordingRepository {
   }
 
   async search(filters: RecordingSearch): Promise<Recording[]> {
-    const conditions = ['r.archived_at IS NULL'];
-    const parameters: Array<string | number> = [];
-    if (filters.projectId) { conditions.push('r.project_id = ?'); parameters.push(filters.projectId); }
-    if (filters.annotationStatus) { conditions.push('r.annotation_status = ?'); parameters.push(filters.annotationStatus); }
-    if (filters.language?.trim()) { conditions.push('r.spoken_languages_json LIKE ?'); parameters.push(`%${filters.language.trim()}%`); }
-    if (filters.qualityRating) { conditions.push('r.quality_rating = ?'); parameters.push(filters.qualityRating); }
-    if (filters.query?.trim()) {
-      conditions.push(`(r.display_id LIKE ? OR p.speaker_code LIKE ? OR sc.title LIKE ? OR r.notes LIKE ?)`);
-      const query = `%${filters.query.trim()}%`;
-      parameters.push(query, query, query, query);
-    }
+    const { clause, parameters } = buildRecordingSearchWhere(filters);
     const rows = await this.db.getAllAsync<RecordingRow>(
       `SELECT ${columns.split(',').map((column) => `r.${column.trim()}`).join(', ')}
        FROM recordings r
        JOIN participants p ON p.id = r.participant_id
        JOIN scenarios sc ON sc.id = r.scenario_id
-       WHERE ${conditions.join(' AND ')} ORDER BY r.recorded_at DESC`,
+       WHERE ${clause} ORDER BY r.recorded_at DESC`,
       ...parameters,
     );
     return rows.map(fromRow);

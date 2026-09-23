@@ -12,6 +12,7 @@ import type { ConsentRepository } from '@/features/consent/data/consent-reposito
 import type { SharingCategory } from '@/features/consent/domain/consent';
 import { getRecordingFile } from '@/features/recordings/data/audio-file-store';
 import { EXPORT_SCHEMA_VERSION, exportManifestSchema, validateManifestReferences, validateRelativeArchivePath, type ExportManifest } from '../domain/manifest';
+import { researchExportRecordsSchema } from '../domain/research-records';
 
 type ExportResult = { archive: File; exportId: string; includedRecordings: number; excludedRecordings: number };
 
@@ -180,15 +181,18 @@ export class ExportService {
         filePaths.push(relativePath);
       }
 
+      const records = researchExportRecordsSchema.parse({
+        project, scenarios, participants, sessions, recordings: exportedRecordings, transcriptions, annotations,
+      });
       const documents: Array<[string, string]> = [
-        ['metadata/project.json', `${JSON.stringify(project, null, 2)}\n`],
-        ['metadata/scenarios.jsonl', jsonLine(scenarios)],
-        ['metadata/participants.jsonl', jsonLine(participants)],
-        ['metadata/participants.csv', rowsToCsv(participants)],
-        ['metadata/sessions.jsonl', jsonLine(sessions)],
-        ['metadata/recordings.jsonl', jsonLine(exportedRecordings)],
-        ['metadata/transcriptions.jsonl', jsonLine(transcriptions)],
-        ['metadata/annotations.jsonl', jsonLine(annotations)],
+        ['metadata/project.json', `${JSON.stringify(records.project, null, 2)}\n`],
+        ['metadata/scenarios.jsonl', jsonLine(records.scenarios)],
+        ['metadata/participants.jsonl', jsonLine(records.participants)],
+        ['metadata/participants.csv', rowsToCsv(records.participants)],
+        ['metadata/sessions.jsonl', jsonLine(records.sessions)],
+        ['metadata/recordings.jsonl', jsonLine(records.recordings)],
+        ['metadata/transcriptions.jsonl', jsonLine(records.transcriptions)],
+        ['metadata/annotations.jsonl', jsonLine(records.annotations)],
       ];
       for (const [path, contents] of documents) { writeText(staging, path, contents); filePaths.push(path); }
       const files = await Promise.all(filePaths.map((path) => describeFile(staging, path)));
@@ -196,8 +200,8 @@ export class ExportService {
         schemaVersion: EXPORT_SCHEMA_VERSION, exportId, exportType: 'research_dataset', exportedAt: timestamp,
         app: 'SautiForge', databaseVersion: DATABASE_VERSION, projectId, sharingCategory: category,
         sensitiveAdministrativeData: false,
-        counts: { projects: 1, scenarios: scenarios.length, participants: participants.length, sessions: sessions.length,
-          recordings: eligible.length, transcriptions: transcriptions.length, annotations: annotations.length,
+        counts: { projects: 1, scenarios: records.scenarios.length, participants: records.participants.length, sessions: records.sessions.length,
+          recordings: records.recordings.length, transcriptions: records.transcriptions.length, annotations: records.annotations.length,
           recordingsExcludedByConsent: allRecordings.length - eligible.length }, files,
       });
       validateManifestReferences(manifest, exportedRecordings.map((item) => String(item.audio_path)));

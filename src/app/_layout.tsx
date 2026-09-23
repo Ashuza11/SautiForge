@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DATABASE_NAME, migrateDatabase } from '@/core/database/migrations';
 import { RepositoryProvider } from '@/core/database/repositories';
+import { recoverRecordingStorage } from '@/features/recordings/data/recording-recovery';
 import { colors } from '@/ui/theme';
 
 function LoadingDatabase() {
@@ -21,7 +22,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <Suspense fallback={<LoadingDatabase />}>
-        <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrateDatabase} useSuspense>
+        <SQLiteProvider databaseName={DATABASE_NAME} onInit={initializeDatabase} useSuspense>
           <RepositoryProvider>
             <Stack screenOptions={{ headerStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTintColor: colors.ink }}>
               <Stack.Screen name="index" options={{ title: 'SautiForge' }} />
@@ -40,12 +41,28 @@ export default function RootLayout() {
               <Stack.Screen name="library/index" options={{ title: 'Recording library' }} />
               <Stack.Screen name="recordings/[recordingId]" options={{ title: 'Recording detail' }} />
               <Stack.Screen name="exports/index" options={{ title: 'Export and backup' }} />
+              <Stack.Screen name="settings/index" options={{ title: 'Settings and safety' }} />
             </Stack>
           </RepositoryProvider>
         </SQLiteProvider>
       </Suspense>
     </SafeAreaProvider>
   );
+}
+
+async function initializeDatabase(database: Parameters<typeof migrateDatabase>[0]) {
+  await migrateDatabase(database);
+  try {
+    await recoverRecordingStorage(database);
+  } catch (cause) {
+    const checkedAt = new Date().toISOString();
+    const message = cause instanceof Error ? cause.message : 'Storage recovery failed without a readable error.';
+    await database.runAsync(
+      `INSERT INTO app_settings (key, value, updated_at) VALUES ('last_storage_recovery', ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      JSON.stringify({ checkedAt, scannedFiles: 0, verifiedFiles: 0, quarantinedPaths: [], missingPaths: [], errors: [message] }), checkedAt,
+    );
+  }
 }
 
 const styles = StyleSheet.create({

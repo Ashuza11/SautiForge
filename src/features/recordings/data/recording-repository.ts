@@ -2,10 +2,14 @@ import type { AcceptedTake, Recording, RecordingMetadataDraft } from '../domain/
 
 export type RecordingSearch = {
   projectId?: string;
+  participantId?: string;
+  scenarioId?: string;
   query?: string;
   annotationStatus?: Recording['annotationStatus'];
   language?: string;
   qualityRating?: number;
+  recordedFrom?: string;
+  recordedTo?: string;
 };
 
 export interface RecordingRepository {

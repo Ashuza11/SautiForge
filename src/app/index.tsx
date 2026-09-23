@@ -84,6 +84,7 @@ export default function HomeScreen() {
       <Button label={strings.newProject} onPress={() => router.push('/projects/new')} />
       <Button label="Open recording library" variant="secondary" onPress={() => router.push('/library')} />
       <Button label="Export or restore" variant="secondary" onPress={() => router.push('/exports')} />
+      <Button label="Settings and safety" variant="secondary" onPress={() => router.push('/settings')} />
       <Text style={styles.privacy}>Offline by design. No account, upload, or remote service is used.</Text>
     </Screen>
   );

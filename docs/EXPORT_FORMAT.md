@@ -22,6 +22,8 @@ sautiforge-<project>-<date>-<export-id-prefix>.zip
 
 JSONL files contain one UTF-8 JSON object per line. CSV is RFC-4180-style UTF-8 with every populated value quoted and embedded quotes doubled. Database column names are retained in `snake_case`; JSON-valued columns end in `_json`. `recordings.jsonl` replaces the private application path with an `audio_path` relative to the ZIP root.
 
+Before files are written, every project, scenario, participant, session, recording, transcription, and annotation object is parsed through a strict versioned Zod export contract. Unknown fields are rejected. This prevents administrative fields such as consent state or research notes from entering the ordinary dataset through a query change, and rejects malformed embedded JSON or unsafe audio references before ZIP creation.
+
 `manifest.json` contains `schemaVersion`, stable export ID, ISO 8601 export time, export type, database version, project ID, sharing category, record counts, and every data/audio member’s relative path, byte size, and lowercase SHA-256 hash. The manifest itself is not self-hashed; its SHA-256 is stored in local `export_history`.
 
 Research exports evaluate the participant’s latest consent revision at export time. They include only eligible, non-archived recordings and the participants/sessions they reference. They exclude consent records, consent notes, participant research notes, session researcher notes, database files, and recordings withdrawn from the selected sharing category. Scenario prompt snapshots and original container/codec metadata remain attached to recordings. M4A/AAC is never described as WAV.
