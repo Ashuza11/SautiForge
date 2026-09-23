@@ -37,7 +37,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "validate:export": "node scripts/validate-export.mjs"
   },
   "private": true
 }

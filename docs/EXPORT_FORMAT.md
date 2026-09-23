@@ -49,3 +49,14 @@ Restore accepts administrative backups only. Before replacement it validates ZIP
 - Audio conversion: not performed
 - Restore policy: exact supported SQLite version only
 - ZIP creation requires an APK/development build; the native ZIP module is unavailable in Expo Go.
+
+## Validate after transfer
+
+On a computer with Node.js, extract the ZIP and run the repository validator against the extracted directory:
+
+```bash
+unzip sautiforge-<project>-<date>-<id>.zip -d transferred-export
+npm run validate:export -- transferred-export
+```
+
+The command exits non-zero for an unsupported schema/type, unsafe or duplicate path, missing member, size mismatch, SHA-256 mismatch, malformed recordings JSONL, unsafe/missing `audio_path`, or recording-count mismatch. A successful message identifies the export ID and verified file/reference counts. This independent validation does not modify the archive or local app data.

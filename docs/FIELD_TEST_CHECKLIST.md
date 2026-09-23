@@ -14,7 +14,7 @@ Record device model, Android version, APK identifier/hash, tester, date, and res
 - Add business labels with unknown/ambiguous/unavailable values; update status and search/filter the library.
 - Withdraw or narrow consent; confirm later recording is blocked and ineligible sharing categories exclude prior audio.
 - Export each sharing category, save via Android folder picker, and transfer the ZIP to a computer.
-- Independently extract the ZIP, validate SHA-256/size entries, resolve every `audio_path`, and play every audio member.
+- Independently extract the ZIP, run `npm run validate:export -- <directory>`, and play every audio member.
 - Create a private backup, restore it on a clean test install, restart, and compare database/audio counts and hashes.
 - Simulate cancellation and insufficient storage during export/restore; confirm local source data remains usable.
 - Verify private consent/administrative fields never appear in a default research export.

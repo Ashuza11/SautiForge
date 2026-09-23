@@ -11,7 +11,8 @@
 - Settings/safety status for microphone permission, free storage, versions, offline behavior, and startup recording-file reconciliation.
 - Consent-filtered research ZIP, portable JSON/JSONL/CSV metadata, SHA-256 manifest, post-compression extraction verification, Android folder/share flows, and export history.
 - Separate sensitive administrative backup and verified rollback-capable restore.
-- Automated tests across every feature module, including executed SQLite migrations/relationships, full library query construction, recording recovery classification, strict privacy-minimized export contracts, and manifest references (15 files, 43 tests).
+- Portable computer-side export validator for post-transfer size, SHA-256, path, count, and audio-reference checks.
+- Automated tests across every feature module and the portable validator, including executed SQLite migrations/relationships, full library query construction, recording recovery classification, strict privacy-minimized export contracts, and manifest references (16 files, 46 tests).
 
 ## Required before field-ready status
 

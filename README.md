@@ -23,7 +23,7 @@ The first vertical slice includes:
 - Settings and safety status for microphone permission, free space, versions, offline behavior, backup limits, and the latest storage check.
 - Consent-filtered research ZIP exports with JSON/JSONL/CSV metadata, original audio, SHA-256 manifest, and post-compression verification.
 - A visibly separate sensitive administrative backup and hash/schema/database/audio-verified restore with rollback on failure.
-- Strict Zod validation for persisted and exported records, plus 43 automated tests across all feature modules including real in-memory SQLite migration/relationship checks.
+- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 46 automated tests including real in-memory SQLite migration/relationship checks.
 - Android APK build profile in `eas.json`.
 
 Recording, ZIP export, and restore have not yet been exercised on the target physical phone. A standalone APK has not yet been produced or installed. The source implementation is therefore **not yet field-ready**.
@@ -48,6 +48,12 @@ npm run android
 ```
 
 The app uses only on-device SQLite. No account or backend is required.
+
+To validate a research ZIP after transfer to a computer, extract it and run:
+
+```bash
+npm run validate:export -- path/to/extracted-export
+```
 
 ## Installable Android build
 

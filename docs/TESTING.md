@@ -9,7 +9,7 @@ npx expo-doctor
 npx expo export --platform android
 ```
 
-Current automated suite: 15 files, 43 tests.
+Current automated suite: 16 files, 46 tests.
 
 | Feature | Automated coverage | Native/field coverage still required |
 | --- | --- | --- |
@@ -23,7 +23,7 @@ Current automated suite: 15 files, 43 tests.
 | Annotations | Versioned strict payload, optional/unknown values, privacy field rejection | Edit/history UI persistence |
 | Dashboard | Aggregate mapping and empty-state zeroes | Counts against device SQLite data |
 | Library | Bound query construction for project, participant, scenario, language, date range, quality, status, and soft-archive exclusion | Full filter and soft-archive UI workflow |
-| Exports | Strict record-level privacy contracts, embedded JSON, safe audio paths, manifest schema, hashes, and reference consistency | Native ZIP creation/extraction, Android folder/share, computer-side validation |
+| Exports | Strict record-level privacy contracts, embedded JSON, safe audio paths, manifest schema/references, plus portable post-transfer size/hash/count/reference validation | Native ZIP creation/extraction, Android folder/share, and validation of a real transferred archive |
 | Restore | Migration chain execution, foreign keys, uniqueness, manifest references | Native ZIP picker, rollback injection, clean-device restore comparison |
 | Settings | Strict local settings and storage-recovery report schemas | Permission/settings presentation and active project persistence |
 | File recovery | Verified/missing/empty/orphan classification | Startup quarantine with real interrupted files and process death |
