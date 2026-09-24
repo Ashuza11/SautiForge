@@ -25,8 +25,9 @@ The first vertical slice includes:
 - A visibly separate sensitive administrative backup and hash/schema/database/audio-verified restore with rollback on failure.
 - Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 46 automated tests including real in-memory SQLite migration/relationship checks.
 - Android APK build profile in `eas.json`.
+- A verified GitHub Actions release build that produces a standalone pilot APK and SHA-256 sidecar.
 
-Recording, ZIP export, and restore have not yet been exercised on the target physical phone. A standalone APK has not yet been produced or installed. The source implementation is therefore **not yet field-ready**.
+The first standalone APK was produced successfully from commit `142375373dd4ac119abb5b6627bf9d46a0cdc916` by [GitHub Actions run 35874820535](https://github.com/Ashuza11/SautiForge/actions/runs/35874820535). Installation, recording, ZIP export, and restore have not yet been exercised on the target physical phone. The application is therefore **not yet field-ready**.
 
 ## Local development
 
@@ -81,6 +82,8 @@ adb install -r sautiforge-*.apk
 ```
 
 This pilot artifact uses the generated Android debug signing configuration so it can be installed without storing signing secrets in GitHub. It is not suitable for Play Store or production distribution. Establish protected production signing and key custody before any production release.
+
+See [build verification](docs/BUILD_VERIFICATION.md) for the exact source commit, workflow result, artifact metadata, and remaining device-validation boundary.
 
 ## Data and ethics
 

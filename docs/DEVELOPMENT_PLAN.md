@@ -3,7 +3,7 @@
 ## Implemented in source
 
 - Expo SDK 57 TypeScript/Router application and APK build profile.
-- GitHub Actions pilot APK workflow with verification, release assembly, SHA-256, and short-lived downloadable artifacts (execution not yet verified).
+- GitHub Actions pilot APK workflow with verification, release assembly, SHA-256, and short-lived downloadable artifacts; first successful release assembly recorded in `BUILD_VERIFICATION.md`.
 - SQLite schema version 3, migration chain, constraints, seed project, and five editable Kingwana scenarios.
 - Offline projects, scenarios, pseudonymous participants, immutable consent revisions, and resumable sessions.
 - Real foreground audio capture, immediate playback, accept/rerecord/discard, document-storage persistence, and verified database save.
@@ -17,7 +17,7 @@
 
 ## Required before field-ready status
 
-1. Produce and install the standalone Android APK.
+1. Install the generated standalone Android APK on the target phone.
 2. Exercise the complete workflow on the target physical phone with airplane mode enabled.
 3. Test microphone denial/re-enable, phone-call interruption, low storage, process death during take/save, restart, and device reboot.
 4. Transfer a research ZIP to a computer, independently verify its hashes/references, and inspect/play every sample file.

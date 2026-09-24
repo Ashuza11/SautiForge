@@ -69,7 +69,16 @@ jobs:
           short_sha="${GITHUB_SHA:0:8}"
           apk_name="sautiforge-0.1.0-${short_sha}-pilot.apk"
           cp android/app/build/outputs/apk/release/app-release.apk "artifacts/${apk_name}"
-          sha256sum "artifacts/${apk_name}" > "artifacts/${apk_name}.sha256"
+          apk_sha="$(sha256sum "artifacts/${apk_name}" | cut -d ' ' -f 1)"
+          printf '%s  %s\n' "${apk_sha}" "${apk_name}" > "artifacts/${apk_name}.sha256"
+          {
+            echo '### Android pilot APK'
+            echo
+            echo "- File: \`${apk_name}\`"
+            echo "- SHA-256: \`${apk_sha}\`"
+            echo "- Source commit: \`${GITHUB_SHA}\`"
+            echo '- Signing: generated Android debug key (pilot installation only)'
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v7
