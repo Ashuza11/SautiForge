@@ -105,6 +105,7 @@ export class SQLiteRecordingRepository implements RecordingRepository {
     const timestamp = nowIso();
     const displayId = `SF-${take.recordedAt.slice(0, 10).replaceAll('-', '')}-${id.slice(0, 8).toUpperCase()}`;
     const stored = await copyAcceptedTake(take.sourceUri, context.project_id, id, take.extension);
+    let metadataInserted = false;
     try {
       const recording = recordingSchema.parse({
         id, displayId, projectId: context.project_id, sessionId, participantId: context.participant_id,
@@ -138,10 +139,22 @@ export class SQLiteRecordingRepository implements RecordingRepository {
         recording.codeSwitchingStatus, recording.recordingEnvironment, recording.noiseLevel, recording.qualityRating,
         recording.notes, recording.annotationStatus, recording.archivedAt, recording.createdAt, recording.updatedAt,
       );
+      metadataInserted = true;
       const verified = await this.get(id);
       if (!verified) throw new Error('Recording metadata was not readable after saving.');
       return verified;
     } catch (error) {
+      if (metadataInserted) {
+        try {
+          await this.db.runAsync('DELETE FROM recordings WHERE id = ?', id);
+        } catch (cleanupCause) {
+          const original = error instanceof Error ? error.message : 'unknown save failure';
+          const cleanup = cleanupCause instanceof Error ? cleanupCause.message : 'unknown database cleanup failure';
+          throw new Error(
+            `Recording save verification failed and database cleanup also failed. The verified audio was retained for recovery. Save error: ${original}. Cleanup error: ${cleanup}`,
+          );
+        }
+      }
       if (stored.file.exists) stored.file.delete();
       throw error;
     }
