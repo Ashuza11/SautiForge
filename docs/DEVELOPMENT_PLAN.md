@@ -13,7 +13,7 @@
 - Consent-filtered research ZIP, portable JSON/JSONL/CSV metadata, SHA-256 manifest, post-compression extraction verification, Android folder/share flows, and export history.
 - Separate sensitive administrative backup and verified rollback-capable restore.
 - Portable computer-side export validator for post-transfer size, SHA-256, path, count, and audio-reference checks.
-- Automated tests across every feature module and the portable validator, including executed SQLite migrations/relationships, full library query construction, recording save compensation/recovery, strict privacy-minimized export contracts, and manifest references (16 files, 48 tests).
+- Automated tests across every feature module and the portable validator, including executed SQLite migrations/relationships, full library query construction, recording interruption/save recovery, strict privacy-minimized export contracts, and manifest references (17 files, 52 tests).
 
 ## Required before field-ready status
 

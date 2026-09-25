@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, BackHandler, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, AppState, BackHandler, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   RecordingPresets,
@@ -17,6 +17,7 @@ import { useRepositories } from '@/core/database/repositories';
 import { nullableText, nowIso } from '@/domain/common';
 import type { Participant } from '@/features/participants/domain/participant';
 import { discardFile, hasRecordingSpace } from '@/features/recordings/data/audio-file-store';
+import { appStateInterruptsRecording, stopAndDiscardInterruptedTake } from '@/features/recordings/domain/interruption';
 import { recordingMetadataDraftSchema, type AcceptedTake } from '@/features/recordings/domain/recording';
 import type { Scenario } from '@/features/scenarios/domain/scenario';
 import type { CollectionSession } from '@/features/sessions/domain/session';
@@ -39,6 +40,7 @@ export default function RecordScreen() {
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const [languages, setLanguages] = useState('');
   const [variety, setVariety] = useState('');
   const [codeSwitching, setCodeSwitching] = useState('unknown');
@@ -46,8 +48,13 @@ export default function RecordScreen() {
   const [noiseLevel, setNoiseLevel] = useState('unknown');
   const [quality, setQuality] = useState('');
   const [notes, setNotes] = useState('');
+  const interruptedRef = useRef(false);
+  const stoppingRef = useRef(false);
   const recorder = useAudioRecorder(recordingOptions, (status) => {
-    if (status.hasError) setError(status.error ?? 'Recording was interrupted.');
+    if (status.hasError) {
+      interruptedRef.current = true;
+      setError(status.error ?? 'Recording was interrupted. The take will not be saved.');
+    }
   });
   const recorderState = useAudioRecorderState(recorder, 100);
 
@@ -125,6 +132,7 @@ export default function RecordScreen() {
       setPermissionDenied(false);
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, allowsBackgroundRecording: false });
       await recorder.prepareToRecordAsync(recordingOptions);
+      interruptedRef.current = false;
       setStartedAt(nowIso());
       recorder.record();
     } catch (cause) {
@@ -132,17 +140,34 @@ export default function RecordScreen() {
     }
   };
 
-  const stop = async () => {
+  const stop = useCallback(async (interrupted = false) => {
+    if (interrupted) interruptedRef.current = true;
+    if (stoppingRef.current) return;
+    stoppingRef.current = true;
+    setStopping(true);
     setError(null);
     try {
       const statusBeforeStop = recorder.getStatus();
       await recorder.stop();
-      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
       const uri = recorder.uri;
+      if (interruptedRef.current) {
+        if (uri) discardFile(uri);
+        setTake(null);
+        setStartedAt(null);
+        setError('Recording stopped because SautiForge left the foreground. The interrupted take was discarded; record again.');
+        return;
+      }
       if (!uri) throw new Error('The recorder did not return an audio file.');
       const file = new File(uri);
       if (!file.exists || !file.size || file.size <= 0) throw new Error('The stopped audio file is missing or empty.');
       await file.slice(0, 1).arrayBuffer();
+      if (interruptedRef.current) {
+        discardFile(uri);
+        setTake(null);
+        setStartedAt(null);
+        setError('Recording stopped because SautiForge left the foreground. The interrupted take was discarded; record again.');
+        return;
+      }
       setTake({
         sourceUri: uri,
         durationMs: Math.max(statusBeforeStop.durationMillis, recorder.getStatus().durationMillis),
@@ -154,9 +179,39 @@ export default function RecordScreen() {
         channelCount: recordingOptions.numberOfChannels,
       });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Recording could not be stopped safely.');
+      const cleanup = await stopAndDiscardInterruptedTake({
+        stop: async () => {
+          if (recorder.getStatus().isRecording) await recorder.stop();
+        },
+        getUri: () => recorder.uri,
+        discard: discardFile,
+      });
+      setTake(null);
+      setStartedAt(null);
+      const detail = cleanup.errors.length ? ` Cleanup details: ${cleanup.errors.join('; ')}.` : '';
+      setError(`${cause instanceof Error ? cause.message : 'Recording could not be stopped safely.'} The take was not saved.${detail}`);
+    } finally {
+      try {
+        await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      } catch (cause) {
+        setError((current) => `${current ?? 'Recording stopped.'} Audio reset failed: ${cause instanceof Error ? cause.message : 'unknown error'}`);
+      }
+      stoppingRef.current = false;
+      setStopping(false);
     }
-  };
+  }, [recorder, startedAt]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (!appStateInterruptsRecording(nextState)) return;
+      const status = recorder.getStatus();
+      if (status.isRecording || stoppingRef.current) {
+        interruptedRef.current = true;
+        if (status.isRecording && !stoppingRef.current) void stop(true);
+      }
+    });
+    return () => subscription.remove();
+  }, [recorder, stop]);
 
   const save = async () => {
     if (!take || !session || !scenario) return;
@@ -212,8 +267,9 @@ export default function RecordScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={recorderState.isRecording ? 'Stop recording' : 'Start recording'}
-            onPress={() => void (recorderState.isRecording ? stop() : start())}
-            style={[styles.recordButton, recorderState.isRecording && styles.stopButton]}>
+            disabled={stopping}
+            onPress={() => void (recorderState.isRecording ? stop(false) : start())}
+            style={[styles.recordButton, recorderState.isRecording && styles.stopButton, stopping && styles.buttonDisabled]}>
             <View style={recorderState.isRecording ? styles.stopIcon : styles.recordIcon} />
           </Pressable>
           <Text style={uiStyles.muted}>Recording stays in the foreground. Pause/resume is disabled until it is verified on the target Android device.</Text>
@@ -236,7 +292,7 @@ export default function RecordScreen() {
           <Button label="Accept and save verified take" onPress={() => void save()} loading={saving} />
         </>
       )}
-      <Button label="Cancel" variant="secondary" onPress={() => confirmDiscard(() => router.back())} disabled={recorderState.isRecording} />
+      <Button label="Cancel" variant="secondary" onPress={() => confirmDiscard(() => router.back())} disabled={recorderState.isRecording || stopping} />
     </Screen>
   );
 }
@@ -263,4 +319,5 @@ const styles = StyleSheet.create({
   stopButton: { backgroundColor: colors.ink, borderColor: '#CAD0CC' },
   recordIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFFFFF' },
   stopIcon: { width: 42, height: 42, borderRadius: 5, backgroundColor: '#FFFFFF' },
+  buttonDisabled: { opacity: 0.5 },
 });

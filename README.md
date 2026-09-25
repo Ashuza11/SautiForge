@@ -23,7 +23,7 @@ The first vertical slice includes:
 - Settings and safety status for microphone permission, free space, versions, offline behavior, backup limits, and the latest storage check.
 - Consent-filtered research ZIP exports with JSON/JSONL/CSV metadata, original audio, SHA-256 manifest, and post-compression verification.
 - A visibly separate sensitive administrative backup and hash/schema/database/audio-verified restore with rollback on failure.
-- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 48 automated tests including real in-memory SQLite migration/relationship checks.
+- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 52 automated tests including real in-memory SQLite migration/relationship checks.
 - Android APK build profile in `eas.json`.
 - A verified GitHub Actions release build that produces a standalone pilot APK and SHA-256 sidecar.
 
