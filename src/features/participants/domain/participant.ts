@@ -26,3 +26,9 @@ export const participantDraftSchema = participantSchema.omit({
 
 export type Participant = z.infer<typeof participantSchema>;
 export type ParticipantDraft = z.infer<typeof participantDraftSchema>;
+
+export function speakerCodeFromId(id: string): string {
+  const compact = id.replaceAll('-', '').slice(0, 12).toUpperCase();
+  if (!/^[A-F0-9]{12}$/.test(compact)) throw new Error('A valid random ID is required to generate a speaker code.');
+  return `SPK-${compact}`;
+}

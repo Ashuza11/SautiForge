@@ -12,6 +12,7 @@
     },
     "android": {
       "package": "org.sautiforge.mobile",
+      "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "RECORD_AUDIO"
       ],

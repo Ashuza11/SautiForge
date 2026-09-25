@@ -18,21 +18,24 @@ export default function ProjectDetailScreen() {
   const [project, setProject] = useState<Project | null>(null);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [currentConsent, setCurrentConsent] = useState<Record<string, ConsentRecord | null>>({});
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!projectId) return;
     try {
-      const [projectResult, scenarioResults, participantResults] = await Promise.all([
+      const [projectResult, scenarioResults, participantResults, activeProject] = await Promise.all([
         repositories.projects.get(projectId),
         repositories.scenarios.listByProject(projectId, true),
         repositories.participants.listByProject(projectId, true),
+        repositories.projects.getActive(),
       ]);
       const consentPairs = await Promise.all(participantResults.map(async (participant) => [participant.id, await repositories.consent.getCurrent(participant.id)] as const));
       setProject(projectResult);
       setScenarios(scenarioResults);
       setParticipants(participantResults);
+      setActiveProjectId(activeProject?.id ?? null);
       setCurrentConsent(Object.fromEntries(consentPairs));
       setError(projectResult ? null : 'Project not found.');
     } catch (cause) {
@@ -57,6 +60,17 @@ export default function ProjectDetailScreen() {
     ]);
   };
 
+  const selectForCollection = async () => {
+    if (!project) return;
+    try {
+      await repositories.projects.setActive(project.id);
+      setActiveProjectId(project.id);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The active collection project could not be changed.');
+    }
+  };
+
   const archiveScenario = (scenario: Scenario) => {
     Alert.alert('Archive scenario?', 'The scenario will be hidden from new collection. Historical recordings will retain their snapshot.', [
       { text: 'Cancel', style: 'cancel' },
@@ -79,12 +93,14 @@ export default function ProjectDetailScreen() {
       {error ? <ErrorNotice message={error} /> : null}
       <Card>
         {project.status === 'archived' ? <Text style={styles.archivedBadge}>ARCHIVED</Text> : null}
+        {activeProjectId === project.id ? <Text style={uiStyles.badge}>CURRENT COLLECTION PROJECT</Text> : null}
         <Text style={uiStyles.body}>{project.description || 'No description'}</Text>
         <View style={uiStyles.divider} />
         <Text style={uiStyles.muted}>Domain: {project.researchDomain}</Text>
         <Text style={uiStyles.muted}>Location: {project.collectionLocation}</Text>
         <Text style={uiStyles.muted}>Protocol: {project.protocolVersion}</Text>
-        {project.status === 'active' ? <Button label={strings.selectProject} variant="secondary" onPress={() => void repositories.projects.setActive(project.id)} /> : null}
+        <Text style={uiStyles.muted}>The current collection project controls the dashboard and where new participants, sessions, and recordings are created. It does not change existing records.</Text>
+        {project.status === 'active' && activeProjectId !== project.id ? <Button label={strings.selectProject} variant="secondary" onPress={() => void selectForCollection()} /> : null}
         <Button label="Edit project" variant="secondary" onPress={() => router.push(`/projects/${project.id}/edit`)} />
       </Card>
 

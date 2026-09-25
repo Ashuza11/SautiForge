@@ -4,7 +4,7 @@ export const strings = {
   projects: 'Research projects',
   newProject: 'New project',
   activeProject: 'Active project',
-  selectProject: 'Make active',
+  selectProject: 'Use for data collection',
   edit: 'Edit',
   archive: 'Archive',
   save: 'Save',

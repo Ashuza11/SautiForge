@@ -14,7 +14,7 @@ The first vertical slice includes:
 - First-run Kingwana pilot project and five editable scenario records.
 - Working offline project creation, editing, selection, and soft archival.
 - Working scenario creation, editing, versioning, structured reference data, and soft archival.
-- Pseudonymous participant registration/editing with data-minimized optional demographics.
+- Pseudonymous participant registration/editing with automatically generated speaker IDs, selection lists for common demographic values, and free-text fallbacks for locally relevant answers.
 - Append-only consent revisions, per-use approvals, visible history, and reusable recording/export authorization checks.
 - Consent-linked, resumable collection sessions with device/environment metadata.
 - Real foreground microphone recording, visible timer/indicator, immediate playback, rerecord/discard confirmation, and verified accepted-file persistence in document storage.
@@ -23,7 +23,7 @@ The first vertical slice includes:
 - Settings and safety status for microphone permission, free space, versions, offline behavior, backup limits, and the latest storage check.
 - Consent-filtered research ZIP exports with JSON/JSONL/CSV metadata, original audio, SHA-256 manifest, and post-compression verification.
 - A visibly separate sensitive administrative backup and hash/schema/database/audio-verified restore with rollback on failure.
-- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 56 automated tests including real in-memory SQLite migration/relationship checks.
+- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 62 automated tests including real in-memory SQLite migration/relationship checks, participant selector behavior, and accepted-audio readability guards.
 - Android APK build profile in `eas.json`.
 - A verified GitHub Actions release build that produces a standalone pilot APK and SHA-256 sidecar.
 

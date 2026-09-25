@@ -3,12 +3,14 @@
 Record device model, Android version, APK identifier/SHA-256, workflow run or build source, tester, date, and results. Do not mark the milestone field-ready from CI, emulator, or source-only testing.
 
 - Install the release APK and launch it with airplane mode enabled and no development server.
-- Confirm seeded project/scenarios, then create/edit/archive generic project and scenario records.
-- Register a fictional participant; prove microphone remains disabled before valid internal-research consent.
+- Confirm seeded project/scenarios, create/edit/archive generic project and scenario records, and verify **Use for data collection** changes the dashboard/current collection context without altering existing records.
+- Register a fictional participant; confirm its pseudonymous speaker ID is generated automatically and common language, age, gender, and business values can be selected or entered through **Other**.
+- On participant, consent, and scenario forms, focus every bottom field and verify Android resizes/scrolls the form so the keyboard never covers the active input or save button.
+- Prove microphone remains disabled before valid internal-research consent.
 - Start, pause, close, reopen, and resume a session without re-entering its participant.
 - Deny microphone permission, recover through Android settings, and record a real take.
 - Interrupt a take with screen lock/app switch/phone call; confirm no false success and safe retry/cleanup.
-- Record, stop, play, rerecord/discard, accept, save metadata, restart, reboot, and play again.
+- Record, stop, play, rerecord/discard, accept, and confirm no Android `ArrayBuffer`/Blob error occurs; save metadata, restart, reboot, and play again.
 - Fill storage near the safety threshold and confirm recording/export stop with an explicit error.
 - Edit verbatim and normalized text twice; confirm both revisions and human provenance remain visible.
 - Add business labels with unknown/ambiguous/unavailable values; update status and search/filter the library.

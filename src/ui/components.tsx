@@ -1,6 +1,9 @@
-import type { PropsWithChildren, ReactNode } from 'react';
+import { useState, type PropsWithChildren, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,11 +18,23 @@ import { colors, spacing } from './theme';
 
 export function Screen({ children, scroll = true }: PropsWithChildren<{ scroll?: boolean }>) {
   const content = scroll ? (
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.screenContent}>{children}</ScrollView>
+    <ScrollView
+      automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={styles.screenContent}>
+      {children}
+    </ScrollView>
   ) : (
     <View style={styles.screenContent}>{children}</View>
   );
-  return <SafeAreaView style={styles.safeArea} edges={['bottom']}>{content}</SafeAreaView>;
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+      <KeyboardAvoidingView style={styles.keyboardArea} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        {content}
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
 }
 
 export function Heading({ children, subtitle }: PropsWithChildren<{ subtitle?: string }>) {
@@ -78,6 +93,56 @@ export function Field({ label, error, multiline, ...props }: TextInputProps & { 
   );
 }
 
+export type SelectOption = { label: string; value: string };
+
+export function SelectField({ label, value, options, onValueChange, placeholder = 'Select an option', error }: {
+  label: string;
+  value: string;
+  options: SelectOption[];
+  onValueChange: (value: string) => void;
+  placeholder?: string;
+  error?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((option) => option.value === value);
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${label}: ${selected?.label ?? placeholder}`}
+        onPress={() => setOpen(true)}
+        style={({ pressed }) => [styles.select, pressed && styles.buttonPressed, error && styles.inputError]}>
+        <Text style={selected ? styles.selectText : styles.selectPlaceholder}>{selected?.label ?? placeholder}</Text>
+        <Text style={styles.selectArrow}>⌄</Text>
+      </Pressable>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <View style={styles.modalRoot}>
+          <Pressable accessibilityLabel="Close options" style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
+          <View style={styles.optionSheet}>
+            <Text style={styles.optionTitle}>{label}</Text>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {options.map((option) => (
+                <Pressable
+                  key={option.value}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: option.value === value }}
+                  onPress={() => { onValueChange(option.value); setOpen(false); }}
+                  style={[styles.option, option.value === value && styles.optionSelected]}>
+                  <Text style={[styles.optionText, option.value === value && styles.optionTextSelected]}>{option.label}</Text>
+                  {option.value === value ? <Text style={styles.optionCheck}>✓</Text> : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Button label="Cancel" variant="secondary" onPress={() => setOpen(false)} />
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
 export function EmptyState({ children }: PropsWithChildren) {
   return <Text style={styles.empty}>{children}</Text>;
 }
@@ -104,7 +169,8 @@ export const uiStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
-  screenContent: { flexGrow: 1, padding: spacing.md, gap: spacing.md },
+  keyboardArea: { flex: 1 },
+  screenContent: { flexGrow: 1, padding: spacing.md, paddingBottom: 120, gap: spacing.md },
   headingBlock: { gap: spacing.xs, marginBottom: spacing.xs },
   heading: { color: colors.ink, fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
   subtitle: { color: colors.muted, fontSize: 15, lineHeight: 22 },
@@ -121,6 +187,18 @@ const styles = StyleSheet.create({
   input: { minHeight: 50, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, color: colors.ink, backgroundColor: colors.surface, fontSize: 16 },
   multiline: { minHeight: 100, textAlignVertical: 'top' },
   inputError: { borderColor: colors.danger },
+  select: { minHeight: 50, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 14, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  selectText: { flex: 1, color: colors.ink, fontSize: 16 },
+  selectPlaceholder: { flex: 1, color: '#8B938E', fontSize: 16 },
+  selectArrow: { color: colors.primary, fontSize: 24, fontWeight: '700' },
+  modalRoot: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(20, 28, 24, 0.45)' },
+  optionSheet: { maxHeight: '75%', padding: spacing.md, paddingBottom: spacing.xl, gap: spacing.sm, backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  optionTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', marginBottom: spacing.xs },
+  option: { minHeight: 50, paddingHorizontal: spacing.sm, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border },
+  optionSelected: { backgroundColor: colors.primarySoft, borderRadius: 10, borderBottomWidth: 0 },
+  optionText: { flex: 1, color: colors.ink, fontSize: 16 },
+  optionTextSelected: { color: colors.primary, fontWeight: '700' },
+  optionCheck: { color: colors.primary, fontSize: 18, fontWeight: '900' },
   error: { color: colors.danger, fontSize: 13 },
   empty: { color: colors.muted, textAlign: 'center', paddingVertical: spacing.xl, fontSize: 15 },
   errorNotice: { borderWidth: 1, borderColor: '#E5BABA', backgroundColor: '#FFF0F0', borderRadius: 12, padding: spacing.md, gap: spacing.sm },

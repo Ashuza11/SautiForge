@@ -1,4 +1,6 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { Directory, File, FileMode, Paths } from 'expo-file-system';
+
+import { requireReadableByteCount } from '../domain/file-readability';
 
 const RECORDINGS_DIRECTORY = 'recordings';
 
@@ -14,9 +16,16 @@ export function hasRecordingSpace(minimumBytes = 50 * 1024 * 1024): boolean {
 
 async function verifyReadable(file: File): Promise<number> {
   if (!file.exists || !file.size || file.size <= 0) throw new Error('Audio file is missing or empty.');
-  await file.slice(0, 1).arrayBuffer();
+  const handle = file.open(FileMode.ReadOnly);
+  try {
+    requireReadableByteCount(handle.readBytes(1).byteLength);
+  } finally {
+    handle.close();
+  }
   return file.size;
 }
+
+export const verifyReadableAudioFile = verifyReadable;
 
 export async function copyAcceptedTake(sourceUri: string, projectId: string, recordingId: string, extension: string): Promise<PersistedAudioFile> {
   const safeExtension = /^\.[a-z0-9]+$/i.test(extension) ? extension.toLowerCase() : '.m4a';

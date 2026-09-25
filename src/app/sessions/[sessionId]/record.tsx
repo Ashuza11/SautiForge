@@ -16,7 +16,7 @@ import { File } from 'expo-file-system';
 import { useRepositories } from '@/core/database/repositories';
 import { nullableText, nowIso } from '@/domain/common';
 import type { Participant } from '@/features/participants/domain/participant';
-import { discardFile, hasRecordingSpace } from '@/features/recordings/data/audio-file-store';
+import { discardFile, hasRecordingSpace, verifyReadableAudioFile } from '@/features/recordings/data/audio-file-store';
 import { appStateInterruptsRecording, stopAndDiscardInterruptedTake } from '@/features/recordings/domain/interruption';
 import { recordingMetadataDraftSchema, type AcceptedTake } from '@/features/recordings/domain/recording';
 import type { Scenario } from '@/features/scenarios/domain/scenario';
@@ -158,9 +158,7 @@ export default function RecordScreen() {
         return;
       }
       if (!uri) throw new Error('The recorder did not return an audio file.');
-      const file = new File(uri);
-      if (!file.exists || !file.size || file.size <= 0) throw new Error('The stopped audio file is missing or empty.');
-      await file.slice(0, 1).arrayBuffer();
+      await verifyReadableAudioFile(new File(uri));
       if (interruptedRef.current) {
         discardFile(uri);
         setTake(null);
