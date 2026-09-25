@@ -40,7 +40,7 @@ sautiforge-private-backup-<date>-<export-id-prefix>.zip
 
 This archive contains the complete SQLite database, consent history, administrative notes, and all referenced audio. It is deliberately separate from research export and visibly marked sensitive. Version 0.1 does not encrypt the ZIP; it must be stored only on an access-controlled, encrypted device or volume.
 
-Restore accepts administrative backups only. Before replacement it validates ZIP paths, the manifest schema, every size/hash, database version, SQLite integrity, foreign keys, and every database-to-audio reference. Existing files affected by restore and the current database are retained temporarily for rollback. If replacement fails, SautiForge restores the prior files and database. Restart the app after a successful restore so every screen reloads current state.
+Restore accepts administrative backups only. Before extraction it verifies sufficient working space using the declared expanded size and rejects unsafe, duplicate, encrypted, malformed, or excessive entry lists. Before replacement it requires the ZIP file set to match the manifest exactly, then validates every size/hash, database version, SQLite integrity, foreign key, and database-to-audio reference. Existing files affected by restore and the current database are retained temporarily for rollback. If replacement fails, SautiForge restores the prior files and database. Restart the app after a successful restore so every screen reloads current state.
 
 ## Compatibility
 

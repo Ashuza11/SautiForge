@@ -9,7 +9,7 @@ npx expo-doctor
 npx expo export --platform android
 ```
 
-Current automated suite: 17 files, 52 tests.
+Current automated suite: 18 files, 56 tests.
 
 The `Android pilot APK` GitHub Actions workflow repeats type-checking/tests, runs Expo prebuild, builds `:app:assembleRelease` with Java 17, and publishes the APK plus SHA-256. A green workflow proves compilation and artifact creation, but not installation, microphone behavior, or offline device persistence.
 
@@ -28,7 +28,7 @@ Release assembly first passed in [run 35874820535](https://github.com/Ashuza11/S
 | Dashboard | Aggregate mapping and empty-state zeroes | Counts against device SQLite data |
 | Library | Bound query construction for project, participant, scenario, language, date range, quality, status, and soft-archive exclusion | Full filter and soft-archive UI workflow |
 | Exports | Strict record-level privacy contracts, embedded JSON, safe audio paths, manifest schema/references, plus portable post-transfer size/hash/count/reference validation | Native ZIP creation/extraction, Android folder/share, and validation of a real transferred archive |
-| Restore | Migration chain execution, foreign keys, uniqueness, manifest references | Native ZIP picker, rollback injection, clean-device restore comparison |
+| Restore | Migration chain execution, foreign keys, uniqueness, exact member set, unsafe/encrypted/duplicate entry rejection, and conservative storage preflight | Native ZIP picker, rollback injection, low-storage simulation, clean-device restore comparison |
 | Settings | Strict local settings and storage-recovery report schemas | Permission/settings presentation and active project persistence |
 | File recovery | Verified/missing/empty/orphan classification | Startup quarantine with real interrupted files and process death |
 

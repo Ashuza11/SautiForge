@@ -13,6 +13,7 @@ import type { SharingCategory } from '@/features/consent/domain/consent';
 import { getRecordingFile } from '@/features/recordings/data/audio-file-store';
 import { EXPORT_SCHEMA_VERSION, exportManifestSchema, validateManifestReferences, validateRelativeArchivePath, type ExportManifest } from '../domain/manifest';
 import { researchExportRecordsSchema } from '../domain/research-records';
+import { requireArchiveCopySpace, validateBackupMemberSet, validateRestoreArchive } from '../domain/restore-preflight';
 
 type ExportResult = { archive: File; exportId: string; includedRecordings: number; excludedRecordings: number };
 
@@ -292,13 +293,20 @@ export class ExportService {
     const picked = await File.pickFileAsync({ mimeTypes: ['application/zip', 'application/x-zip-compressed'] });
     if (picked.canceled) throw new Error('Backup selection was cancelled.');
     const selected = picked.result;
+    requireArchiveCopySpace(selected.size, Paths.availableDiskSpace);
     const localZip = new File(Paths.cache, `restore-${newId()}.zip`);
-    await selected.copy(localZip, { overwrite: true });
-    const entries = await listContents(nativePath(localZip.uri));
-    if (entries.some((entry) => !validateRelativeArchivePath(entry.path.replace(/\/$/, '')))) throw new Error('Backup contains an unsafe path.');
     const staging = new Directory(Paths.cache, `restore-${newId()}`);
-    staging.create({ intermediates: true });
     try {
+      await selected.copy(localZip, { overwrite: true });
+      if (!localZip.exists || !localZip.size || (selected.size !== null && localZip.size !== selected.size)) {
+        throw new Error('The selected backup could not be copied and verified.');
+      }
+      const entries = await listContents(nativePath(localZip.uri));
+      const currentRecordingBytes = (await this.db.getFirstAsync<{ total: number }>(
+        'SELECT COALESCE(SUM(file_size_bytes), 0) AS total FROM recordings',
+      ))?.total ?? 0;
+      validateRestoreArchive(entries, Paths.availableDiskSpace, currentRecordingBytes);
+      staging.create({ intermediates: true });
       await unzip(nativePath(localZip.uri), nativePath(staging.uri));
       const manifestFile = new File(staging, 'manifest.json');
       if (!manifestFile.exists) throw new Error('Backup manifest is missing.');
@@ -306,6 +314,10 @@ export class ExportService {
       if (manifest.exportType !== 'administrative_backup' || !manifest.sensitiveAdministrativeData) throw new Error('This is not an administrative backup.');
       if (manifest.databaseVersion !== DATABASE_VERSION) throw new Error(`Backup database version ${manifest.databaseVersion} is not supported by this app version.`);
       validateManifestReferences(manifest, []);
+      validateBackupMemberSet(
+        manifest.files.map((file) => file.path),
+        entries.filter((entry) => !entry.isDirectory).map((entry) => entry.path),
+      );
       for (const expected of manifest.files) {
         const actual = await describeFile(staging, expected.path);
         if (actual.sizeBytes !== expected.sizeBytes || actual.sha256 !== expected.sha256) throw new Error(`Backup integrity check failed for ${expected.path}.`);
