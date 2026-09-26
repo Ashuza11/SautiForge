@@ -44,10 +44,11 @@ export default function SessionDetailScreen() {
   }, [repositories, sessionId]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
-  const updateState = async (action: 'resume' | 'pause' | 'complete') => {
+  const updateState = async (action: 'resume' | 'reopen' | 'pause' | 'complete') => {
     if (!session) return;
     try {
       if (action === 'resume') await repositories.sessions.resume(session.id);
+      if (action === 'reopen') await repositories.sessions.reopen(session.id);
       if (action === 'pause') await repositories.sessions.pause(session.id);
       if (action === 'complete') await repositories.sessions.complete(session.id);
       await load();
@@ -60,6 +61,15 @@ export default function SessionDetailScreen() {
     { text: 'Cancel', style: 'cancel' },
     { text: 'Complete', onPress: () => void updateState('complete') },
   ]);
+
+  const confirmReopen = () => Alert.alert(
+    'Reopen completed session?',
+    'The completion time will be cleared and new takes can be added. Existing recordings will remain attached.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Reopen session', onPress: () => void updateState('reopen') },
+    ],
+  );
 
   if (!session) return <Screen>{error ? <ErrorNotice message={error} /> : <EmptyState>Loading session…</EmptyState>}</Screen>;
   const canCollect = session.status === 'in_progress' && consentValid && participant?.status === 'active';
@@ -82,7 +92,16 @@ export default function SessionDetailScreen() {
         {session.status === 'paused' && consentValid ? <Button label="Resume session" onPress={() => void updateState('resume')} /> : null}
         {session.status === 'in_progress' ? <Button label="Pause and finish later" variant="secondary" onPress={() => void updateState('pause')} /> : null}
         {session.status === 'in_progress' || session.status === 'paused' ? <Button label="Complete session" variant="secondary" onPress={confirmComplete} /> : null}
+        {session.status === 'completed' && consentValid ? <Button label="Reopen completed session" variant="secondary" onPress={confirmReopen} /> : null}
       </Card>
+
+      {recordings.length > 0 ? (
+        <Card>
+          <Text style={uiStyles.title}>Transcription and annotation</Text>
+          <Text style={uiStyles.body}>You can annotate now or after finishing every scenario. Open a recording in the library to replay it, enter verbatim and normalized text, add language tags and business labels, and save revision history.</Text>
+          <Button label="Review, transcribe and annotate recordings" variant="secondary" onPress={() => router.push('/library')} />
+        </Card>
+      ) : null}
 
       <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Choose a scenario</Text></View>
       {!consentValid ? <ErrorNotice message="Recording is disabled. Review the participant's current consent before continuing." /> : null}

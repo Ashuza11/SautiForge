@@ -5,7 +5,7 @@
 - Expo SDK 57 TypeScript/Router application and APK build profile.
 - GitHub Actions pilot APK workflow with verification, release assembly, SHA-256, and short-lived downloadable artifacts; first successful release assembly recorded in `BUILD_VERIFICATION.md`.
 - SQLite schema version 3, migration chain, constraints, seed project, and five editable Kingwana scenarios.
-- Offline projects, scenarios, pseudonymous participants, immutable consent revisions, and resumable sessions.
+- Offline projects, scenarios, pseudonymous participants, immutable consent revisions, resumable sessions, and consent-checked reopening after accidental completion.
 - Real foreground audio capture, immediate playback, accept/rerecord/discard, document-storage persistence, and verified database save.
 - Dashboard, searchable recording library, detail playback, workflow status, soft archive, human transcription revisions, and versioned business annotations.
 - Complete library filters for project, participant, scenario, language, date range, quality, and annotation status.
@@ -13,7 +13,7 @@
 - Consent-filtered research ZIP, portable JSON/JSONL/CSV metadata, SHA-256 manifest, post-compression extraction verification, Android folder/share flows, and export history.
 - Separate sensitive administrative backup and verified rollback-capable restore.
 - Portable computer-side export validator for post-transfer size, SHA-256, path, count, and audio-reference checks.
-- Automated tests across every feature module and the portable validator, including executed SQLite migrations/relationships, participant selector behavior, full library query construction, recording interruption/save recovery, accepted-file readability, strict privacy-minimized export contracts, restore preflight, and manifest references (20 files, 62 tests).
+- Automated tests across every feature module and the portable validator, including executed SQLite migrations/relationships, participant and recording-metadata selectors, session state recovery, repeat playback, full library query construction, recording interruption/save recovery, accepted-file readability, strict privacy-minimized export contracts, restore preflight, and manifest references (24 files, 70 tests).
 
 ## Required before field-ready status
 

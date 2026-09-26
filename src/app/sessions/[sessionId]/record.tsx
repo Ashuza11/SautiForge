@@ -18,10 +18,12 @@ import { nullableText, nowIso } from '@/domain/common';
 import type { Participant } from '@/features/participants/domain/participant';
 import { discardFile, hasRecordingSpace, verifyReadableAudioFile } from '@/features/recordings/data/audio-file-store';
 import { appStateInterruptsRecording, stopAndDiscardInterruptedTake } from '@/features/recordings/domain/interruption';
+import { shouldRestartFinishedPlayback } from '@/features/recordings/domain/playback';
 import { recordingMetadataDraftSchema, type AcceptedTake } from '@/features/recordings/domain/recording';
+import { codeSwitchingOptions } from '@/features/recordings/domain/recording-metadata-options';
 import type { Scenario } from '@/features/scenarios/domain/scenario';
 import type { CollectionSession } from '@/features/sessions/domain/session';
-import { Button, Card, EmptyState, ErrorNotice, Field, Heading, Screen, uiStyles } from '@/ui/components';
+import { Button, Card, EmptyState, ErrorNotice, Field, Heading, Screen, SelectField, uiStyles } from '@/ui/components';
 import { colors, spacing } from '@/ui/theme';
 
 // Unaccepted takes remain temporary; accepted takes are copied and verified in document storage.
@@ -282,7 +284,7 @@ export default function RecordScreen() {
           <Heading subtitle="Confirm inherited values or correct them for this take.">Recording metadata</Heading>
           <Field label="Spoken languages, comma separated" value={languages} onChangeText={setLanguages} />
           <Field label="Language variety (optional)" value={variety} onChangeText={setVariety} />
-          <Field label="Code switching" value={codeSwitching} onChangeText={setCodeSwitching} placeholder="none, present, ambiguous, unknown" />
+          <SelectField label="Code switching" value={codeSwitching} options={[...codeSwitchingOptions]} onValueChange={setCodeSwitching} />
           <Field label="Recording environment" value={environment} onChangeText={setEnvironment} />
           <Field label="Noise level" value={noiseLevel} onChangeText={setNoiseLevel} placeholder="low, medium, high, unknown" />
           <Field label="Quality rating 1–5 (optional)" value={quality} onChangeText={setQuality} keyboardType="number-pad" />
@@ -298,7 +300,11 @@ export default function RecordScreen() {
 function TakePlayer({ uri }: { uri: string }) {
   const player = useAudioPlayer(uri);
   const status = useAudioPlayerStatus(player);
-  return <Button label={status.playing ? 'Pause playback' : 'Play take'} variant="secondary" onPress={() => status.playing ? player.pause() : player.play()} />;
+  const play = () => {
+    if (shouldRestartFinishedPlayback(status.didJustFinish)) player.seekTo(0);
+    player.play();
+  };
+  return <Button label={status.playing ? 'Pause playback' : 'Play take'} variant="secondary" onPress={() => status.playing ? player.pause() : play()} />;
 }
 
 function formatDuration(milliseconds: number): string {

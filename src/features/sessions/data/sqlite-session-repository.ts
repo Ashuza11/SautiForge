@@ -3,6 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { newId, nowIso } from '@/domain/common';
 import type { ConsentRepository } from '@/features/consent/data/consent-repository';
 import { sessionDraftSchema, sessionSchema, type CollectionSession, type SessionDraft } from '../domain/session';
+import { requireCompletedSessionForReopen } from '../domain/session-transition';
 import type { SessionRepository } from './session-repository';
 
 type SessionRow = {
@@ -118,6 +119,26 @@ export class SQLiteSessionRepository implements SessionRepository {
     await this.db.runAsync(`UPDATE sessions SET status = 'in_progress', ended_at = NULL, updated_at = ? WHERE id = ?`, nowIso(), id);
     const updated = await this.get(id);
     if (!updated) throw new Error('Session was not readable after resuming.');
+    return updated;
+  }
+
+  async reopen(id: string): Promise<CollectionSession> {
+    const session = await this.get(id);
+    if (!session) throw new Error('Session not found.');
+    requireCompletedSessionForReopen(session.status);
+    if (!(await this.consent.participantCanRecord(session.participantId))) {
+      throw new Error('Current recording consent is not valid. Review consent before reopening.');
+    }
+    const result = await this.db.runAsync(
+      `UPDATE sessions SET status = 'in_progress', ended_at = NULL, updated_at = ? WHERE id = ? AND status = 'completed'`,
+      nowIso(),
+      id,
+    );
+    if (result.changes !== 1) throw new Error('The completed session could not be reopened.');
+    const updated = await this.get(id);
+    if (!updated || updated.status !== 'in_progress' || updated.endedAt !== null) {
+      throw new Error('The reopened session was not readable after saving.');
+    }
     return updated;
   }
 

@@ -5,6 +5,7 @@ export interface SessionRepository {
   get(id: string): Promise<CollectionSession | null>;
   create(projectId: string, participantId: string, draft: SessionDraft): Promise<CollectionSession>;
   resume(id: string): Promise<CollectionSession>;
+  reopen(id: string): Promise<CollectionSession>;
   pause(id: string): Promise<CollectionSession>;
   complete(id: string): Promise<CollectionSession>;
 }

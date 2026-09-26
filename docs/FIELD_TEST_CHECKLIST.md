@@ -7,12 +7,13 @@ Record device model, Android version, APK identifier/SHA-256, workflow run or bu
 - Register a fictional participant; confirm its pseudonymous speaker ID is generated automatically and common language, age, gender, and business values can be selected or entered through **Other**.
 - On participant, consent, and scenario forms, focus every bottom field and verify Android resizes/scrolls the form so the keyboard never covers the active input or save button.
 - Prove microphone remains disabled before valid internal-research consent.
-- Start, pause, close, reopen, and resume a session without re-entering its participant.
+- Start, pause, close, reopen, and resume a session without re-entering its participant; accidentally complete it and verify **Reopen completed session** restores collection only with valid consent.
 - Deny microphone permission, recover through Android settings, and record a real take.
 - Interrupt a take with screen lock/app switch/phone call; confirm no false success and safe retry/cleanup.
-- Record, stop, play, rerecord/discard, accept, and confirm no Android `ArrayBuffer`/Blob error occurs; save metadata, restart, reboot, and play again.
+- Record, stop, play the temporary take to the end at least three times, rerecord/discard, accept, and confirm no Android `ArrayBuffer`/Blob error occurs.
+- Select each predefined code-switching value (`none`, `present`, `ambiguous`, `unknown`); save metadata, restart, reboot, and play again.
 - Fill storage near the safety threshold and confirm recording/export stop with an explicit error.
-- Edit verbatim and normalized text twice; confirm both revisions and human provenance remain visible.
+- Finish all scenarios, open the recording library from the session, then edit verbatim and normalized text twice; confirm both revisions and human provenance remain visible.
 - Add business labels with unknown/ambiguous/unavailable values; update status and search/filter the library.
 - Withdraw or narrow consent; confirm later recording is blocked and ineligible sharing categories exclude prior audio.
 - Export each sharing category, save via Android folder picker, and transfer the ZIP to a computer.
