@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-export const EXPORT_SCHEMA_VERSION = '1.0.0';
+export const EXPORT_SCHEMA_VERSION = '1.1.0';
+export const supportedExportSchemaVersions = ['1.0.0', EXPORT_SCHEMA_VERSION] as const;
 
 export const manifestFileSchema = z.object({
   path: z.string().min(1),
@@ -9,7 +10,7 @@ export const manifestFileSchema = z.object({
 });
 
 export const exportManifestSchema = z.object({
-  schemaVersion: z.literal(EXPORT_SCHEMA_VERSION),
+  schemaVersion: z.enum(supportedExportSchemaVersions),
   exportId: z.string().uuid(),
   exportType: z.enum(['research_dataset', 'administrative_backup']),
   exportedAt: z.string().datetime({ offset: true }),

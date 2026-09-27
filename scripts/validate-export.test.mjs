@@ -24,7 +24,7 @@ async function sampleExport() {
     await writeFile(path.join(root, relative), content);
     members.push({ path: relative, sizeBytes: Buffer.byteLength(content), sha256: createHash('sha256').update(content).digest('hex') });
   }
-  const manifest = { schemaVersion: '1.0.0', exportId: '0d050af7-474d-4ac7-b1e2-f9e05ecbdc79', exportType: 'research_dataset', counts: { recordings: 1 }, files: members };
+  const manifest = { schemaVersion: '1.1.0', exportId: '0d050af7-474d-4ac7-b1e2-f9e05ecbdc79', exportType: 'research_dataset', counts: { recordings: 1 }, files: members };
   await writeFile(path.join(root, 'manifest.json'), JSON.stringify(manifest));
   return { root, manifest, recordingId };
 }

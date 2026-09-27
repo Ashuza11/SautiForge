@@ -1,4 +1,4 @@
-# Local schema version 3
+# Local schema version 4
 
 The authoritative migration is `src/core/database/migrations.ts`. SQLite stores metadata; audio files are stored by verified relative path in the application document directory.
 
@@ -19,4 +19,4 @@ Deletion uses restrictive foreign keys for research records. Projects, scenarios
 
 Consent updates are new records linked through `supersedes_id`; previous decisions are not silently overwritten. Export authorization must use the latest applicable consent record at the time of export and record the selected sharing category.
 
-Database versioning starts at `1` and uses incremental migrations guarded by `PRAGMA user_version`. Version 2 adds an explicit consent-protocol version to every historical consent record. Version 3 links sessions and recordings to the exact consent revision that authorized collection.
+Database versioning starts at `1` and uses incremental migrations guarded by `PRAGMA user_version`. Version 2 adds an explicit consent-protocol version to every historical consent record. Version 3 links sessions and recordings to the exact consent revision that authorized collection. Version 4 records whether audio came from the device microphone or a manual import, its transport and prompt exposure, import timestamp, source MIME type, SHA-256 content hash, and pseudonymous external submission code. Imported audio hashes are indexed for duplicate detection; archived mistakes do not prevent a deliberate replacement import.

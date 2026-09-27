@@ -40,9 +40,11 @@ Feature code is grouped under `src/features/<feature>`. Shared database setup li
 7. Delete the temporary source only after both file and row verification pass. On failure, remove the incomplete destination and retain the source take for retry.
 8. Report success only after verification.
 
+External contributions use the same acceptance boundary. The researcher shares only a pseudonymous, sanitized task through Android's share sheet, then manually selects the returned audio through the document picker. SautiForge copies the provider file into cache, verifies it is readable and non-empty, hashes it for duplicate detection, decodes it for playback/duration, and only then allows the normal verified save. The original container is preserved; unavailable codec, sample-rate, and channel metadata remain null rather than being guessed. Capture source, transport, prompt exposure, import time, source MIME type, hash, and submission code are stored and exported.
+
 At database initialization, document-storage recordings are reconciled against SQLite. Referenced non-empty files are counted as verified; missing references are reported in Settings; zero-byte and unreferenced files are moved into app-private recovery storage rather than treated as successful recordings or silently deleted.
 
-Background recording, automatic uploads, remote authentication, and AI transcription are out of scope for 0.1.
+Background recording, automatic WhatsApp/chat access, automatic uploads, remote authentication, and AI transcription are out of scope for 0.1.
 
 ## Export boundary
 

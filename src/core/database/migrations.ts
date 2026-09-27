@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DATABASE_NAME = 'sautiforge.db';
-export const DATABASE_VERSION = 3;
+export const DATABASE_VERSION = 4;
 export const DATABASE_OPEN_PRAGMAS = 'PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;';
 export const DATABASE_CREATE_PRAGMAS = 'PRAGMA journal_mode = WAL;';
 
@@ -184,6 +184,21 @@ ALTER TABLE sessions ADD COLUMN consent_record_id TEXT REFERENCES consent_record
 ALTER TABLE recordings ADD COLUMN consent_record_id TEXT REFERENCES consent_records(id) ON UPDATE CASCADE ON DELETE RESTRICT;
 `;
 
+export const MIGRATION_4_SQL = `
+ALTER TABLE recordings ADD COLUMN capture_source TEXT NOT NULL DEFAULT 'device_microphone'
+  CHECK (capture_source IN ('device_microphone', 'imported_file'));
+ALTER TABLE recordings ADD COLUMN transport TEXT
+  CHECK (transport IS NULL OR transport IN ('whatsapp_manual', 'other_messaging', 'file_transfer', 'other'));
+ALTER TABLE recordings ADD COLUMN prompt_exposure TEXT NOT NULL DEFAULT 'instructions_only'
+  CHECK (prompt_exposure IN ('instructions_only', 'example_shown', 'scripted_reading'));
+ALTER TABLE recordings ADD COLUMN imported_at TEXT;
+ALTER TABLE recordings ADD COLUMN source_mime_type TEXT;
+ALTER TABLE recordings ADD COLUMN content_sha256 TEXT
+  CHECK (content_sha256 IS NULL OR (length(content_sha256) = 64 AND content_sha256 NOT GLOB '*[^0-9a-f]*'));
+ALTER TABLE recordings ADD COLUMN external_submission_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_recordings_content_sha256 ON recordings(content_sha256) WHERE content_sha256 IS NOT NULL;
+`;
+
 const KINGWANA_PROJECT_ID = '6a7d8df7-d495-4f69-9934-dc48ce5ee8d1';
 const SEEDED_AT = '2026-01-01T00:00:00.000Z';
 
@@ -269,6 +284,14 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
       await transaction.execAsync('PRAGMA user_version = 3');
     });
     currentVersion = 3;
+  }
+
+  if (currentVersion === 3) {
+    await db.withExclusiveTransactionAsync(async (transaction) => {
+      await transaction.execAsync(MIGRATION_4_SQL);
+      await transaction.execAsync('PRAGMA user_version = 4');
+    });
+    currentVersion = 4;
   }
 
   await db.execAsync(DATABASE_OPEN_PRAGMAS);

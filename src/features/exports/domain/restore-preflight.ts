@@ -2,6 +2,7 @@ import { validateRelativeArchivePath } from './manifest';
 
 export const RESTORE_SPACE_RESERVE_BYTES = 25 * 1024 * 1024;
 export const MAX_BACKUP_ENTRIES = 100_000;
+export const MIN_RESTORABLE_DATABASE_VERSION = 3;
 
 export type BackupArchiveEntry = {
   path: string;
@@ -10,6 +11,15 @@ export type BackupArchiveEntry = {
   isDirectory: boolean;
   isEncrypted: boolean;
 };
+
+export function assertRestorableDatabaseVersion(backupVersion: number, currentVersion: number): void {
+  if (!Number.isInteger(backupVersion) || backupVersion < MIN_RESTORABLE_DATABASE_VERSION) {
+    throw new Error(`Backup database version ${backupVersion} is too old for a reliable restore.`);
+  }
+  if (backupVersion > currentVersion) {
+    throw new Error(`Backup database version ${backupVersion} is newer than this app supports.`);
+  }
+}
 
 function safeBytes(value: number, label: string): number {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error(`Backup contains an invalid ${label}.`);

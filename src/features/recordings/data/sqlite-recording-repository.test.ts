@@ -36,6 +36,13 @@ const take = {
   codec: 'aac',
   sampleRateHz: 44100,
   channelCount: 2,
+  captureSource: 'device_microphone' as const,
+  transport: null,
+  promptExposure: 'instructions_only' as const,
+  importedAt: null,
+  sourceMimeType: 'audio/mp4',
+  contentSha256: null,
+  externalSubmissionId: null,
 };
 
 const metadata = {
@@ -85,6 +92,30 @@ describe('recording library query', () => {
 });
 
 describe('accepted recording persistence', () => {
+  it('rejects an active duplicate import before copying it into permanent storage', async () => {
+    const duplicateHash = 'a'.repeat(64);
+    const getFirstAsync = vi.fn()
+      .mockResolvedValueOnce(context)
+      .mockResolvedValueOnce({ display_id: 'SF-EXISTING' });
+    const db = { getFirstAsync, runAsync: vi.fn() };
+    const consent = {
+      participantCanRecord: vi.fn().mockResolvedValue(true),
+      getCurrent: vi.fn().mockResolvedValue({ id: 'e8047f61-d626-4b05-b163-48346bc6aecb' }),
+    };
+    const repository = new SQLiteRecordingRepository(db as never, consent as never);
+
+    await expect(repository.saveAcceptedTake(context.session_id, context.scenario_id, {
+      ...take,
+      captureSource: 'imported_file',
+      transport: 'whatsapp_manual',
+      importedAt: '2026-09-24T09:59:30.000+02:00',
+      contentSha256: duplicateHash,
+      externalSubmissionId: 'SUB-ABC123',
+    }, metadata)).rejects.toThrow('already saved as SF-EXISTING');
+
+    expect(copyAcceptedTake).not.toHaveBeenCalled();
+  });
+
   it('removes inserted metadata before deleting audio when post-save verification fails', async () => {
     const removeAudio = vi.fn();
     vi.mocked(copyAcceptedTake).mockResolvedValue({

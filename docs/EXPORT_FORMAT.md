@@ -1,4 +1,4 @@
-# Export and backup format 1.0.0
+# Export and backup format 1.1.0
 
 SautiForge creates ZIP archives offline. Each archive is staged, hashed, compressed, extracted into a second temporary directory, and checked byte-for-byte before the app reports success. Temporary archives remain in cache until Android saves or shares them; local source recordings are never deleted.
 
@@ -26,7 +26,7 @@ Before files are written, every project, scenario, participant, session, recordi
 
 `manifest.json` contains `schemaVersion`, stable export ID, ISO 8601 export time, export type, database version, project ID, sharing category, record counts, and every data/audio member’s relative path, byte size, and lowercase SHA-256 hash. The manifest itself is not self-hashed; its SHA-256 is stored in local `export_history`.
 
-Research exports evaluate the participant’s latest consent revision at export time. They include only eligible, non-archived recordings and the participants/sessions they reference. They exclude consent records, consent notes, participant research notes, session researcher notes, database files, and recordings withdrawn from the selected sharing category. Scenario prompt snapshots and original container/codec metadata remain attached to recordings. M4A/AAC is never described as WAV.
+Research exports evaluate the participant’s latest consent revision at export time. They include only eligible, non-archived recordings and the participants/sessions they reference. They exclude consent records, consent notes, participant research notes, session researcher notes, database files, and recordings withdrawn from the selected sharing category. Scenario prompt snapshots, original container/codec metadata, capture source, transport, prompt exposure, import time, source MIME type, content hash, and pseudonymous submission code remain attached to recordings. M4A/AAC is never described as WAV.
 
 ## Restricted administrative backup
 
@@ -44,10 +44,10 @@ Restore accepts administrative backups only. Before extraction it verifies suffi
 
 ## Compatibility
 
-- Export schema: `1.0.0`
-- SQLite schema: `3`
+- Export schema written by this release: `1.1.0` (the validator also accepts `1.0.0`)
+- SQLite schema: `4`
 - Audio conversion: not performed
-- Restore policy: exact supported SQLite version only
+- Restore policy: backup database versions `3` and `4` are accepted; version `3` is migrated during verified restore, older/incomplete and newer versions are rejected
 - ZIP creation requires an APK/development build; the native ZIP module is unavailable in Expo Go.
 
 ## Validate after transfer

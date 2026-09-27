@@ -18,12 +18,13 @@ The first vertical slice includes:
 - Append-only consent revisions, per-use approvals, visible history, and reusable recording/export authorization checks.
 - Consent-linked, resumable collection sessions with device/environment metadata, consent-checked recovery from accidental completion, and research-safe removal of incorrect sessions.
 - Real foreground microphone recording, visible timer/indicator, repeatable immediate playback, rerecord/discard confirmation, and verified accepted-file persistence in document storage.
+- Manual remote collection support: share a sanitized scenario task through the Android share sheet, import a returned audio file, preview it, and retain transport, prompt-exposure, pseudonymous submission, format, and SHA-256 provenance. SautiForge does not read WhatsApp chats or groups.
 - Dashboard counts, a recording library filterable by project/participant/scenario/language/date/quality/status, detail playback, soft archive, status changes, human transcription revision history, and versioned business annotations.
 - Startup storage reconciliation that reports missing audio and quarantines zero-byte or unreferenced recording files for recovery.
 - Settings and safety status for microphone permission, free space, versions, offline behavior, backup limits, and the latest storage check.
 - Consent-filtered research ZIP exports with JSON/JSONL/CSV metadata, original audio, SHA-256 manifest, and post-compression verification.
 - A visibly separate sensitive administrative backup and hash/schema/database/audio-verified restore with rollback on failure.
-- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 72 automated tests including real in-memory SQLite migration/relationship checks, session recovery/removal, metadata selectors, repeat playback, and accepted-audio readability guards.
+- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 83 automated tests including real in-memory SQLite migration/relationship checks, session recovery/removal, imported-audio hashing, provenance and duplicate prevention, metadata selectors, repeat playback, and accepted-audio readability guards.
 - Android APK build profile in `eas.json`.
 - A verified GitHub Actions release build that produces a standalone pilot APK and SHA-256 sidecar.
 

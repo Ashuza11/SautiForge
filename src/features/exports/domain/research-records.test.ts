@@ -19,6 +19,8 @@ const recording = {
   scenario_id: '17f523b2-2db8-4f59-82e9-e70b182656f1', scenario_version: '1.0', scenario_prompt_snapshot_json: '{}',
   collection_method: 'elicited_prompt', recorded_at: time, duration_ms: 1200, file_size_bytes: 42,
   container: 'm4a', codec: 'aac', sample_rate_hz: 44100, channel_count: 2, spoken_languages_json: '["Kingwana"]',
+  capture_source: 'device_microphone' as const, transport: null, prompt_exposure: 'instructions_only' as const,
+  imported_at: null, source_mime_type: 'audio/mp4', content_sha256: null, external_submission_id: null,
   language_variety: 'Bukavu', code_switching_status: 'none', recording_environment: 'Indoor shop', noise_level: 'low',
   quality_rating: 4, notes: null, annotation_status: 'needs_transcription' as const, created_at: time, updated_at: time,
   audio_path: `audio/${recordingId}.m4a`,

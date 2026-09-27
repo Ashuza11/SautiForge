@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 
-import { DATABASE_CREATE_PRAGMAS, DATABASE_OPEN_PRAGMAS, DATABASE_VERSION, MIGRATION_1_SQL, MIGRATION_2_SQL, MIGRATION_3_SQL } from './migrations';
+import { DATABASE_CREATE_PRAGMAS, DATABASE_OPEN_PRAGMAS, DATABASE_VERSION, MIGRATION_1_SQL, MIGRATION_2_SQL, MIGRATION_3_SQL, MIGRATION_4_SQL } from './migrations';
 
 const requiredTables = [
   'projects',
@@ -17,7 +17,7 @@ const requiredTables = [
 
 describe('database migration 1', () => {
   it('has an explicit schema version', () => {
-    expect(DATABASE_VERSION).toBe(3);
+    expect(DATABASE_VERSION).toBe(4);
   });
 
   it.each(requiredTables)('creates the %s table', (table) => {
@@ -38,6 +38,13 @@ describe('database migration 1', () => {
     expect(MIGRATION_3_SQL).toContain('ALTER TABLE recordings ADD COLUMN consent_record_id');
   });
 
+  it('adds external-audio provenance and duplicate-detection fields in migration 4', () => {
+    expect(MIGRATION_4_SQL).toContain('capture_source');
+    expect(MIGRATION_4_SQL).toContain('prompt_exposure');
+    expect(MIGRATION_4_SQL).toContain('content_sha256');
+    expect(MIGRATION_4_SQL).toContain('external_submission_id');
+  });
+
   it('executes the complete migration chain in SQLite', () => {
     const db = new DatabaseSync(':memory:');
     try {
@@ -45,6 +52,7 @@ describe('database migration 1', () => {
       db.exec(MIGRATION_1_SQL);
       db.exec(MIGRATION_2_SQL);
       db.exec(MIGRATION_3_SQL);
+      db.exec(MIGRATION_4_SQL);
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => String(row.name));
       expect(tables).toEqual(expect.arrayContaining(requiredTables));
       expect(db.prepare('PRAGMA foreign_keys').get()).toMatchObject({ foreign_keys: 1 });
@@ -58,6 +66,7 @@ describe('database migration 1', () => {
       db.exec(MIGRATION_1_SQL);
       db.exec(MIGRATION_2_SQL);
       db.exec(MIGRATION_3_SQL);
+      db.exec(MIGRATION_4_SQL);
       const timestamp = '2026-09-23T08:00:00.000Z';
       db.prepare(`INSERT INTO projects (id, title, description, target_language, language_variety, research_domain,
         collection_location, protocol_version, status, created_at, updated_at) VALUES (?, ?, '', ?, ?, ?, ?, ?, 'active', ?, ?)`)

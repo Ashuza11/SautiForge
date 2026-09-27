@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { requireArchiveCopySpace, RESTORE_SPACE_RESERVE_BYTES, validateBackupMemberSet, validateRestoreArchive } from './restore-preflight';
+import { assertRestorableDatabaseVersion, requireArchiveCopySpace, RESTORE_SPACE_RESERVE_BYTES, validateBackupMemberSet, validateRestoreArchive } from './restore-preflight';
 
 const entries = [
   { path: 'manifest.json', size: 500, compressedSize: 250, isDirectory: false, isEncrypted: false },
@@ -10,6 +10,13 @@ const entries = [
 ];
 
 describe('backup restore preflight', () => {
+  it('accepts migratable backups and rejects too-old or newer database versions', () => {
+    expect(() => assertRestorableDatabaseVersion(3, 4)).not.toThrow();
+    expect(() => assertRestorableDatabaseVersion(4, 4)).not.toThrow();
+    expect(() => assertRestorableDatabaseVersion(2, 4)).toThrow(/too old/);
+    expect(() => assertRestorableDatabaseVersion(5, 4)).toThrow(/newer/);
+  });
+
   it('calculates conservative extraction, destination, rollback, and reserve space', () => {
     const result = validateRestoreArchive(entries, 100_000_000, 5_000);
     expect(result).toEqual({

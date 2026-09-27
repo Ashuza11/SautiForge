@@ -12,6 +12,9 @@ Record device model, Android version, APK identifier/SHA-256, workflow run or bu
 - Deny microphone permission, recover through Android settings, and record a real take.
 - Interrupt a take with screen lock/app switch/phone call; confirm no false success and safe retry/cleanup.
 - Record, stop, play the temporary take to the end at least three times, rerecord/discard, accept, and confirm no Android `ArrayBuffer`/Blob error occurs.
+- Choose a scenario, enter only a fictional example, and share its sanitized prompt to WhatsApp; confirm it contains speaker/submission codes and no private participant data.
+- Return a voice note through WhatsApp, save/select it through Android, import it, play it repeatedly, correct its transport/prompt exposure, and save it. Confirm a second import of the same active audio is rejected as a duplicate.
+- Review the imported recording and exported JSONL; confirm the original container plus import provenance and SHA-256 are accurate. Verify the workflow after app restart because SautiForge does not read or track WhatsApp delivery.
 - Select each predefined code-switching value (`none`, `present`, `ambiguous`, `unknown`); save metadata, restart, reboot, and play again.
 - Fill storage near the safety threshold and confirm recording/export stop with an explicit error.
 - Finish all scenarios, open the recording library from the session, then edit verbatim and normalized text twice; confirm both revisions and human provenance remain visible.

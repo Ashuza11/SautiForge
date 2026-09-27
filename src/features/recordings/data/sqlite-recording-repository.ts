@@ -7,7 +7,7 @@ import type { CollectionSession } from '@/features/sessions/domain/session';
 import { copyAcceptedTake } from './audio-file-store';
 import { buildRecordingSearchWhere } from './recording-search';
 import type { RecordingRepository, RecordingSearch } from './recording-repository';
-import { recordingMetadataDraftSchema, recordingSchema, type AcceptedTake, type Recording, type RecordingMetadataDraft } from '../domain/recording';
+import { acceptedTakeSchema, recordingMetadataDraftSchema, recordingSchema, type AcceptedTake, type Recording, type RecordingMetadataDraft } from '../domain/recording';
 
 type ContextRow = {
   session_id: string;
@@ -32,12 +32,15 @@ type RecordingRow = {
   sample_rate_hz: number | null; channel_count: number | null; spoken_languages_json: string; language_variety: string | null;
   code_switching_status: string | null; recording_environment: string | null; noise_level: string | null; quality_rating: number | null;
   notes: string | null; annotation_status: Recording['annotationStatus']; archived_at: string | null; created_at: string; updated_at: string;
+  capture_source: Recording['captureSource']; transport: Recording['transport']; prompt_exposure: Recording['promptExposure'];
+  imported_at: string | null; source_mime_type: string | null; content_sha256: string | null; external_submission_id: string | null;
 };
 
 const columns = `id, display_id, project_id, session_id, participant_id, scenario_id, consent_record_id, scenario_version,
   scenario_prompt_snapshot_json, relative_audio_path, collection_method, recorded_at, duration_ms, file_size_bytes,
   container, codec, sample_rate_hz, channel_count, spoken_languages_json, language_variety, code_switching_status,
-  recording_environment, noise_level, quality_rating, notes, annotation_status, archived_at, created_at, updated_at`;
+  recording_environment, noise_level, quality_rating, notes, annotation_status, archived_at, created_at, updated_at,
+  capture_source, transport, prompt_exposure, imported_at, source_mime_type, content_sha256, external_submission_id`;
 
 function fromRow(row: RecordingRow): Recording {
   if (!row.consent_record_id) throw new Error('Recording has no linked consent revision.');
@@ -48,6 +51,9 @@ function fromRow(row: RecordingRow): Recording {
     relativeAudioPath: row.relative_audio_path, collectionMethod: row.collection_method, recordedAt: row.recorded_at,
     durationMs: row.duration_ms, fileSizeBytes: row.file_size_bytes, container: row.container, codec: row.codec,
     sampleRateHz: row.sample_rate_hz, channelCount: row.channel_count, spokenLanguages: JSON.parse(row.spoken_languages_json),
+    captureSource: row.capture_source, transport: row.transport, promptExposure: row.prompt_exposure,
+    importedAt: row.imported_at, sourceMimeType: row.source_mime_type, contentSha256: row.content_sha256,
+    externalSubmissionId: row.external_submission_id,
     languageVariety: row.language_variety, codeSwitchingStatus: row.code_switching_status,
     recordingEnvironment: row.recording_environment, noiseLevel: row.noise_level, qualityRating: row.quality_rating,
     notes: row.notes, annotationStatus: row.annotation_status, archivedAt: row.archived_at,
@@ -82,6 +88,7 @@ export class SQLiteRecordingRepository implements RecordingRepository {
   }
 
   async saveAcceptedTake(sessionId: string, scenarioId: string, take: AcceptedTake, input: RecordingMetadataDraft): Promise<Recording> {
+    const verifiedTake = acceptedTakeSchema.parse(take);
     const metadata = recordingMetadataDraftSchema.parse(input);
     const context = await this.db.getFirstAsync<ContextRow>(
       `SELECT se.id AS session_id, se.project_id, se.participant_id, se.status AS session_status,
@@ -100,11 +107,18 @@ export class SQLiteRecordingRepository implements RecordingRepository {
     }
     const currentConsent = await this.consent.getCurrent(context.participant_id);
     if (!currentConsent) throw new Error('The authorizing consent revision could not be loaded.');
+    if (verifiedTake.contentSha256) {
+      const duplicate = await this.db.getFirstAsync<{ display_id: string }>(
+        'SELECT display_id FROM recordings WHERE content_sha256 = ? AND archived_at IS NULL',
+        verifiedTake.contentSha256,
+      );
+      if (duplicate) throw new Error(`This audio file is already saved as ${duplicate.display_id}.`);
+    }
 
     const id = newId();
     const timestamp = nowIso();
-    const displayId = `SF-${take.recordedAt.slice(0, 10).replaceAll('-', '')}-${id.slice(0, 8).toUpperCase()}`;
-    const stored = await copyAcceptedTake(take.sourceUri, context.project_id, id, take.extension);
+    const displayId = `SF-${verifiedTake.recordedAt.slice(0, 10).replaceAll('-', '')}-${id.slice(0, 8).toUpperCase()}`;
+    const stored = await copyAcceptedTake(verifiedTake.sourceUri, context.project_id, id, verifiedTake.extension);
     let metadataInserted = false;
     try {
       const recording = recordingSchema.parse({
@@ -120,8 +134,11 @@ export class SQLiteRecordingRepository implements RecordingRepository {
           referenceData: context.reference_data_json ? JSON.parse(context.reference_data_json) : null,
         },
         relativeAudioPath: stored.relativePath, collectionMethod: context.collection_method,
-        recordedAt: take.recordedAt, durationMs: take.durationMs, fileSizeBytes: stored.size,
-        container: take.container, codec: take.codec, sampleRateHz: take.sampleRateHz, channelCount: take.channelCount,
+        recordedAt: verifiedTake.recordedAt, durationMs: verifiedTake.durationMs, fileSizeBytes: stored.size,
+        container: verifiedTake.container, codec: verifiedTake.codec, sampleRateHz: verifiedTake.sampleRateHz, channelCount: verifiedTake.channelCount,
+        captureSource: verifiedTake.captureSource, transport: verifiedTake.transport, promptExposure: verifiedTake.promptExposure,
+        importedAt: verifiedTake.importedAt, sourceMimeType: verifiedTake.sourceMimeType, contentSha256: verifiedTake.contentSha256,
+        externalSubmissionId: verifiedTake.externalSubmissionId,
         ...metadata, archivedAt: null, createdAt: timestamp, updatedAt: timestamp,
       });
       await this.db.runAsync(
@@ -129,8 +146,9 @@ export class SQLiteRecordingRepository implements RecordingRepository {
          (id, display_id, project_id, session_id, participant_id, scenario_id, consent_record_id, scenario_version,
           scenario_prompt_snapshot_json, relative_audio_path, collection_method, recorded_at, duration_ms, file_size_bytes,
           container, codec, sample_rate_hz, channel_count, spoken_languages_json, language_variety, code_switching_status,
-          recording_environment, noise_level, quality_rating, notes, annotation_status, archived_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          recording_environment, noise_level, quality_rating, notes, annotation_status, archived_at, created_at, updated_at,
+          capture_source, transport, prompt_exposure, imported_at, source_mime_type, content_sha256, external_submission_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         recording.id, recording.displayId, recording.projectId, recording.sessionId, recording.participantId,
         recording.scenarioId, recording.consentRecordId, recording.scenarioVersion,
         JSON.stringify(recording.scenarioPromptSnapshot), recording.relativeAudioPath, recording.collectionMethod,
@@ -138,6 +156,8 @@ export class SQLiteRecordingRepository implements RecordingRepository {
         recording.sampleRateHz, recording.channelCount, JSON.stringify(recording.spokenLanguages), recording.languageVariety,
         recording.codeSwitchingStatus, recording.recordingEnvironment, recording.noiseLevel, recording.qualityRating,
         recording.notes, recording.annotationStatus, recording.archivedAt, recording.createdAt, recording.updatedAt,
+        recording.captureSource, recording.transport, recording.promptExposure, recording.importedAt,
+        recording.sourceMimeType, recording.contentSha256, recording.externalSubmissionId,
       );
       metadataInserted = true;
       const verified = await this.get(id);

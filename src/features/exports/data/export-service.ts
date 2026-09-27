@@ -6,14 +6,14 @@ import { listContents, unzip, zip } from 'react-native-zip-archive';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 
-import { DATABASE_OPEN_PRAGMAS, DATABASE_VERSION } from '@/core/database/migrations';
+import { DATABASE_OPEN_PRAGMAS, DATABASE_VERSION, migrateDatabase } from '@/core/database/migrations';
 import { newId, nowIso } from '@/domain/common';
 import type { ConsentRepository } from '@/features/consent/data/consent-repository';
 import type { SharingCategory } from '@/features/consent/domain/consent';
 import { getRecordingFile } from '@/features/recordings/data/audio-file-store';
 import { EXPORT_SCHEMA_VERSION, exportManifestSchema, validateManifestReferences, validateRelativeArchivePath, type ExportManifest } from '../domain/manifest';
 import { researchExportRecordsSchema } from '../domain/research-records';
-import { requireArchiveCopySpace, validateBackupMemberSet, validateRestoreArchive } from '../domain/restore-preflight';
+import { assertRestorableDatabaseVersion, requireArchiveCopySpace, validateBackupMemberSet, validateRestoreArchive } from '../domain/restore-preflight';
 
 type ExportResult = { archive: File; exportId: string; includedRecordings: number; excludedRecordings: number };
 
@@ -112,6 +112,7 @@ export class ExportService {
       `SELECT id, display_id, project_id, session_id, participant_id, scenario_id, scenario_version,
        scenario_prompt_snapshot_json, collection_method, recorded_at, duration_ms, file_size_bytes, container, codec,
        sample_rate_hz, channel_count, spoken_languages_json, language_variety, code_switching_status,
+       capture_source, transport, prompt_exposure, imported_at, source_mime_type, content_sha256, external_submission_id,
        recording_environment, noise_level, quality_rating, notes, annotation_status, created_at, updated_at,
        relative_audio_path FROM recordings WHERE project_id = ? AND archived_at IS NULL ORDER BY recorded_at`, projectId,
     );
@@ -312,7 +313,7 @@ export class ExportService {
       if (!manifestFile.exists) throw new Error('Backup manifest is missing.');
       const manifest = exportManifestSchema.parse(await manifestFile.json()) as ExportManifest;
       if (manifest.exportType !== 'administrative_backup' || !manifest.sensitiveAdministrativeData) throw new Error('This is not an administrative backup.');
-      if (manifest.databaseVersion !== DATABASE_VERSION) throw new Error(`Backup database version ${manifest.databaseVersion} is not supported by this app version.`);
+      assertRestorableDatabaseVersion(manifest.databaseVersion, DATABASE_VERSION);
       validateManifestReferences(manifest, []);
       validateBackupMemberSet(
         manifest.files.map((file) => file.path),
@@ -328,6 +329,7 @@ export class ExportService {
         const integrity = await restored.getFirstAsync<{ integrity_check: string }>('PRAGMA integrity_check');
         const foreignKeys = await restored.getAllAsync('PRAGMA foreign_key_check');
         if (integrity?.integrity_check !== 'ok' || foreignKeys.length) throw new Error('The restored database failed integrity checks.');
+        await migrateDatabase(restored);
         const version = await restored.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
         if (version?.user_version !== DATABASE_VERSION) throw new Error('The restored database schema is incompatible.');
         const audioRows = await restored.getAllAsync<{ relative_audio_path: string }>('SELECT relative_audio_path FROM recordings');
