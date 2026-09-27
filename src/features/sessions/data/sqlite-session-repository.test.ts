@@ -25,7 +25,11 @@ const completed: CollectionSession = {
 };
 
 function repository(consentValid = true, changes = 1) {
-  const db = { runAsync: vi.fn().mockResolvedValue({ changes }) };
+  const runAsync = vi.fn().mockResolvedValue({ changes });
+  const db = {
+    runAsync,
+    withExclusiveTransactionAsync: vi.fn(async (operation: (transaction: { runAsync: typeof runAsync }) => Promise<void>) => operation({ runAsync })),
+  };
   const consent = { participantCanRecord: vi.fn().mockResolvedValue(consentValid) };
   const instance = new SQLiteSessionRepository(db as never, consent as never);
   return { instance, db, consent };
@@ -60,5 +64,31 @@ describe('completed session recovery', () => {
     vi.spyOn(instance, 'get').mockResolvedValue(completed);
 
     await expect(instance.reopen(completed.id)).rejects.toThrow(/could not be reopened/);
+  });
+});
+
+describe('incorrect session removal', () => {
+  it('atomically archives the session and every recording attached to it', async () => {
+    const { instance, db } = repository();
+    const archived = { ...completed, status: 'archived' as const, updatedAt: '2026-09-26T10:00:00.000+02:00' };
+    vi.spyOn(instance, 'get').mockResolvedValueOnce(completed).mockResolvedValueOnce(archived);
+
+    await expect(instance.archive(completed.id)).resolves.toBeUndefined();
+
+    expect(db.withExclusiveTransactionAsync).toHaveBeenCalledOnce();
+    expect(db.runAsync).toHaveBeenCalledTimes(2);
+    expect(db.runAsync.mock.calls[0]?.[0]).toContain("SET status = 'archived'");
+    expect(db.runAsync.mock.calls[1]?.[0]).toContain('UPDATE recordings SET archived_at');
+    expect(db.runAsync.mock.calls[1]?.at(-1)).toBe(completed.id);
+  });
+
+  it('excludes archived sessions from the ordinary participant session list', async () => {
+    const getAllAsync = vi.fn().mockResolvedValue([]);
+    const db = { getAllAsync };
+    const instance = new SQLiteSessionRepository(db as never, {} as never);
+
+    await expect(instance.listByParticipant(completed.participantId)).resolves.toEqual([]);
+
+    expect(getAllAsync.mock.calls[0]?.[0]).toContain("status != 'archived'");
   });
 });

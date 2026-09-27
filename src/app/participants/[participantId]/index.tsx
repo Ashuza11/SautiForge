@@ -80,9 +80,11 @@ export default function ParticipantDetailScreen() {
             <Text style={session.status === 'completed' ? uiStyles.badge : styles.sessionBadge}>{session.status.replaceAll('_', ' ').toUpperCase()}</Text>
           </View>
           <Text style={uiStyles.muted}>{session.collectionEnvironment}{session.city ? ` · ${session.city}` : ''}</Text>
-          {session.status === 'in_progress' || session.status === 'paused' ? (
-            <Button label="Resume session" variant="secondary" onPress={() => router.push(`/sessions/${session.id}`)} />
-          ) : null}
+          <Button
+            label={session.status === 'in_progress' || session.status === 'paused' ? 'Resume session' : 'Review session'}
+            variant="secondary"
+            onPress={() => router.push(`/sessions/${session.id}`)}
+          />
         </Card>
       ))}
 

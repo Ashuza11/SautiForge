@@ -71,6 +71,27 @@ export default function SessionDetailScreen() {
     ],
   );
 
+  const removeIncorrectSession = () => {
+    if (!session) return;
+    Alert.alert(
+      'Remove incorrect session?',
+      recordings.length > 0
+        ? `This session and its ${recordings.length} recording${recordings.length === 1 ? '' : 's'} will be hidden and excluded from research dataset exports. A restricted administrative backup will still retain them for recovery and audit.`
+        : 'This session will be hidden and excluded from research dataset exports. A restricted administrative backup will still retain it for recovery and audit.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove session', style: 'destructive', onPress: async () => {
+          try {
+            await repositories.sessions.archive(session.id);
+            router.back();
+          } catch (cause) {
+            setError(cause instanceof Error ? cause.message : 'The incorrect session could not be removed.');
+          }
+        } },
+      ],
+    );
+  };
+
   if (!session) return <Screen>{error ? <ErrorNotice message={error} /> : <EmptyState>Loading session…</EmptyState>}</Screen>;
   const canCollect = session.status === 'in_progress' && consentValid && participant?.status === 'active';
   const counts = recordings.reduce<Record<string, number>>((accumulator, recording) => {
@@ -99,6 +120,7 @@ export default function SessionDetailScreen() {
         <Card>
           <Text style={uiStyles.title}>Transcription and annotation</Text>
           <Text style={uiStyles.body}>You can annotate now or after finishing every scenario. Open a recording in the library to replay it, enter verbatim and normalized text, add language tags and business labels, and save revision history.</Text>
+          <Text style={uiStyles.muted}>If only one recording used the wrong scenario, archive that recording in the library and record it again under the correct scenario. Remove the whole session only when the session itself is incorrect.</Text>
           <Button label="Review, transcribe and annotate recordings" variant="secondary" onPress={() => router.push('/library')} />
         </Card>
       ) : null}
@@ -121,6 +143,7 @@ export default function SessionDetailScreen() {
           </Card>
         </Pressable>
       ))}
+      <Button label="Remove incorrect session" variant="danger" onPress={removeIncorrectSession} />
     </Screen>
   );
 }

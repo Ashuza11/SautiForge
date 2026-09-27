@@ -8,4 +8,5 @@ export interface SessionRepository {
   reopen(id: string): Promise<CollectionSession>;
   pause(id: string): Promise<CollectionSession>;
   complete(id: string): Promise<CollectionSession>;
+  archive(id: string): Promise<void>;
 }

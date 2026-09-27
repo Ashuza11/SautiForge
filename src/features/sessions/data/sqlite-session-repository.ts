@@ -49,7 +49,7 @@ export class SQLiteSessionRepository implements SessionRepository {
 
   async listByParticipant(participantId: string): Promise<CollectionSession[]> {
     const rows = await this.db.getAllAsync<SessionRow>(
-      `SELECT ${columns} FROM sessions WHERE participant_id = ? ORDER BY started_at DESC`,
+      `SELECT ${columns} FROM sessions WHERE participant_id = ? AND status != 'archived' ORDER BY started_at DESC`,
       participantId,
     );
     return rows.map(fromRow);
@@ -148,6 +148,32 @@ export class SQLiteSessionRepository implements SessionRepository {
 
   async complete(id: string): Promise<CollectionSession> {
     return this.setState(id, 'completed', nowIso());
+  }
+
+  async archive(id: string): Promise<void> {
+    const session = await this.get(id);
+    if (!session || session.status === 'archived') throw new Error('Active session not found.');
+    const timestamp = nowIso();
+    await this.db.withExclusiveTransactionAsync(async (transaction) => {
+      const result = await transaction.runAsync(
+        `UPDATE sessions
+         SET status = 'archived', ended_at = COALESCE(ended_at, ?), updated_at = ?
+         WHERE id = ? AND status != 'archived'`,
+        timestamp,
+        timestamp,
+        id,
+      );
+      if (result.changes !== 1) throw new Error('Active session not found.');
+      await transaction.runAsync(
+        `UPDATE recordings SET archived_at = COALESCE(archived_at, ?), updated_at = ?
+         WHERE session_id = ?`,
+        timestamp,
+        timestamp,
+        id,
+      );
+    });
+    const archived = await this.get(id);
+    if (!archived || archived.status !== 'archived') throw new Error('The removed session was not readable after saving.');
   }
 
   private async setState(id: string, status: 'paused' | 'completed', endedAt: string | null): Promise<CollectionSession> {

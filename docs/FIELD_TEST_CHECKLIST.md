@@ -8,6 +8,7 @@ Record device model, Android version, APK identifier/SHA-256, workflow run or bu
 - On participant, consent, and scenario forms, focus every bottom field and verify Android resizes/scrolls the form so the keyboard never covers the active input or save button.
 - Prove microphone remains disabled before valid internal-research consent.
 - Start, pause, close, reopen, and resume a session without re-entering its participant; accidentally complete it and verify **Reopen completed session** restores collection only with valid consent.
+- Remove an incorrect empty session and an incorrect session containing test recordings; confirm both disappear from participant sessions, child recordings disappear from the library/dashboard, and neither appears in a research dataset export.
 - Deny microphone permission, recover through Android settings, and record a real take.
 - Interrupt a take with screen lock/app switch/phone call; confirm no false success and safe retry/cleanup.
 - Record, stop, play the temporary take to the end at least three times, rerecord/discard, accept, and confirm no Android `ArrayBuffer`/Blob error occurs.

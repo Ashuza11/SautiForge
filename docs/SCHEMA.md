@@ -15,7 +15,7 @@ The authoritative migration is `src/core/database/migrations.ts`. SQLite stores 
 | `export_history` | Explicit export attempts, destinations, hashes, and errors |
 | `app_settings` | Small local preferences such as the active project |
 
-Deletion uses restrictive foreign keys for research records. Projects, scenarios, participants, sessions, and recordings expose status/archive fields instead of destructive cascading deletion.
+Deletion uses restrictive foreign keys for research records. Projects, scenarios, participants, sessions, and recordings expose status/archive fields instead of destructive cascading deletion. Removing an incorrect session atomically marks the session and all its recordings as archived; audio and related records remain available only through the restricted administrative backup path.
 
 Consent updates are new records linked through `supersedes_id`; previous decisions are not silently overwritten. Export authorization must use the latest applicable consent record at the time of export and record the selected sharing category.
 

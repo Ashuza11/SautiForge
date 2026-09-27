@@ -9,7 +9,7 @@ npx expo-doctor
 npx expo export --platform android
 ```
 
-Current automated suite: 24 files, 70 tests.
+Current automated suite: 24 files, 72 tests.
 
 The `Android pilot APK` GitHub Actions workflow repeats type-checking/tests, runs Expo prebuild, builds `:app:assembleRelease` with Java 17, and publishes the APK plus SHA-256. A green workflow proves compilation and artifact creation, but not installation, microphone behavior, or offline device persistence.
 
@@ -21,7 +21,7 @@ Release assembly first passed in [run 35874820535](https://github.com/Ashuza11/S
 | Scenarios | Versioned reusable prompt/reference validation | Screen CRUD and historical prompt snapshot inspection |
 | Participants | Pseudonymous required fields, generated speaker IDs, demographic bounds, common selector values, and preservation of custom values | Screen CRUD, selector interaction, and uniqueness error UX |
 | Consent | Recording gate, expiry, withdrawal, and each sharing category | Microphone gate and export exclusion on device |
-| Sessions | Environment/nullability, exact consent linkage, valid reopen transitions, consent-checked completed-session recovery, and verified persistence | Pause, close, resume/reopen, and process restart |
+| Sessions | Environment/nullability, exact consent linkage, valid reopen transitions, consent-checked recovery, verified persistence, and atomic soft-removal of sessions and child recordings | Pause, close, resume/reopen/remove, and process restart |
 | Recordings | Spoken-language/quality validation, predefined code-switching values, repeat-playback reset, interrupted-take stop/discard/error handling, save compensation, and non-empty accepted-file readability guard | Permission, actual microphone, phone-call behavior, file verification, repeated playback, reboot, low storage |
 | Transcriptions | Independent verbatim/normalized text, optional transcript, revision provenance | Edit/history UI persistence |
 | Annotations | Versioned strict payload, optional/unknown values, privacy field rejection | Edit/history UI persistence |
