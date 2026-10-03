@@ -7,14 +7,14 @@
 - SQLite schema version 4, migration chain, constraints, seed project, and five editable Kingwana scenarios.
 - Offline projects, scenarios, pseudonymous participants, immutable consent revisions, resumable sessions, consent-checked reopening, and atomic soft-removal of incorrect sessions and their recordings.
 - Real foreground audio capture, immediate playback, accept/rerecord/discard, document-storage persistence, and verified database save.
-- Consent-gated Android prompt sharing and manual external-audio import with playback, original-container preservation, SHA-256 duplicate detection, and explicit transport/prompt provenance. This does not read WhatsApp chats or confirm delivery.
+- Consent-gated Android sharing of a bold fictional example with internal-only research linkage, plus manual external-audio import with playback, original-container preservation, SHA-256 duplicate detection, and explicit transport/prompt provenance. This does not read WhatsApp chats or confirm delivery.
 - Dashboard, searchable recording library, detail playback, workflow status, soft archive, human transcription revisions, and versioned business annotations.
 - Complete library filters for project, participant, scenario, language, date range, quality, and annotation status.
 - Settings/safety status for microphone permission, free storage, versions, offline behavior, and startup recording-file reconciliation.
 - Consent-filtered research ZIP, portable JSON/JSONL/CSV metadata, SHA-256 manifest, post-compression extraction verification, Android folder/share flows, and export history.
 - Separate sensitive administrative backup and verified rollback-capable restore.
 - Portable computer-side export validator for post-transfer size, SHA-256, path, count, and audio-reference checks.
-- Automated tests across every feature module and the portable validator, including executed SQLite migrations/relationships, participant and recording-metadata selectors, session state recovery/removal, external-audio validation/hashing/provenance/duplicate checks, repeat playback, full library query construction, recording interruption/save recovery, accepted-file readability, strict privacy-minimized export contracts, restore preflight, and manifest references (27 files, 83 tests).
+- Automated tests across every feature module and the portable validator, including executed SQLite migrations/relationships, participant and recording-metadata selectors, session state recovery/removal, privacy-minimized remote sharing, external-audio validation/hashing/provenance/duplicate checks, repeat playback, full library query construction, recording interruption/save recovery, accepted-file readability, strict privacy-minimized export contracts, restore preflight, and manifest references (27 files, 85 tests).
 
 ## Required before field-ready status
 

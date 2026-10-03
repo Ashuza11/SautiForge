@@ -223,16 +223,10 @@ export default function RecordScreen() {
     try {
       if (!(await repositories.consent.participantCanRecord(participant.id))) throw new Error('Valid recording consent is required before sending a collection task.');
       const submissionId = `SUB-${newId().replaceAll('-', '').slice(0, 12).toUpperCase()}`;
-      const message = buildRemotePrompt({
-        speakerCode: participant.speakerCode,
-        submissionId,
-        scenarioTitle: scenario.title,
-        instructions: scenario.collectionInstructions,
-        fictionalExample: remoteExample,
-      });
+      const message = buildRemotePrompt(remoteExample);
       await Share.share({ message, title: `SautiForge: ${scenario.title}` }, { dialogTitle: 'Share remote collection task' });
       setLastSubmissionId(submissionId);
-      Alert.alert('Share sheet opened', `Submission code ${submissionId} was added to the message. Android cannot confirm that the message was delivered.`);
+      Alert.alert('Share sheet opened', `Submission code ${submissionId} is tracked inside SautiForge and was not included in the message. Android cannot confirm that the message was delivered.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The remote collection task could not be shared.');
     }
@@ -355,12 +349,12 @@ export default function RecordScreen() {
           {!recorderState.isRecording ? (
             <Card>
               <Text style={uiStyles.title}>Remote or externally recorded contribution</Text>
-              <Text style={uiStyles.body}>Share a sanitized task through any messaging app. When a voice note returns, save it on this phone and import the audio file here.</Text>
-              <Field label="Fictional situation/example to share (optional)" value={remoteExample} onChangeText={setRemoteExample} multiline />
-              <Button label="Share scenario prompt" variant="secondary" onPress={() => void shareRemotePrompt()} />
-              {lastSubmissionId ? <Text style={uiStyles.muted}>Latest shared submission code: {lastSubmissionId}</Text> : null}
+              <Text style={uiStyles.body}>Share only a fictional example through any messaging app. The contributor receives short guidance and the example in bold, without speaker, submission, scenario, or instruction fields.</Text>
+              <Field label="Fictional situation/example to share" value={remoteExample} onChangeText={setRemoteExample} multiline />
+              <Button label="Share fictional example" variant="secondary" onPress={() => void shareRemotePrompt()} />
+              {lastSubmissionId ? <Text style={uiStyles.muted}>Internally tracked submission code: {lastSubmissionId}</Text> : null}
               <Button label="Import returned audio" variant="secondary" onPress={() => void importExternalAudio()} />
-              <Text style={uiStyles.muted}>Opening the share sheet does not prove delivery. SautiForge does not read WhatsApp chats or groups.</Text>
+              <Text style={uiStyles.muted}>Use fictional or sanitized content only. Opening the share sheet does not prove delivery. SautiForge does not read WhatsApp chats or groups.</Text>
             </Card>
           ) : null}
         </>
