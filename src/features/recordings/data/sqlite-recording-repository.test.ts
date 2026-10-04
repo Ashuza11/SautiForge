@@ -25,6 +25,7 @@ const context = {
   collection_method: 'elicited',
   scenario_version: '1.0.0',
   reference_data_json: null,
+  remote_examples_json: '[]',
 };
 
 const take = {
@@ -43,6 +44,8 @@ const take = {
   sourceMimeType: 'audio/mp4',
   contentSha256: null,
   externalSubmissionId: null,
+  elicitationPromptText: null,
+  sourceFileName: null,
 };
 
 const metadata = {
@@ -111,6 +114,8 @@ describe('accepted recording persistence', () => {
       importedAt: '2026-09-24T09:59:30.000+02:00',
       contentSha256: duplicateHash,
       externalSubmissionId: 'SUB-ABC123',
+      elicitationPromptText: null,
+      sourceFileName: 'voice-note.ogg',
     }, metadata)).rejects.toThrow('already saved as SF-EXISTING');
 
     expect(copyAcceptedTake).not.toHaveBeenCalled();

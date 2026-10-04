@@ -8,6 +8,13 @@ export const collectionMethodSchema = z.enum([
   'other',
 ]);
 
+export const scenarioExamplesSchema = z.array(z.string().trim().min(1).max(500)).max(25)
+  .refine((examples) => new Set(examples).size === examples.length, 'Examples must be unique');
+
+export function parseScenarioExamples(value: string): string[] {
+  return scenarioExamplesSchema.parse(value.split(/\r?\n/).map((example) => example.trim()).filter(Boolean));
+}
+
 export const scenarioSchema = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid(),
@@ -17,6 +24,7 @@ export const scenarioSchema = z.object({
   expectedIntent: z.string().trim().min(1, 'Expected intent is required').max(160),
   collectionMethod: collectionMethodSchema,
   version: z.string().trim().min(1, 'Version is required').max(40),
+  remoteExamples: scenarioExamplesSchema,
   referenceData: z.record(z.string(), z.unknown()).nullable(),
   createdAt: z.string().datetime({ offset: true }),
   updatedAt: z.string().datetime({ offset: true }),

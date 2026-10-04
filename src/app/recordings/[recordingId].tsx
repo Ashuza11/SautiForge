@@ -138,7 +138,11 @@ export default function RecordingDetailScreen() {
         <Text style={uiStyles.muted}>Codec: {recording.codec ?? 'unavailable'} · {recording.sampleRateHz ?? 'unavailable'} Hz · {recording.channelCount ?? 'unavailable'} channels</Text>
         <Text style={uiStyles.muted}>Source: {recording.captureSource === 'imported_file' ? 'Imported audio' : 'Device microphone'} · prompt: {recording.promptExposure.replaceAll('_', ' ')}</Text>
         {recording.captureSource === 'imported_file' ? (
-          <Text style={uiStyles.muted}>Transport: {recording.transport?.replaceAll('_', ' ') ?? 'unavailable'} · submission: {recording.externalSubmissionId ?? 'unavailable'}</Text>
+          <>
+            <Text style={uiStyles.muted}>Transport: {recording.transport?.replaceAll('_', ' ') ?? 'unavailable'} · submission: {recording.externalSubmissionId ?? 'unavailable'}</Text>
+            <Text style={uiStyles.muted}>Source file: {recording.sourceFileName ?? 'unavailable'}</Text>
+            {recording.elicitationPromptText ? <Text style={uiStyles.body}>Example used: {recording.elicitationPromptText}</Text> : null}
+          </>
         ) : null}
         {audioUri ? <StoredAudioPlayer uri={audioUri} /> : null}
       </Card>

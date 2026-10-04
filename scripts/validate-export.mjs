@@ -27,7 +27,7 @@ export async function validateExportDirectory(directoryPath) {
   const root = path.resolve(directoryPath);
   const manifestPath = path.join(root, 'manifest.json');
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-  if (!['1.0.0', '1.1.0'].includes(manifest.schemaVersion)) throw new Error(`Unsupported export schema: ${String(manifest.schemaVersion)}`);
+  if (!['1.0.0', '1.1.0', '1.2.0'].includes(manifest.schemaVersion)) throw new Error(`Unsupported export schema: ${String(manifest.schemaVersion)}`);
   if (!['research_dataset', 'administrative_backup'].includes(manifest.exportType)) throw new Error('Unknown export type.');
   if (!Array.isArray(manifest.files)) throw new Error('Manifest files must be an array.');
 

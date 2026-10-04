@@ -31,6 +31,8 @@ export const recordingSchema = z.object({
   sourceMimeType: z.string().min(1).nullable(),
   contentSha256: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
   externalSubmissionId: z.string().trim().min(1).max(80).nullable(),
+  elicitationPromptText: z.string().trim().min(1).max(1000).nullable(),
+  sourceFileName: z.string().trim().min(1).max(255).nullable(),
   spokenLanguages: z.array(z.string().min(1)).min(1),
   languageVariety: z.string().nullable(),
   codeSwitchingStatus: z.string().nullable(),
@@ -73,12 +75,17 @@ export const acceptedTakeSchema = z.object({
   sourceMimeType: z.string().min(1).nullable(),
   contentSha256: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
   externalSubmissionId: z.string().trim().min(1).max(80).nullable(),
+  elicitationPromptText: z.string().trim().min(1).max(1000).nullable(),
+  sourceFileName: z.string().trim().min(1).max(255).nullable(),
 }).superRefine((take, context) => {
   if (take.captureSource !== 'imported_file') return;
   if (!take.transport) context.addIssue({ code: 'custom', path: ['transport'], message: 'Imported audio must record how it arrived.' });
   if (!take.importedAt) context.addIssue({ code: 'custom', path: ['importedAt'], message: 'Imported audio must record its import time.' });
   if (!take.contentSha256) context.addIssue({ code: 'custom', path: ['contentSha256'], message: 'Imported audio must have a verified SHA-256 hash.' });
   if (!take.externalSubmissionId) context.addIssue({ code: 'custom', path: ['externalSubmissionId'], message: 'Imported audio must have a pseudonymous submission code.' });
+  if (take.promptExposure === 'example_shown' && !take.elicitationPromptText) {
+    context.addIssue({ code: 'custom', path: ['elicitationPromptText'], message: 'Select the example used for this recording.' });
+  }
 });
 
 export type AcceptedTake = z.infer<typeof acceptedTakeSchema>;

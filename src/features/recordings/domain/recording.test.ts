@@ -50,11 +50,13 @@ describe('accepted take provenance', () => {
       sourceMimeType: 'audio/ogg',
       contentSha256: null,
       externalSubmissionId: null,
+      elicitationPromptText: null,
+      sourceFileName: 'voice-note.ogg',
     });
 
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.issues.map((issue) => issue.path[0])).toEqual([
-      'transport', 'importedAt', 'contentSha256', 'externalSubmissionId',
+      'transport', 'importedAt', 'contentSha256', 'externalSubmissionId', 'elicitationPromptText',
     ]);
   });
 });

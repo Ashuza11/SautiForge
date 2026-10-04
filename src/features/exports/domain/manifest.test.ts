@@ -8,7 +8,7 @@ const manifest = exportManifestSchema.parse({
   exportType: 'research_dataset',
   exportedAt: '2026-09-23T10:00:00.000Z',
   app: 'SautiForge',
-  databaseVersion: 4,
+  databaseVersion: 5,
   projectId: '6a7d8df7-d495-4f69-9934-dc48ce5ee8d1',
   sharingCategory: 'internal_research',
   sensitiveAdministrativeData: false,

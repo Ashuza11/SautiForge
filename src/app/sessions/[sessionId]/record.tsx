@@ -20,6 +20,7 @@ import type { Participant } from '@/features/participants/domain/participant';
 import { discardFile, hasRecordingSpace, verifyReadableAudioFile } from '@/features/recordings/data/audio-file-store';
 import { hashAudioFile } from '@/features/recordings/data/audio-hash';
 import { describeImportedAudio, importedDurationMs } from '@/features/recordings/domain/imported-audio';
+import { advanceImportedTakeQueue } from '@/features/recordings/domain/import-queue';
 import { appStateInterruptsRecording, stopAndDiscardInterruptedTake } from '@/features/recordings/domain/interruption';
 import { shouldRestartFinishedPlayback } from '@/features/recordings/domain/playback';
 import { recordingMetadataDraftSchema, type AcceptedTake } from '@/features/recordings/domain/recording';
@@ -42,6 +43,7 @@ export default function RecordScreen() {
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [take, setTake] = useState<AcceptedTake | null>(null);
+  const [importQueue, setImportQueue] = useState<AcceptedTake[]>([]);
   const [startedAt, setStartedAt] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +56,6 @@ export default function RecordScreen() {
   const [noiseLevel, setNoiseLevel] = useState('unknown');
   const [quality, setQuality] = useState('');
   const [notes, setNotes] = useState('');
-  const [remoteExample, setRemoteExample] = useState('');
   const [lastSubmissionId, setLastSubmissionId] = useState<string | null>(null);
   const interruptedRef = useRef(false);
   const stoppingRef = useRef(false);
@@ -111,6 +112,29 @@ export default function RecordScreen() {
     ]);
   }, [take]);
 
+  const advanceImportQueue = useCallback(() => {
+    setImportQueue((current) => {
+      const { next, remaining } = advanceImportedTakeQueue(current);
+      setTake(next);
+      return remaining;
+    });
+  }, []);
+
+  const confirmExit = useCallback((afterDiscard: () => void) => {
+    const count = (take ? 1 : 0) + importQueue.length;
+    if (!count) return afterDiscard();
+    Alert.alert('Discard unsaved audio?', `${count} unsaved audio file${count === 1 ? '' : 's'} will be permanently removed.`, [
+      { text: 'Keep reviewing', style: 'cancel' },
+      { text: 'Discard all', style: 'destructive', onPress: () => {
+        if (take) discardFile(take.sourceUri);
+        for (const queued of importQueue) discardFile(queued.sourceUri);
+        setTake(null);
+        setImportQueue([]);
+        afterDiscard();
+      } },
+    ]);
+  }, [importQueue, take]);
+
   const updateImportedDuration = useCallback((durationMs: number) => {
     setTake((current) => current && current.durationMs !== durationMs ? { ...current, durationMs } : current);
   }, []);
@@ -121,14 +145,14 @@ export default function RecordScreen() {
         Alert.alert('Recording in progress', 'Stop the recording before leaving this screen.');
         return true;
       }
-      if (take) {
-        confirmDiscard(() => router.back());
+      if (take || importQueue.length) {
+        confirmExit(() => router.back());
         return true;
       }
       return false;
     });
     return () => subscription.remove();
-  }, [confirmDiscard, recorderState.isRecording, take]);
+  }, [confirmExit, importQueue.length, recorderState.isRecording, take]);
 
   const start = async () => {
     setError(null);
@@ -194,6 +218,8 @@ export default function RecordScreen() {
         sourceMimeType: 'audio/mp4',
         contentSha256: null,
         externalSubmissionId: null,
+        elicitationPromptText: null,
+        sourceFileName: null,
       });
     } catch (cause) {
       const cleanup = await stopAndDiscardInterruptedTake({
@@ -223,7 +249,7 @@ export default function RecordScreen() {
     try {
       if (!(await repositories.consent.participantCanRecord(participant.id))) throw new Error('Valid recording consent is required before sending a collection task.');
       const submissionId = `SUB-${newId().replaceAll('-', '').slice(0, 12).toUpperCase()}`;
-      const message = buildRemotePrompt(remoteExample);
+      const message = buildRemotePrompt(scenario.remoteExamples);
       await Share.share({ message, title: `SautiForge: ${scenario.title}` }, { dialogTitle: 'Share remote collection task' });
       setLastSubmissionId(submissionId);
       Alert.alert('Share sheet opened', `Submission code ${submissionId} is tracked inside SautiForge and was not included in the message. Android cannot confirm that the message was delivered.`);
@@ -238,31 +264,43 @@ export default function RecordScreen() {
     try {
       if (!(await repositories.consent.participantCanRecord(participant.id))) throw new Error('Valid recording consent is required before importing audio.');
       if (!hasRecordingSpace()) throw new Error('Less than 50 MB of free storage remains. Free space before importing audio.');
-      const result = await DocumentPicker.getDocumentAsync({ type: 'audio/*', copyToCacheDirectory: true, multiple: false });
+      const result = await DocumentPicker.getDocumentAsync({ type: 'audio/*', copyToCacheDirectory: true, multiple: true });
       if (result.canceled) return;
-      const asset = result.assets[0];
-      if (!asset) throw new Error('Android did not return the selected audio file.');
-      const media = describeImportedAudio(asset.name, asset.mimeType ?? null);
-      const file = new File(asset.uri);
-      await verifyReadableAudioFile(file);
-      const contentSha256 = await hashAudioFile(file);
-      setTake({
-        sourceUri: file.uri,
-        durationMs: 0,
-        recordedAt: nowIso(),
-        extension: media.extension,
-        container: media.container,
-        codec: null,
-        sampleRateHz: null,
-        channelCount: null,
-        captureSource: 'imported_file',
-        transport: 'whatsapp_manual',
-        promptExposure: remoteExample.trim() ? 'example_shown' : 'instructions_only',
-        importedAt: nowIso(),
-        sourceMimeType: media.mimeType,
-        contentSha256,
-        externalSubmissionId: lastSubmissionId ?? `SUB-${newId().replaceAll('-', '').slice(0, 12).toUpperCase()}`,
-      });
+      if (!result.assets.length) throw new Error('Android did not return any selected audio files.');
+      const submissionId = lastSubmissionId ?? `SUB-${newId().replaceAll('-', '').slice(0, 12).toUpperCase()}`;
+      const imported: AcceptedTake[] = [];
+      try {
+        for (const asset of result.assets) {
+          const media = describeImportedAudio(asset.name, asset.mimeType ?? null);
+          const file = new File(asset.uri);
+          await verifyReadableAudioFile(file);
+          imported.push({
+            sourceUri: file.uri,
+            durationMs: 0,
+            recordedAt: nowIso(),
+            extension: media.extension,
+            container: media.container,
+            codec: null,
+            sampleRateHz: null,
+            channelCount: null,
+            captureSource: 'imported_file',
+            transport: 'whatsapp_manual',
+            promptExposure: scenario.remoteExamples.length ? 'example_shown' : 'instructions_only',
+            importedAt: nowIso(),
+            sourceMimeType: media.mimeType,
+            contentSha256: await hashAudioFile(file),
+            externalSubmissionId: submissionId,
+            elicitationPromptText: null,
+            sourceFileName: asset.name.trim().slice(0, 255) || null,
+          });
+        }
+      } catch (cause) {
+        for (const asset of result.assets) discardFile(asset.uri);
+        throw cause;
+      }
+      const [first, ...remaining] = imported;
+      setTake(first ?? null);
+      setImportQueue(remaining);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The external audio file could not be imported.');
     }
@@ -306,10 +344,15 @@ export default function RecordScreen() {
     try {
       const saved = await repositories.recordings.saveAcceptedTake(session.id, scenario.id, take, parsed.data);
       discardFile(take.sourceUri);
-      setTake(null);
-      Alert.alert('Recording saved', `${saved.displayId} and its audio file were verified in local storage.`, [
-        { text: 'Next recording', onPress: () => router.back() },
-      ]);
+      if (take.captureSource === 'imported_file' && importQueue.length) {
+        advanceImportQueue();
+        Alert.alert('Recording saved', `${saved.displayId} was verified. Review the next imported file; ${importQueue.length} file${importQueue.length === 1 ? '' : 's'} remain including the next file.`);
+      } else {
+        setTake(null);
+        Alert.alert('Recording saved', `${saved.displayId} and its audio file were verified in local storage.`, [
+          { text: 'Next recording', onPress: () => router.back() },
+        ]);
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Recording was not saved. The original take is still available.');
     } finally {
@@ -349,11 +392,12 @@ export default function RecordScreen() {
           {!recorderState.isRecording ? (
             <Card>
               <Text style={uiStyles.title}>Remote or externally recorded contribution</Text>
-              <Text style={uiStyles.body}>Share only a fictional example through any messaging app. The contributor receives short guidance and the example in bold, without speaker, submission, scenario, or instruction fields.</Text>
-              <Field label="Fictional situation/example to share" value={remoteExample} onChangeText={setRemoteExample} multiline />
-              <Button label="Share fictional example" variant="secondary" onPress={() => void shareRemotePrompt()} />
+              <Text style={uiStyles.body}>Share all {scenario.remoteExamples.length} configured fictional example{scenario.remoteExamples.length === 1 ? '' : 's'} together. Each example is numbered and bold; research identifiers remain inside SautiForge.</Text>
+              {scenario.remoteExamples.map((example, index) => <Text key={`${index}-${example}`} style={uiStyles.muted}>{index + 1}. {example}</Text>)}
+              {!scenario.remoteExamples.length ? <Text style={uiStyles.muted}>Edit this scenario and add examples before sharing.</Text> : null}
+              <Button label="Share all examples" variant="secondary" onPress={() => void shareRemotePrompt()} disabled={!scenario.remoteExamples.length} />
               {lastSubmissionId ? <Text style={uiStyles.muted}>Internally tracked submission code: {lastSubmissionId}</Text> : null}
-              <Button label="Import returned audio" variant="secondary" onPress={() => void importExternalAudio()} />
+              <Button label="Import returned audio files" variant="secondary" onPress={() => void importExternalAudio()} />
               <Text style={uiStyles.muted}>Use fictional or sanitized content only. Opening the share sheet does not prove delivery. SautiForge does not read WhatsApp chats or groups.</Text>
             </Card>
           ) : null}
@@ -363,11 +407,13 @@ export default function RecordScreen() {
           <Card>
             <Text style={styles.timer}>{formatDuration(take.durationMs)}</Text>
             <TakePlayer
+              key={take.sourceUri}
               uri={take.sourceUri}
               onDurationMs={take.captureSource === 'imported_file' ? updateImportedDuration : undefined}
             />
             <Text style={uiStyles.muted}>Source: {take.captureSource === 'imported_file' ? `Imported file · ${take.container.toUpperCase()}` : 'Device microphone'}</Text>
-            <Button label={take.captureSource === 'imported_file' ? 'Discard imported file' : 'Rerecord'} variant="secondary" onPress={() => confirmDiscard(() => setStartedAt(null))} />
+            {take.sourceFileName ? <Text style={uiStyles.muted}>File: {take.sourceFileName} · {importQueue.length} waiting after this file</Text> : null}
+            <Button label={take.captureSource === 'imported_file' ? 'Discard imported file' : 'Rerecord'} variant="secondary" onPress={() => confirmDiscard(() => take.captureSource === 'imported_file' ? advanceImportQueue() : setStartedAt(null))} />
           </Card>
           <Heading subtitle="Confirm inherited values or correct them for this take.">Recording metadata</Heading>
           <Field label="Spoken languages, comma separated" value={languages} onChangeText={setLanguages} />
@@ -394,8 +440,20 @@ export default function RecordScreen() {
                   { label: 'Example shown', value: 'example_shown' },
                   { label: 'Scripted reading', value: 'scripted_reading' },
                 ]}
-                onValueChange={(promptExposure) => setTake((current) => current ? { ...current, promptExposure: promptExposure as AcceptedTake['promptExposure'] } : current)}
+                onValueChange={(promptExposure) => setTake((current) => current ? {
+                  ...current,
+                  promptExposure: promptExposure as AcceptedTake['promptExposure'],
+                  elicitationPromptText: promptExposure === 'example_shown' ? current.elicitationPromptText : null,
+                } : current)}
               />
+              {take.promptExposure === 'example_shown' ? (
+                <SelectField
+                  label="Example used for this recording"
+                  value={take.elicitationPromptText ?? ''}
+                  options={scenario.remoteExamples.map((example, index) => ({ label: `${index + 1}. ${example}`, value: example }))}
+                  onValueChange={(elicitationPromptText) => setTake((current) => current ? { ...current, elicitationPromptText } : current)}
+                />
+              ) : null}
               <Field
                 label="Pseudonymous submission code"
                 value={take.externalSubmissionId ?? ''}
@@ -411,7 +469,7 @@ export default function RecordScreen() {
           <Button label="Accept and save verified take" onPress={() => void save()} loading={saving} />
         </>
       )}
-      <Button label="Cancel" variant="secondary" onPress={() => confirmDiscard(() => router.back())} disabled={recorderState.isRecording || stopping} />
+      <Button label="Cancel" variant="secondary" onPress={() => confirmExit(() => router.back())} disabled={recorderState.isRecording || stopping} />
     </Screen>
   );
 }

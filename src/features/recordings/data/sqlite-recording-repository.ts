@@ -23,6 +23,7 @@ type ContextRow = {
   collection_method: Scenario['collectionMethod'];
   scenario_version: string;
   reference_data_json: string | null;
+  remote_examples_json: string;
 };
 
 type RecordingRow = {
@@ -34,13 +35,15 @@ type RecordingRow = {
   notes: string | null; annotation_status: Recording['annotationStatus']; archived_at: string | null; created_at: string; updated_at: string;
   capture_source: Recording['captureSource']; transport: Recording['transport']; prompt_exposure: Recording['promptExposure'];
   imported_at: string | null; source_mime_type: string | null; content_sha256: string | null; external_submission_id: string | null;
+  elicitation_prompt_text: string | null; source_file_name: string | null;
 };
 
 const columns = `id, display_id, project_id, session_id, participant_id, scenario_id, consent_record_id, scenario_version,
   scenario_prompt_snapshot_json, relative_audio_path, collection_method, recorded_at, duration_ms, file_size_bytes,
   container, codec, sample_rate_hz, channel_count, spoken_languages_json, language_variety, code_switching_status,
   recording_environment, noise_level, quality_rating, notes, annotation_status, archived_at, created_at, updated_at,
-  capture_source, transport, prompt_exposure, imported_at, source_mime_type, content_sha256, external_submission_id`;
+  capture_source, transport, prompt_exposure, imported_at, source_mime_type, content_sha256, external_submission_id,
+  elicitation_prompt_text, source_file_name`;
 
 function fromRow(row: RecordingRow): Recording {
   if (!row.consent_record_id) throw new Error('Recording has no linked consent revision.');
@@ -54,6 +57,7 @@ function fromRow(row: RecordingRow): Recording {
     captureSource: row.capture_source, transport: row.transport, promptExposure: row.prompt_exposure,
     importedAt: row.imported_at, sourceMimeType: row.source_mime_type, contentSha256: row.content_sha256,
     externalSubmissionId: row.external_submission_id,
+    elicitationPromptText: row.elicitation_prompt_text, sourceFileName: row.source_file_name,
     languageVariety: row.language_variety, codeSwitchingStatus: row.code_switching_status,
     recordingEnvironment: row.recording_environment, noiseLevel: row.noise_level, qualityRating: row.quality_rating,
     notes: row.notes, annotationStatus: row.annotation_status, archivedAt: row.archived_at,
@@ -94,7 +98,7 @@ export class SQLiteRecordingRepository implements RecordingRepository {
       `SELECT se.id AS session_id, se.project_id, se.participant_id, se.status AS session_status,
        sc.id AS scenario_id, sc.project_id AS scenario_project_id, sc.title AS scenario_title,
        sc.description AS scenario_description, sc.collection_instructions, sc.expected_intent,
-       sc.collection_method, sc.version AS scenario_version, sc.reference_data_json
+       sc.collection_method, sc.version AS scenario_version, sc.reference_data_json, sc.remote_examples_json
        FROM sessions se JOIN scenarios sc ON sc.id = ? WHERE se.id = ?`,
       scenarioId,
       sessionId,
@@ -131,6 +135,7 @@ export class SQLiteRecordingRepository implements RecordingRepository {
           expectedIntent: context.expected_intent,
           collectionMethod: context.collection_method,
           version: context.scenario_version,
+          remoteExamples: JSON.parse(context.remote_examples_json),
           referenceData: context.reference_data_json ? JSON.parse(context.reference_data_json) : null,
         },
         relativeAudioPath: stored.relativePath, collectionMethod: context.collection_method,
@@ -139,6 +144,7 @@ export class SQLiteRecordingRepository implements RecordingRepository {
         captureSource: verifiedTake.captureSource, transport: verifiedTake.transport, promptExposure: verifiedTake.promptExposure,
         importedAt: verifiedTake.importedAt, sourceMimeType: verifiedTake.sourceMimeType, contentSha256: verifiedTake.contentSha256,
         externalSubmissionId: verifiedTake.externalSubmissionId,
+        elicitationPromptText: verifiedTake.elicitationPromptText, sourceFileName: verifiedTake.sourceFileName,
         ...metadata, archivedAt: null, createdAt: timestamp, updatedAt: timestamp,
       });
       await this.db.runAsync(
@@ -147,8 +153,9 @@ export class SQLiteRecordingRepository implements RecordingRepository {
           scenario_prompt_snapshot_json, relative_audio_path, collection_method, recorded_at, duration_ms, file_size_bytes,
           container, codec, sample_rate_hz, channel_count, spoken_languages_json, language_variety, code_switching_status,
           recording_environment, noise_level, quality_rating, notes, annotation_status, archived_at, created_at, updated_at,
-          capture_source, transport, prompt_exposure, imported_at, source_mime_type, content_sha256, external_submission_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          capture_source, transport, prompt_exposure, imported_at, source_mime_type, content_sha256, external_submission_id,
+          elicitation_prompt_text, source_file_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         recording.id, recording.displayId, recording.projectId, recording.sessionId, recording.participantId,
         recording.scenarioId, recording.consentRecordId, recording.scenarioVersion,
         JSON.stringify(recording.scenarioPromptSnapshot), recording.relativeAudioPath, recording.collectionMethod,
@@ -158,6 +165,7 @@ export class SQLiteRecordingRepository implements RecordingRepository {
         recording.notes, recording.annotationStatus, recording.archivedAt, recording.createdAt, recording.updatedAt,
         recording.captureSource, recording.transport, recording.promptExposure, recording.importedAt,
         recording.sourceMimeType, recording.contentSha256, recording.externalSubmissionId,
+        recording.elicitationPromptText, recording.sourceFileName,
       );
       metadataInserted = true;
       const verified = await this.get(id);

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-export const EXPORT_SCHEMA_VERSION = '1.1.0';
-export const supportedExportSchemaVersions = ['1.0.0', EXPORT_SCHEMA_VERSION] as const;
+export const EXPORT_SCHEMA_VERSION = '1.2.0';
+export const supportedExportSchemaVersions = ['1.0.0', '1.1.0', EXPORT_SCHEMA_VERSION] as const;
 
 export const manifestFileSchema = z.object({
   path: z.string().min(1),

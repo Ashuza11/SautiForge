@@ -113,6 +113,7 @@ export class ExportService {
        scenario_prompt_snapshot_json, collection_method, recorded_at, duration_ms, file_size_bytes, container, codec,
        sample_rate_hz, channel_count, spoken_languages_json, language_variety, code_switching_status,
        capture_source, transport, prompt_exposure, imported_at, source_mime_type, content_sha256, external_submission_id,
+       elicitation_prompt_text,
        recording_environment, noise_level, quality_rating, notes, annotation_status, created_at, updated_at,
        relative_audio_path FROM recordings WHERE project_id = ? AND archived_at IS NULL ORDER BY recorded_at`, projectId,
     );
@@ -155,7 +156,7 @@ export class ExportService {
       );
       const scenarios = await this.db.getAllAsync<Record<string, unknown>>(
         `SELECT id, project_id, title, description, collection_instructions, expected_intent, collection_method,
-         version, reference_data_json, status, created_at, updated_at FROM scenarios WHERE project_id = ?`, projectId,
+         version, remote_examples_json, reference_data_json, status, created_at, updated_at FROM scenarios WHERE project_id = ?`, projectId,
       );
       const transcriptions = await this.db.getAllAsync<Record<string, unknown>>(
         `SELECT id, recording_id, verbatim_text, normalized_text, language_tags_json, notes, source,

@@ -26,7 +26,7 @@ Feature code is grouped under `src/features/<feature>`. Shared database setup li
 - Migrations use `PRAGMA user_version`; the app refuses to open a newer unsupported schema.
 - User input is bound as query parameters and parsed at runtime with Zod.
 - Projects and scenarios are archived rather than deleted.
-- A recording stores a scenario version and prompt snapshot, not only a mutable scenario foreign key.
+- A recording stores a scenario version and prompt snapshot, not only a mutable scenario foreign key. Imported elicited recordings also preserve the exact example selected during review.
 - Audio remains outside SQLite under document storage. A recording row is inserted only after the accepted file has been copied and verified readable.
 
 ## Recording save transaction
@@ -40,7 +40,7 @@ Feature code is grouped under `src/features/<feature>`. Shared database setup li
 7. Delete the temporary source only after both file and row verification pass. On failure, remove the incomplete destination and retain the source take for retry.
 8. Report success only after verification.
 
-External contributions use the same acceptance boundary. The researcher shares only a fictional example in bold with brief speaking guidance through Android's share sheet; participant, submission, scenario, and instruction fields remain inside SautiForge. The researcher then manually selects the returned audio through the document picker. SautiForge copies the provider file into cache, verifies it is readable and non-empty, hashes it for duplicate detection, decodes it for playback/duration, and only then allows the normal verified save. The original container is preserved; unavailable codec, sample-rate, and channel metadata remain null rather than being guessed. Capture source, transport, prompt exposure, import time, source MIME type, hash, and submission code are stored and exported.
+External contributions use the same acceptance boundary. A scenario stores up to 25 unique examples. The researcher shares the full numbered set in bold with brief speaking guidance through Android's share sheet; participant, submission, scenario, and instruction fields remain inside SautiForge. The Android document picker can return multiple audio files, which enter an in-memory review queue. Each file must be played and explicitly matched to its eliciting example—SautiForge never infers this label from picker order. It verifies every provider file is readable and non-empty, hashes it for duplicate detection, decodes it for playback/duration, and only then allows the normal verified save. The original container is preserved; unavailable codec, sample-rate, and channel metadata remain null rather than being guessed. Capture source, transport, prompt exposure, exact elicitation example, import time, source MIME type, hash, and submission code are stored and exported. The provider filename is retained only in the restricted local/administrative record because filenames may contain private information.
 
 At database initialization, document-storage recordings are reconciled against SQLite. Referenced non-empty files are counted as verified; missing references are reported in Settings; zero-byte and unreferenced files are moved into app-private recovery storage rather than treated as successful recordings or silently deleted.
 

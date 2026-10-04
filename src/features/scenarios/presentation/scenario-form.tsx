@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ZodIssue } from 'zod';
 
-import { scenarioDraftSchema, type ScenarioDraft } from '../domain/scenario';
+import { parseScenarioExamples, scenarioDraftSchema, type ScenarioDraft } from '../domain/scenario';
 import { Button, ErrorNotice, Field, uiStyles } from '@/ui/components';
 import { colors, spacing } from '@/ui/theme';
 
@@ -21,6 +21,7 @@ const blankScenario: ScenarioDraft = {
   expectedIntent: '',
   collectionMethod: 'elicited_prompt',
   version: '1.0',
+  remoteExamples: [],
   referenceData: null,
   status: 'active',
 };
@@ -33,6 +34,7 @@ type Props = {
 export function ScenarioForm({ initial = blankScenario, onSave }: Props) {
   const [draft, setDraft] = useState(initial);
   const [referenceText, setReferenceText] = useState(initial.referenceData ? JSON.stringify(initial.referenceData, null, 2) : '');
+  const [examplesText, setExamplesText] = useState(initial.remoteExamples.join('\n'));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -51,7 +53,14 @@ export function ScenarioForm({ initial = blankScenario, onSave }: Props) {
         return;
       }
     }
-    const result = scenarioDraftSchema.safeParse({ ...draft, referenceData });
+    let remoteExamples: string[];
+    try {
+      remoteExamples = parseScenarioExamples(examplesText);
+    } catch {
+      setErrors((current) => ({ ...current, remoteExamples: 'Enter up to 25 unique examples, one per line (500 characters maximum each).' }));
+      return;
+    }
+    const result = scenarioDraftSchema.safeParse({ ...draft, remoteExamples, referenceData });
     if (!result.success) {
       setErrors(Object.fromEntries(result.error.issues.map((issue: ZodIssue) => [String(issue.path[0]), issue.message])));
       return;
@@ -90,6 +99,14 @@ export function ScenarioForm({ initial = blankScenario, onSave }: Props) {
         </View>
       </View>
       <Field label="Scenario version" value={draft.version} onChangeText={set('version')} error={errors.version} autoCapitalize="none" />
+      <Field
+        label="Remote collection examples (one per line)"
+        value={examplesText}
+        onChangeText={setExamplesText}
+        error={errors.remoteExamples}
+        multiline
+      />
+      <Text style={uiStyles.muted}>These examples can be shared together and linked individually to returned recordings.</Text>
       <Field
         label="Structured reference data (optional JSON object)"
         value={referenceText}

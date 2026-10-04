@@ -21,6 +21,7 @@ const recording = {
   container: 'm4a', codec: 'aac', sample_rate_hz: 44100, channel_count: 2, spoken_languages_json: '["Kingwana"]',
   capture_source: 'device_microphone' as const, transport: null, prompt_exposure: 'instructions_only' as const,
   imported_at: null, source_mime_type: 'audio/mp4', content_sha256: null, external_submission_id: null,
+  elicitation_prompt_text: null,
   language_variety: 'Bukavu', code_switching_status: 'none', recording_environment: 'Indoor shop', noise_level: 'low',
   quality_rating: 4, notes: null, annotation_status: 'needs_transcription' as const, created_at: time, updated_at: time,
   audio_path: `audio/${recordingId}.m4a`,
@@ -42,5 +43,20 @@ describe('research export record contracts', () => {
   it('rejects malformed JSON and unsafe audio references', () => {
     expect(researchParticipantSchema.safeParse({ ...participant, other_languages_json: 'not-json' }).success).toBe(false);
     expect(researchRecordingSchema.safeParse({ ...recording, audio_path: '../private/audio.m4a' }).success).toBe(false);
+  });
+
+  it('preserves batch-import prompt provenance without exporting the provider filename', () => {
+    const parsed = researchRecordingSchema.parse({
+      ...recording,
+      capture_source: 'imported_file',
+      transport: 'whatsapp_manual',
+      prompt_exposure: 'example_shown',
+      imported_at: time,
+      content_sha256: 'a'.repeat(64),
+      external_submission_id: 'SUB-BATCH01',
+      elicitation_prompt_text: 'Mfano wa kwanza',
+    });
+    expect(parsed.elicitation_prompt_text).toBe('Mfano wa kwanza');
+    expect(researchRecordingSchema.safeParse({ ...parsed, source_file_name: 'private-provider-name.opus' }).success).toBe(false);
   });
 });

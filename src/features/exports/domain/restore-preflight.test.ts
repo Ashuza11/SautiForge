@@ -11,10 +11,11 @@ const entries = [
 
 describe('backup restore preflight', () => {
   it('accepts migratable backups and rejects too-old or newer database versions', () => {
-    expect(() => assertRestorableDatabaseVersion(3, 4)).not.toThrow();
-    expect(() => assertRestorableDatabaseVersion(4, 4)).not.toThrow();
-    expect(() => assertRestorableDatabaseVersion(2, 4)).toThrow(/too old/);
-    expect(() => assertRestorableDatabaseVersion(5, 4)).toThrow(/newer/);
+    expect(() => assertRestorableDatabaseVersion(3, 5)).not.toThrow();
+    expect(() => assertRestorableDatabaseVersion(4, 5)).not.toThrow();
+    expect(() => assertRestorableDatabaseVersion(5, 5)).not.toThrow();
+    expect(() => assertRestorableDatabaseVersion(2, 5)).toThrow(/too old/);
+    expect(() => assertRestorableDatabaseVersion(6, 5)).toThrow(/newer/);
   });
 
   it('calculates conservative extraction, destination, rollback, and reserve space', () => {

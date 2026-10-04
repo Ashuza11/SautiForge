@@ -13,6 +13,7 @@ type ScenarioRow = {
   expected_intent: string;
   collection_method: Scenario['collectionMethod'];
   version: string;
+  remote_examples_json: string;
   reference_data_json: string | null;
   status: Scenario['status'];
   created_at: string;
@@ -20,7 +21,7 @@ type ScenarioRow = {
 };
 
 const selectColumns = `id, project_id, title, description, collection_instructions, expected_intent,
-  collection_method, version, reference_data_json, status, created_at, updated_at`;
+  collection_method, version, remote_examples_json, reference_data_json, status, created_at, updated_at`;
 
 function fromRow(row: ScenarioRow): Scenario {
   return scenarioSchema.parse({
@@ -32,6 +33,7 @@ function fromRow(row: ScenarioRow): Scenario {
     expectedIntent: row.expected_intent,
     collectionMethod: row.collection_method,
     version: row.version,
+    remoteExamples: JSON.parse(row.remote_examples_json),
     referenceData: row.reference_data_json ? JSON.parse(row.reference_data_json) : null,
     status: row.status,
     createdAt: row.created_at,
@@ -71,8 +73,8 @@ export class SQLiteScenarioRepository implements ScenarioRepository {
     await this.db.runAsync(
       `INSERT INTO scenarios
        (id, project_id, title, description, collection_instructions, expected_intent, collection_method,
-        version, reference_data_json, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        version, remote_examples_json, reference_data_json, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       scenario.id,
       scenario.projectId,
       scenario.title,
@@ -81,6 +83,7 @@ export class SQLiteScenarioRepository implements ScenarioRepository {
       scenario.expectedIntent,
       scenario.collectionMethod,
       scenario.version,
+      JSON.stringify(scenario.remoteExamples),
       scenario.referenceData ? JSON.stringify(scenario.referenceData) : null,
       scenario.status,
       scenario.createdAt,
@@ -93,13 +96,14 @@ export class SQLiteScenarioRepository implements ScenarioRepository {
     const draft = scenarioDraftSchema.parse(input);
     const result = await this.db.runAsync(
       `UPDATE scenarios SET title = ?, description = ?, collection_instructions = ?, expected_intent = ?,
-       collection_method = ?, version = ?, reference_data_json = ?, status = ?, updated_at = ? WHERE id = ?`,
+       collection_method = ?, version = ?, remote_examples_json = ?, reference_data_json = ?, status = ?, updated_at = ? WHERE id = ?`,
       draft.title,
       draft.description,
       draft.collectionInstructions,
       draft.expectedIntent,
       draft.collectionMethod,
       draft.version,
+      JSON.stringify(draft.remoteExamples),
       draft.referenceData ? JSON.stringify(draft.referenceData) : null,
       draft.status,
       nowIso(),

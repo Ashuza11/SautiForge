@@ -4,10 +4,14 @@ import { buildRemotePrompt } from './remote-prompt';
 
 describe('remote collection prompt', () => {
   it('shares only the guidance and a WhatsApp-bold fictional example', () => {
-    const prompt = buildRemotePrompt('Nipe montant ya deni zote ku anziya le 22 September');
+    const prompt = buildRemotePrompt([
+      'Nipe montant ya deni zote ku anziya le 22 September',
+      'Stock ya cartes Orange iko ngapi?',
+    ]);
     expect(prompt).toBe([
       'Iyi njo exemple ya kuji-référer ako. Usiisome mot à mot; sema vile utaweza kuisema réellement.',
-      '*Nipe montant ya deni zote ku anziya le 22 September*',
+      '1. *Nipe montant ya deni zote ku anziya le 22 September*',
+      '2. *Stock ya cartes Orange iko ngapi?*',
     ].join('\n\n'));
     expect(prompt).not.toContain('Speaker code');
     expect(prompt).not.toContain('Submission code');
@@ -16,10 +20,10 @@ describe('remote collection prompt', () => {
   });
 
   it('removes nested bold markers and normalizes whitespace', () => {
-    expect(buildRemotePrompt('  *Mfano*\nwa pili  ')).toContain('*Mfano wa pili*');
+    expect(buildRemotePrompt(['  *Mfano*\nwa pili  '])).toContain('1. *Mfano wa pili*');
   });
 
   it('requires a fictional example', () => {
-    expect(() => buildRemotePrompt('   ')).toThrow(/Enter a fictional example/);
+    expect(() => buildRemotePrompt(['   '])).toThrow(/Add at least one fictional example/);
   });
 });

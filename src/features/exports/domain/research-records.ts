@@ -17,7 +17,7 @@ export const researchProjectSchema = z.object({
 export const researchScenarioSchema = z.object({
   id, project_id: id, title: z.string().min(1), description: z.string(), collection_instructions: z.string().min(1),
   expected_intent: z.string().min(1), collection_method: z.string().min(1), version: z.string().min(1),
-  reference_data_json: nullableJsonText, status: z.enum(['active', 'archived']), created_at: timestamp, updated_at: timestamp,
+  remote_examples_json: jsonText, reference_data_json: nullableJsonText, status: z.enum(['active', 'archived']), created_at: timestamp, updated_at: timestamp,
 }).strict();
 
 export const researchParticipantSchema = z.object({
@@ -43,6 +43,7 @@ export const researchRecordingSchema = z.object({
   transport: z.enum(['whatsapp_manual', 'other_messaging', 'file_transfer', 'other']).nullable(),
   prompt_exposure: z.enum(['instructions_only', 'example_shown', 'scripted_reading']), imported_at: timestamp.nullable(),
   source_mime_type: nullableText, content_sha256: z.string().regex(/^[a-f0-9]{64}$/).nullable(), external_submission_id: nullableText,
+  elicitation_prompt_text: nullableText,
   code_switching_status: nullableText, recording_environment: nullableText, noise_level: nullableText,
   quality_rating: z.number().int().min(1).max(5).nullable(), notes: nullableText,
   annotation_status: z.enum(['recorded', 'needs_transcription', 'transcribed', 'needs_review', 'validated', 'rejected']),

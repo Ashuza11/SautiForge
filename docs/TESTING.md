@@ -9,7 +9,7 @@ npx expo-doctor
 npx expo export --platform android
 ```
 
-Current automated suite: 27 files, 85 tests.
+Current automated suite: 29 files, 92 tests.
 
 The `Android pilot APK` GitHub Actions workflow repeats type-checking/tests, runs Expo prebuild, builds `:app:assembleRelease` with Java 17, and publishes the APK plus SHA-256. A green workflow proves compilation and artifact creation, but not installation, microphone behavior, or offline device persistence.
 
@@ -18,11 +18,11 @@ Release assembly first passed in [run 35874820535](https://github.com/Ashuza11/S
 | Feature | Automated coverage | Native/field coverage still required |
 | --- | --- | --- |
 | Projects | Required fields and reusable project validation | Screen CRUD and restart persistence |
-| Scenarios | Versioned reusable prompt/reference validation | Screen CRUD and historical prompt snapshot inspection |
+| Scenarios | Versioned reusable prompt/reference validation plus bounded, unique, line-separated remote example sets | Screen CRUD, batch-example editing, and historical prompt snapshot inspection |
 | Participants | Pseudonymous required fields, generated speaker IDs, demographic bounds, common selector values, and preservation of custom values | Screen CRUD, selector interaction, and uniqueness error UX |
 | Consent | Recording gate, expiry, withdrawal, and each sharing category | Microphone gate and export exclusion on device |
 | Sessions | Environment/nullability, exact consent linkage, valid reopen transitions, consent-checked recovery, verified persistence, and atomic soft-removal of sessions and child recordings | Pause, close, resume/reopen/remove, and process restart |
-| Recordings | Spoken-language/quality validation, predefined code-switching values, repeat-playback reset, interrupted-take stop/discard/error handling, save compensation, non-empty accepted-file readability, imported format/provenance validation, sanitized remote prompt, and duplicate-content rejection | Permission, actual microphone, phone-call behavior, file verification, repeated playback, Android share target, WhatsApp/file-provider import, reboot, low storage |
+| Recordings | Spoken-language/quality validation, predefined code-switching values, repeat-playback reset, interrupted-take stop/discard/error handling, save compensation, non-empty accepted-file readability, imported format/provenance validation, multi-example remote prompt, exact example/source-file export provenance, and duplicate-content rejection | Permission, actual microphone, phone-call behavior, file verification, repeated playback, Android share target, ten-file WhatsApp/document-provider queue, explicit example matching, reboot, low storage |
 | Transcriptions | Independent verbatim/normalized text, optional transcript, revision provenance | Edit/history UI persistence |
 | Annotations | Versioned strict payload, optional/unknown values, privacy field rejection | Edit/history UI persistence |
 | Dashboard | Aggregate mapping and empty-state zeroes | Counts against device SQLite data |
@@ -32,4 +32,4 @@ Release assembly first passed in [run 35874820535](https://github.com/Ashuza11/S
 | Settings | Strict local settings and storage-recovery report schemas | Permission/settings presentation and active project persistence |
 | File recovery | Verified/missing/empty/orphan classification | Startup quarantine with real interrupted files and process death |
 
-The migration tests execute all four migration SQL scripts against an in-memory SQLite database and check table creation, foreign-key enforcement, speaker-code uniqueness, and imported-audio provenance columns. Native modules cannot be proven by Node unit tests: all microphone, document-provider, sharing, ZIP-native, reboot, and interruption cases remain explicit gates in `FIELD_TEST_CHECKLIST.md`.
+The migration tests execute all five migration SQL scripts against an in-memory SQLite database and check table creation, foreign-key enforcement, speaker-code uniqueness, imported-audio provenance, scenario examples, and elicitation linkage. Native modules cannot be proven by Node unit tests: all microphone, multi-file document-provider, sharing, ZIP-native, reboot, and interruption cases remain explicit gates in `FIELD_TEST_CHECKLIST.md`.

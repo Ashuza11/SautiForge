@@ -12,8 +12,9 @@ Record device model, Android version, APK identifier/SHA-256, workflow run or bu
 - Deny microphone permission, recover through Android settings, and record a real take.
 - Interrupt a take with screen lock/app switch/phone call; confirm no false success and safe retry/cleanup.
 - Record, stop, play the temporary take to the end at least three times, rerecord/discard, accept, and confirm no Android `ArrayBuffer`/Blob error occurs.
-- Choose a scenario, enter a fictional example, and share it to WhatsApp; confirm the message contains only the guidance sentence and bold example, while speaker/submission/scenario/instruction fields remain inside SautiForge.
-- Return a voice note through WhatsApp, save/select it through Android, import it, play it repeatedly, correct its transport/prompt exposure, and save it. Confirm a second import of the same active audio is rejected as a duplicate.
+- Edit a scenario with ten unique fictional examples, restart the app, and confirm all ten persist. Share them to WhatsApp and confirm the message contains only the guidance plus ten numbered bold examples, while speaker/submission/scenario/instruction fields remain inside SautiForge.
+- Return ten voice notes through WhatsApp, select all ten through Android, and verify the review queue count. Play each file, explicitly select its matching example, correct transport/prompt exposure, and save it before advancing. Discard one file and confirm the others remain queued; cancel another batch and confirm all unsaved cache files are removed.
+- Attempt to save an example-exposed recording without selecting its exact example and confirm it is rejected. Confirm a second import of the same active audio is also rejected as a duplicate.
 - Review the imported recording and exported JSONL; confirm the original container plus import provenance and SHA-256 are accurate. Verify the workflow after app restart because SautiForge does not read or track WhatsApp delivery.
 - Select each predefined code-switching value (`none`, `present`, `ambiguous`, `unknown`); save metadata, restart, reboot, and play again.
 - Fill storage near the safety threshold and confirm recording/export stop with an explicit error.

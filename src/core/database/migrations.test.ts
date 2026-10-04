@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 
-import { DATABASE_CREATE_PRAGMAS, DATABASE_OPEN_PRAGMAS, DATABASE_VERSION, MIGRATION_1_SQL, MIGRATION_2_SQL, MIGRATION_3_SQL, MIGRATION_4_SQL } from './migrations';
+import { DATABASE_CREATE_PRAGMAS, DATABASE_OPEN_PRAGMAS, DATABASE_VERSION, MIGRATION_1_SQL, MIGRATION_2_SQL, MIGRATION_3_SQL, MIGRATION_4_SQL, MIGRATION_5_SQL } from './migrations';
 
 const requiredTables = [
   'projects',
@@ -17,7 +17,7 @@ const requiredTables = [
 
 describe('database migration 1', () => {
   it('has an explicit schema version', () => {
-    expect(DATABASE_VERSION).toBe(4);
+    expect(DATABASE_VERSION).toBe(5);
   });
 
   it.each(requiredTables)('creates the %s table', (table) => {
@@ -45,6 +45,12 @@ describe('database migration 1', () => {
     expect(MIGRATION_4_SQL).toContain('external_submission_id');
   });
 
+  it('adds scenario example sets and per-recording prompt linkage in migration 5', () => {
+    expect(MIGRATION_5_SQL).toContain('remote_examples_json');
+    expect(MIGRATION_5_SQL).toContain('elicitation_prompt_text');
+    expect(MIGRATION_5_SQL).toContain('source_file_name');
+  });
+
   it('executes the complete migration chain in SQLite', () => {
     const db = new DatabaseSync(':memory:');
     try {
@@ -53,6 +59,7 @@ describe('database migration 1', () => {
       db.exec(MIGRATION_2_SQL);
       db.exec(MIGRATION_3_SQL);
       db.exec(MIGRATION_4_SQL);
+      db.exec(MIGRATION_5_SQL);
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => String(row.name));
       expect(tables).toEqual(expect.arrayContaining(requiredTables));
       expect(db.prepare('PRAGMA foreign_keys').get()).toMatchObject({ foreign_keys: 1 });
@@ -67,6 +74,7 @@ describe('database migration 1', () => {
       db.exec(MIGRATION_2_SQL);
       db.exec(MIGRATION_3_SQL);
       db.exec(MIGRATION_4_SQL);
+      db.exec(MIGRATION_5_SQL);
       const timestamp = '2026-09-23T08:00:00.000Z';
       db.prepare(`INSERT INTO projects (id, title, description, target_language, language_variety, research_domain,
         collection_location, protocol_version, status, created_at, updated_at) VALUES (?, ?, '', ?, ?, ?, ?, ?, 'active', ?, ?)`)

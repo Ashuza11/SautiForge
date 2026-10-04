@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DATABASE_NAME = 'sautiforge.db';
-export const DATABASE_VERSION = 4;
+export const DATABASE_VERSION = 5;
 export const DATABASE_OPEN_PRAGMAS = 'PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;';
 export const DATABASE_CREATE_PRAGMAS = 'PRAGMA journal_mode = WAL;';
 
@@ -199,6 +199,12 @@ ALTER TABLE recordings ADD COLUMN external_submission_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_recordings_content_sha256 ON recordings(content_sha256) WHERE content_sha256 IS NOT NULL;
 `;
 
+export const MIGRATION_5_SQL = `
+ALTER TABLE scenarios ADD COLUMN remote_examples_json TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE recordings ADD COLUMN elicitation_prompt_text TEXT;
+ALTER TABLE recordings ADD COLUMN source_file_name TEXT;
+`;
+
 const KINGWANA_PROJECT_ID = '6a7d8df7-d495-4f69-9934-dc48ce5ee8d1';
 const SEEDED_AT = '2026-01-01T00:00:00.000Z';
 
@@ -292,6 +298,14 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
       await transaction.execAsync('PRAGMA user_version = 4');
     });
     currentVersion = 4;
+  }
+
+  if (currentVersion === 4) {
+    await db.withExclusiveTransactionAsync(async (transaction) => {
+      await transaction.execAsync(MIGRATION_5_SQL);
+      await transaction.execAsync('PRAGMA user_version = 5');
+    });
+    currentVersion = 5;
   }
 
   await db.execAsync(DATABASE_OPEN_PRAGMAS);
