@@ -92,6 +92,22 @@ describe('recording library query', () => {
   it('always excludes soft-archived recordings', () => {
     expect(buildRecordingSearchWhere({}).clause).toBe('r.archived_at IS NULL');
   });
+
+  it('soft-archives a recording so its audio remains recoverable', async () => {
+    const runAsync = vi.fn().mockResolvedValue({ changes: 1 });
+    const repository = new SQLiteRecordingRepository(
+      { runAsync } as never,
+      {} as never,
+    );
+
+    await expect(repository.archive('recording-id')).resolves.toBeUndefined();
+    expect(runAsync).toHaveBeenCalledWith(
+      'UPDATE recordings SET archived_at = ?, updated_at = ? WHERE id = ? AND archived_at IS NULL',
+      '2026-09-24T10:00:00.000+02:00',
+      '2026-09-24T10:00:00.000+02:00',
+      'recording-id',
+    );
+  });
 });
 
 describe('accepted recording persistence', () => {

@@ -26,3 +26,4 @@ Record device model, Android version, APK identifier/SHA-256, workflow run or bu
 - Create a private backup, restore it on a clean test install, restart, and compare database/audio counts and hashes.
 - Simulate cancellation and insufficient storage during export/restore; confirm local source data remains usable.
 - Verify private consent/administrative fields never appear in a default research export.
+- From a recording detail screen, remove an intentional duplicate and verify that it disappears from the library, dashboard counts, and research export while remaining in an administrative backup.

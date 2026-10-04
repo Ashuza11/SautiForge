@@ -111,9 +111,9 @@ export default function RecordingDetailScreen() {
 
   const archive = () => {
     if (!recording) return;
-    Alert.alert('Archive recording?', 'The audio and metadata will be excluded from the active library but retained for research integrity.', [
+    Alert.alert('Remove recording from dataset?', 'This recording will disappear from the active library, counts, and research dataset exports. A restricted recovery copy is retained for research integrity.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Archive', style: 'destructive', onPress: async () => {
+      { text: 'Remove', style: 'destructive', onPress: async () => {
         try { await repositories.recordings.archive(recording.id); router.replace('/library'); }
         catch (cause) { setError(cause instanceof Error ? cause.message : 'Recording could not be archived.'); }
       } },
@@ -175,7 +175,8 @@ export default function RecordingDetailScreen() {
       <BusinessField label="Payment method" field="paymentMethod" value={business.paymentMethod} setBusiness={setBusiness} />
       <BusinessField label="Transaction reference" field="transactionReference" value={business.transactionReference} setBusiness={setBusiness} />
       <Button label="Save business annotation revision" onPress={() => void saveAnnotation()} loading={savingAnnotation} />
-      <Button label="Archive recording" variant="danger" onPress={archive} />
+      <Heading subtitle="Use this for duplicate, incorrect, or mismatched takes. Removal is non-destructive and excludes the recording from normal dataset exports.">Correct a collection mistake</Heading>
+      <Button label="Remove recording from dataset" variant="danger" onPress={archive} />
     </Screen>
   );
 }

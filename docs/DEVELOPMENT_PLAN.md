@@ -26,6 +26,21 @@
 6. Restore a private backup onto a clean test installation and compare record/audio counts and hashes.
 7. Record device model, Android version, results, failures, and any workaround in a signed-off field-test report.
 
+## Planned WhatsApp import inbox (not implemented)
+
+Do not scan or import the whole WhatsApp media directory automatically. It contains unrelated and potentially private audio, and file metadata does not reliably identify the participant, task, scenario, or example.
+
+The recommended next vertical slice is an Android share target:
+
+1. In WhatsApp, the researcher explicitly selects one or more pilot voice notes and chooses **Share > SautiForge**.
+2. SautiForge copies the received `audio/*` content URIs into a private, recoverable pending-import inbox and verifies each copied file before reporting success.
+3. The inbox deduplicates files by SHA-256 and shows playback, source filename when available, size, format, and import time. It does not inspect WhatsApp chats or infer contributor identity.
+4. The researcher assigns every pending file to a project, participant, session, scenario, and exact example. No file becomes a dataset recording until this review is complete.
+5. Saving reuses the existing recording validation and persistence workflow. Cancelled or failed imports remain recoverable or are explicitly discarded.
+6. Automated tests cover incoming single/multiple-share parsing, queue persistence, duplicate detection, assignment validation, and save recovery. A physical Android test covers WhatsApp `ACTION_SEND` and `ACTION_SEND_MULTIPLE` behavior.
+
+An optional later experiment may let the researcher grant access to a specific directory through Android's Storage Access Framework and discover new audio files since the last scan. It must remain opt-in, present candidates in the same review inbox, never auto-assign recordings, and be retained only if it works reliably across the target phones and their WhatsApp storage layouts.
+
 Pause/resume recording remains disabled until it is stable on the target device. App-private storage and an unencrypted backup ZIP are not a complete security strategy; deployment requires Android device encryption, screen/application access controls, restricted backup handling, and a documented withdrawal process.
 
 ## Future, outside MVP
