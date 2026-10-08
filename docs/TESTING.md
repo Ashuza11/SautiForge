@@ -9,7 +9,7 @@ npx expo-doctor
 npx expo export --platform android
 ```
 
-Current automated suite: 31 files, 99 tests.
+Current automated suite: 33 files, 105 tests.
 
 The `Android pilot APK` GitHub Actions workflow repeats type-checking/tests, runs Expo prebuild, builds `:app:assembleRelease` with Java 17, and publishes the APK plus SHA-256. A green workflow proves compilation and artifact creation, but not installation, microphone behavior, or offline device persistence.
 
@@ -29,7 +29,7 @@ Release assembly first passed in [run 35874820535](https://github.com/Ashuza11/S
 | Library | Bound query construction for project, participant, scenario, language, date range, quality, status, and soft-archive exclusion | Full filter and soft-archive UI workflow |
 | Exports | Strict record-level privacy contracts, embedded JSON, safe audio paths, manifest schema/references, plus portable post-transfer size/hash/count/reference validation | Native ZIP creation/extraction, Android folder/share, and validation of a real transferred archive |
 | Restore | Migration chain execution, foreign keys, uniqueness, exact member set, unsafe/encrypted/duplicate entry rejection, and conservative storage preflight | Native ZIP picker, rollback injection, low-storage simulation, clean-device restore comparison |
-| Settings | Strict local settings and storage-recovery report schemas | Permission/settings presentation and active project persistence |
+| Settings | Strict local settings and storage-recovery report schemas, complete English/French/Kiswahili dictionaries, and write-read verification of the interface language | Permission presentation, language switching across screens, and restart persistence |
 | File recovery | Verified/missing/empty/orphan classification | Startup quarantine with real interrupted files and process death |
 
 The migration tests execute all five migration SQL scripts against an in-memory SQLite database and check table creation, foreign-key enforcement, speaker-code uniqueness, imported-audio provenance, scenario examples, and elicitation linkage. Native modules cannot be proven by Node unit tests: all microphone, multi-file document-provider, sharing, ZIP-native, reboot, and interruption cases remain explicit gates in `FIELD_TEST_CHECKLIST.md`.

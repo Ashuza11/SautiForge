@@ -4,6 +4,8 @@
 
 SautiForge is a single offline-first Expo application. Screens depend on repository interfaces; SQLite implementations live below those interfaces. This keeps presentation code independent from storage details and leaves room for a later opt-in synchronization adapter without building a backend now.
 
+The interface language is an app-level presentation preference stored in `app_settings`. The i18n provider exposes complete English, French, and Kiswahili dictionaries to navigation and shared controls. Changing it does not translate or mutate researcher-entered projects, prompts, metadata, transcripts, or annotations.
+
 ```text
 Expo Router screens
         ↓

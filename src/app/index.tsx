@@ -5,12 +5,13 @@ import { router, useFocusEffect } from 'expo-router';
 import { useRepositories } from '@/core/database/repositories';
 import type { Project } from '@/features/projects/domain/project';
 import type { DashboardSummary } from '@/features/dashboard/data/dashboard-repository';
-import { strings } from '@/i18n/en';
+import { useI18n } from '@/i18n';
 import { Button, Card, EmptyState, ErrorNotice, Heading, Screen, uiStyles } from '@/ui/components';
 import { colors, spacing } from '@/ui/theme';
 
 export default function HomeScreen() {
   const repositories = useRepositories();
+  const { strings } = useI18n();
   const projectRepository = repositories.projects;
   const [projects, setProjects] = useState<Project[]>([]);
   const [active, setActive] = useState<Project | null>(null);
@@ -25,9 +26,9 @@ export default function HomeScreen() {
       setSummary(selected ? await repositories.dashboard.getProjectSummary(selected.id) : null);
       setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Projects could not be loaded.');
+      setError(cause instanceof Error ? cause.message : strings.projectsLoadFailed);
     }
-  }, [projectRepository, repositories.dashboard]);
+  }, [projectRepository, repositories.dashboard, strings.projectsLoadFailed]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
@@ -36,7 +37,7 @@ export default function HomeScreen() {
       await projectRepository.setActive(project.id);
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The active project could not be changed.');
+      setError(cause instanceof Error ? cause.message : strings.activeProjectChangeFailed);
     }
   };
 
@@ -48,22 +49,22 @@ export default function HomeScreen() {
       <Text style={styles.sectionLabel}>{strings.activeProject}</Text>
       {active ? (
         <Card>
-          <Text style={uiStyles.badge}>ACTIVE</Text>
+          <Text style={uiStyles.badge}>{strings.active}</Text>
           <Text style={uiStyles.title}>{active.title}</Text>
           <Text style={uiStyles.muted}>{active.languageVariety} · {active.collectionLocation}</Text>
-          <Button label="Open project" onPress={() => router.push(`/projects/${active.id}`)} />
+          <Button label={strings.openProject} onPress={() => router.push(`/projects/${active.id}`)} />
         </Card>
       ) : (
-        <Card><EmptyState>Select an active project before collecting data.</EmptyState></Card>
+        <Card><EmptyState>{strings.selectActiveProject}</EmptyState></Card>
       )}
 
       {summary ? (
         <View style={styles.statGrid}>
-          <Stat label="Participants" value={summary.participantCount.toString()} />
-          <Stat label="Sessions" value={summary.sessionCount.toString()} />
-          <Stat label="Recordings" value={summary.recordingCount.toString()} />
-          <Stat label="Duration" value={formatDuration(summary.durationMs)} />
-          <Stat label="Needs review" value={summary.needsReviewCount.toString()} />
+          <Stat label={strings.participants} value={summary.participantCount.toString()} />
+          <Stat label={strings.sessions} value={summary.sessionCount.toString()} />
+          <Stat label={strings.recordings} value={summary.recordingCount.toString()} />
+          <Stat label={strings.duration} value={formatDuration(summary.durationMs, strings.minuteShort, strings.hourShort)} />
+          <Stat label={strings.needsReview} value={summary.needsReviewCount.toString()} />
         </View>
       ) : null}
 
@@ -73,19 +74,19 @@ export default function HomeScreen() {
       {projects.length === 0 ? <EmptyState>{strings.noProjects}</EmptyState> : projects.map((project) => (
         <Pressable key={project.id} onPress={() => router.push(`/projects/${project.id}`)}>
           <Card>
-            {project.status === 'archived' ? <Text style={styles.archivedBadge}>ARCHIVED</Text> : null}
+            {project.status === 'archived' ? <Text style={styles.archivedBadge}>{strings.archived}</Text> : null}
             <Text style={uiStyles.title}>{project.title}</Text>
             <Text style={uiStyles.muted}>{project.targetLanguage} · {project.languageVariety}</Text>
-            <Text style={uiStyles.body} numberOfLines={2}>{project.description || 'No description'}</Text>
+            <Text style={uiStyles.body} numberOfLines={2}>{project.description || strings.noDescription}</Text>
             {project.status === 'active' && active?.id !== project.id ? <Button label={strings.selectProject} variant="secondary" onPress={() => void select(project)} /> : null}
           </Card>
         </Pressable>
       ))}
       <Button label={strings.newProject} onPress={() => router.push('/projects/new')} />
-      <Button label="Open recording library" variant="secondary" onPress={() => router.push('/library')} />
-      <Button label="Export or restore" variant="secondary" onPress={() => router.push('/exports')} />
-      <Button label="Settings and safety" variant="secondary" onPress={() => router.push('/settings')} />
-      <Text style={styles.privacy}>Offline by design. No account, upload, or remote service is used.</Text>
+      <Button label={strings.openRecordingLibrary} variant="secondary" onPress={() => router.push('/library')} />
+      <Button label={strings.exportOrRestore} variant="secondary" onPress={() => router.push('/exports')} />
+      <Button label={strings.settingsAndSafety} variant="secondary" onPress={() => router.push('/settings')} />
+      <Text style={styles.privacy}>{strings.offlineByDesign}</Text>
     </Screen>
   );
 }
@@ -94,9 +95,9 @@ function Stat({ label, value }: { label: string; value: string }) {
   return <View style={styles.stat}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>;
 }
 
-function formatDuration(milliseconds: number): string {
+function formatDuration(milliseconds: number, minuteShort: string, hourShort: string): string {
   const totalMinutes = Math.round(milliseconds / 60000);
-  return totalMinutes < 60 ? `${totalMinutes} min` : `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
+  return totalMinutes < 60 ? `${totalMinutes} ${minuteShort}` : `${Math.floor(totalMinutes / 60)} ${hourShort} ${totalMinutes % 60} ${minuteShort}`;
 }
 
 const styles = StyleSheet.create({

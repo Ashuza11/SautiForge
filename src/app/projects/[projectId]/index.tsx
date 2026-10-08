@@ -8,7 +8,7 @@ import type { Scenario } from '@/features/scenarios/domain/scenario';
 import type { Participant } from '@/features/participants/domain/participant';
 import type { ParticipantProgress } from '@/features/participants/domain/participant-progress';
 import { canRecord, type ConsentRecord } from '@/features/consent/domain/consent';
-import { strings } from '@/i18n/en';
+import { useI18n } from '@/i18n';
 import { Button, Card, EmptyState, ErrorNotice, Heading, Screen, uiStyles } from '@/ui/components';
 import { colors, spacing } from '@/ui/theme';
 
@@ -16,6 +16,7 @@ export default function ProjectDetailScreen() {
   const params = useLocalSearchParams<{ projectId: string }>();
   const projectId = Array.isArray(params.projectId) ? params.projectId[0] : params.projectId;
   const repositories = useRepositories();
+  const { strings } = useI18n();
   const [project, setProject] = useState<Project | null>(null);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -97,22 +98,22 @@ export default function ProjectDetailScreen() {
       {error ? <ErrorNotice message={error} /> : null}
       <Card>
         {project.status === 'archived' ? <Text style={styles.archivedBadge}>ARCHIVED</Text> : null}
-        {activeProjectId === project.id ? <Text style={uiStyles.badge}>CURRENT COLLECTION PROJECT</Text> : null}
+        {activeProjectId === project.id ? <Text style={uiStyles.badge}>{strings.currentCollectionProject}</Text> : null}
         <Text style={uiStyles.body}>{project.description || 'No description'}</Text>
         <View style={uiStyles.divider} />
-        <Text style={uiStyles.muted}>Domain: {project.researchDomain}</Text>
-        <Text style={uiStyles.muted}>Location: {project.collectionLocation}</Text>
-        <Text style={uiStyles.muted}>Protocol: {project.protocolVersion}</Text>
+        <Text style={uiStyles.muted}>{strings.domain}: {project.researchDomain}</Text>
+        <Text style={uiStyles.muted}>{strings.location}: {project.collectionLocation}</Text>
+        <Text style={uiStyles.muted}>{strings.protocol}: {project.protocolVersion}</Text>
         <Text style={uiStyles.muted}>The current collection project controls the dashboard and where new participants, sessions, and recordings are created. It does not change existing records.</Text>
         {project.status === 'active' && activeProjectId !== project.id ? <Button label={strings.selectProject} variant="secondary" onPress={() => void selectForCollection()} /> : null}
         <Button label="Edit project" variant="secondary" onPress={() => router.push(`/projects/${project.id}/edit`)} />
       </Card>
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Participants</Text>
+        <Text style={styles.sectionTitle}>{strings.participants}</Text>
         <Text style={styles.count}>{participants.length}</Text>
       </View>
-      <Text style={uiStyles.muted}>Gold means every active scenario target is collected. Green means every retained recording also has a verbatim transcription.</Text>
+      <Text style={uiStyles.muted}>{strings.progressLegend}</Text>
       {participants.length === 0 ? <EmptyState>No participants registered. Add a pseudonymous speaker before starting a session.</EmptyState> : participants.map((participant) => {
         const progress = participantProgress[participant.id];
         return (
@@ -121,12 +122,12 @@ export default function ProjectDetailScreen() {
               <View style={uiStyles.row}>
                 <Text style={[uiStyles.title, uiStyles.grow]}>{participant.speakerCode}</Text>
                 <Text style={canRecord(currentConsent[participant.id] ?? null) ? uiStyles.badge : styles.consentRequired}>
-                  {canRecord(currentConsent[participant.id] ?? null) ? 'CONSENT VALID' : 'CONSENT REQUIRED'}
+                  {canRecord(currentConsent[participant.id] ?? null) ? strings.consentValid : strings.consentRequired}
                 </Text>
               </View>
               <Text style={uiStyles.muted}>{participant.primaryLanguage}{participant.languageVariety ? ` · ${participant.languageVariety}` : ''}</Text>
-              {progress ? <Text style={uiStyles.muted}>{progress.recordingCount}/{progress.requiredRecordingCount} target recordings · {progress.transcribedRecordingCount}/{progress.recordingCount} transcribed</Text> : null}
-              {progress?.transcriptionComplete ? <Text style={styles.transcriptionCompleteBadge}>TRANSCRIPTION COMPLETE</Text> : progress?.collectionComplete ? <Text style={styles.collectionCompleteBadge}>COLLECTION COMPLETE</Text> : null}
+              {progress ? <Text style={uiStyles.muted}>{progress.recordingCount}/{progress.requiredRecordingCount} {strings.targetRecordings} · {progress.transcribedRecordingCount}/{progress.recordingCount} {strings.transcribed}</Text> : null}
+              {progress?.transcriptionComplete ? <Text style={styles.transcriptionCompleteBadge}>{strings.transcriptionComplete}</Text> : progress?.collectionComplete ? <Text style={styles.collectionCompleteBadge}>{strings.collectionComplete}</Text> : null}
               {participant.status !== 'active' ? <Text style={styles.archivedBadge}>{participant.status.toUpperCase()}</Text> : null}
             </View>
           </Pressable>

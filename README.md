@@ -10,6 +10,7 @@ The first vertical slice includes:
 
 - Expo SDK 57, React Native, TypeScript, and Expo Router application structure.
 - A consistent high-contrast green brand palette shared by the icon, launch screen, primary controls, selections, and progress indicators.
+- A verified, device-persisted interface language selector for English, French, and Kiswahili; navigation, dashboard, settings, and shared workflow controls update offline without changing research-entered content.
 - A versioned `expo-sqlite` database with foreign keys and WAL journaling.
 - All MVP entity tables, stable UUID keys, timestamps, constraints, and indexes.
 - First-run Kingwana pilot project and five editable scenario records.
@@ -25,7 +26,7 @@ The first vertical slice includes:
 - Settings and safety status for microphone permission, free space, versions, offline behavior, backup limits, and the latest storage check.
 - Consent-filtered research ZIP exports with JSON/JSONL/CSV metadata, original audio, SHA-256 manifest, and post-compression verification.
 - A visibly separate sensitive administrative backup and hash/schema/database/audio-verified restore with rollback on failure.
-- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 99 automated tests including brand-palette consistency, participant progress, clear example-selection validation, real in-memory SQLite migration/relationship checks, scenario example sets, privacy-minimized batch sharing and queue progression, imported-audio hashing, prompt provenance and duplicate prevention, metadata selectors, repeat playback, and accepted-audio readability guards.
+- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 105 automated tests including translation completeness and language persistence, brand-palette consistency, participant progress, clear example-selection validation, real in-memory SQLite migration/relationship checks, scenario example sets, privacy-minimized batch sharing and queue progression, imported-audio hashing, prompt provenance and duplicate prevention, metadata selectors, repeat playback, and accepted-audio readability guards.
 - Android APK build profile in `eas.json`.
 - A verified GitHub Actions release build that produces a standalone pilot APK and SHA-256 sidecar.
 

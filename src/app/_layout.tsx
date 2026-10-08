@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DATABASE_NAME, migrateDatabase } from '@/core/database/migrations';
 import { RepositoryProvider } from '@/core/database/repositories';
 import { recoverRecordingStorage } from '@/features/recordings/data/recording-recovery';
+import { I18nProvider, useI18n } from '@/i18n';
 import { colors } from '@/ui/theme';
 
 function LoadingDatabase() {
@@ -24,29 +25,36 @@ export default function RootLayout() {
       <Suspense fallback={<LoadingDatabase />}>
         <SQLiteProvider databaseName={DATABASE_NAME} onInit={initializeDatabase} useSuspense>
           <RepositoryProvider>
-            <Stack screenOptions={{ headerStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTintColor: colors.ink }}>
-              <Stack.Screen name="index" options={{ title: 'SautiForge' }} />
-              <Stack.Screen name="projects/new" options={{ title: 'New project' }} />
-              <Stack.Screen name="projects/[projectId]/index" options={{ title: 'Project' }} />
-              <Stack.Screen name="projects/[projectId]/edit" options={{ title: 'Edit project' }} />
-              <Stack.Screen name="projects/[projectId]/scenarios/new" options={{ title: 'New scenario' }} />
-              <Stack.Screen name="scenarios/[scenarioId]/edit" options={{ title: 'Edit scenario' }} />
-              <Stack.Screen name="projects/[projectId]/participants/new" options={{ title: 'New participant' }} />
-              <Stack.Screen name="participants/[participantId]/index" options={{ title: 'Participant' }} />
-              <Stack.Screen name="participants/[participantId]/edit" options={{ title: 'Edit participant' }} />
-              <Stack.Screen name="participants/[participantId]/consent/new" options={{ title: 'Update consent' }} />
-              <Stack.Screen name="participants/[participantId]/sessions/new" options={{ title: 'Start session' }} />
-              <Stack.Screen name="sessions/[sessionId]/index" options={{ title: 'Collection session' }} />
-              <Stack.Screen name="sessions/[sessionId]/record" options={{ title: 'Record audio', gestureEnabled: false, headerBackVisible: false }} />
-              <Stack.Screen name="library/index" options={{ title: 'Recording library' }} />
-              <Stack.Screen name="recordings/[recordingId]" options={{ title: 'Recording detail' }} />
-              <Stack.Screen name="exports/index" options={{ title: 'Export and backup' }} />
-              <Stack.Screen name="settings/index" options={{ title: 'Settings and safety' }} />
-            </Stack>
+            <I18nProvider><LocalizedStack /></I18nProvider>
           </RepositoryProvider>
         </SQLiteProvider>
       </Suspense>
     </SafeAreaProvider>
+  );
+}
+
+function LocalizedStack() {
+  const { strings } = useI18n();
+  return (
+    <Stack screenOptions={{ headerStyle: { backgroundColor: colors.background }, headerShadowVisible: false, headerTintColor: colors.ink }}>
+      <Stack.Screen name="index" options={{ title: strings.appName }} />
+      <Stack.Screen name="projects/new" options={{ title: strings.newProject }} />
+      <Stack.Screen name="projects/[projectId]/index" options={{ title: strings.project }} />
+      <Stack.Screen name="projects/[projectId]/edit" options={{ title: strings.editProject }} />
+      <Stack.Screen name="projects/[projectId]/scenarios/new" options={{ title: strings.newScenario }} />
+      <Stack.Screen name="scenarios/[scenarioId]/edit" options={{ title: strings.editScenario }} />
+      <Stack.Screen name="projects/[projectId]/participants/new" options={{ title: strings.newParticipant }} />
+      <Stack.Screen name="participants/[participantId]/index" options={{ title: strings.participant }} />
+      <Stack.Screen name="participants/[participantId]/edit" options={{ title: strings.editParticipant }} />
+      <Stack.Screen name="participants/[participantId]/consent/new" options={{ title: strings.updateConsent }} />
+      <Stack.Screen name="participants/[participantId]/sessions/new" options={{ title: strings.startSession }} />
+      <Stack.Screen name="sessions/[sessionId]/index" options={{ title: strings.collectionSession }} />
+      <Stack.Screen name="sessions/[sessionId]/record" options={{ title: strings.recordAudio, gestureEnabled: false, headerBackVisible: false }} />
+      <Stack.Screen name="library/index" options={{ title: strings.recordingLibrary }} />
+      <Stack.Screen name="recordings/[recordingId]" options={{ title: strings.recordingDetail }} />
+      <Stack.Screen name="exports/index" options={{ title: strings.exports }} />
+      <Stack.Screen name="settings/index" options={{ title: strings.settingsAndSafety }} />
+    </Stack>
   );
 }
 

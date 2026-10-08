@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, spacing } from './theme';
+import { useI18n } from '@/i18n';
 
 export function Screen({ children, scroll = true }: PropsWithChildren<{ scroll?: boolean }>) {
   const content = scroll ? (
@@ -38,10 +39,11 @@ export function Screen({ children, scroll = true }: PropsWithChildren<{ scroll?:
 }
 
 export function Heading({ children, subtitle }: PropsWithChildren<{ subtitle?: string }>) {
+  const { translateText } = useI18n();
   return (
     <View style={styles.headingBlock}>
-      <Text style={styles.heading}>{children}</Text>
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      <Text style={styles.heading}>{typeof children === 'string' ? translateText(children) : children}</Text>
+      {subtitle ? <Text style={styles.subtitle}>{translateText(subtitle)}</Text> : null}
     </View>
   );
 }
@@ -59,6 +61,7 @@ type ButtonProps = {
 };
 
 export function Button({ label, onPress, disabled, loading, variant = 'primary' }: ButtonProps) {
+  const { translateText } = useI18n();
   return (
     <Pressable
       accessibilityRole="button"
@@ -72,23 +75,25 @@ export function Button({ label, onPress, disabled, loading, variant = 'primary' 
         (disabled || loading) && styles.buttonDisabled,
       ]}>
       {loading ? <ActivityIndicator color={variant === 'secondary' ? colors.primary : '#FFFFFF'} /> : (
-        <Text style={[styles.buttonLabel, variant === 'secondary' && styles.buttonLabelSecondary]}>{label}</Text>
+        <Text style={[styles.buttonLabel, variant === 'secondary' && styles.buttonLabelSecondary]}>{translateText(label)}</Text>
       )}
     </Pressable>
   );
 }
 
-export function Field({ label, error, multiline, ...props }: TextInputProps & { label: string; error?: string }) {
+export function Field({ label, error, multiline, placeholder, ...props }: TextInputProps & { label: string; error?: string }) {
+  const { translateText } = useI18n();
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>{translateText(label)}</Text>
       <TextInput
         {...props}
         multiline={multiline}
+        placeholder={placeholder ? translateText(placeholder) : undefined}
         placeholderTextColor="#8B938E"
         style={[styles.input, multiline && styles.multiline, error && styles.inputError]}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={styles.error}>{translateText(error)}</Text> : null}
     </View>
   );
 }
@@ -103,25 +108,26 @@ export function SelectField({ label, value, options, onValueChange, placeholder 
   placeholder?: string;
   error?: string;
 }) {
+  const { translateText } = useI18n();
   const [open, setOpen] = useState(false);
   const selected = options.find((option) => option.value === value);
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>{translateText(label)}</Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label}: ${selected?.label ?? placeholder}`}
+        accessibilityLabel={`${translateText(label)}: ${selected ? translateText(selected.label) : translateText(placeholder)}`}
         onPress={() => setOpen(true)}
         style={({ pressed }) => [styles.select, pressed && styles.buttonPressed, error && styles.inputError]}>
-        <Text style={selected ? styles.selectText : styles.selectPlaceholder}>{selected?.label ?? placeholder}</Text>
+        <Text style={selected ? styles.selectText : styles.selectPlaceholder}>{selected ? translateText(selected.label) : translateText(placeholder)}</Text>
         <Text style={styles.selectArrow}>⌄</Text>
       </Pressable>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={styles.error}>{translateText(error)}</Text> : null}
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <View style={styles.modalRoot}>
           <Pressable accessibilityLabel="Close options" style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
           <View style={styles.optionSheet}>
-            <Text style={styles.optionTitle}>{label}</Text>
+            <Text style={styles.optionTitle}>{translateText(label)}</Text>
             <ScrollView keyboardShouldPersistTaps="handled">
               {options.map((option) => (
                 <Pressable
@@ -130,7 +136,7 @@ export function SelectField({ label, value, options, onValueChange, placeholder 
                   accessibilityState={{ checked: option.value === value }}
                   onPress={() => { onValueChange(option.value); setOpen(false); }}
                   style={[styles.option, option.value === value && styles.optionSelected]}>
-                  <Text style={[styles.optionText, option.value === value && styles.optionTextSelected]}>{option.label}</Text>
+                  <Text style={[styles.optionText, option.value === value && styles.optionTextSelected]}>{translateText(option.label)}</Text>
                   {option.value === value ? <Text style={styles.optionCheck}>✓</Text> : null}
                 </Pressable>
               ))}
@@ -144,13 +150,15 @@ export function SelectField({ label, value, options, onValueChange, placeholder 
 }
 
 export function EmptyState({ children }: PropsWithChildren) {
-  return <Text style={styles.empty}>{children}</Text>;
+  const { translateText } = useI18n();
+  return <Text style={styles.empty}>{typeof children === 'string' ? translateText(children) : children}</Text>;
 }
 
 export function ErrorNotice({ message, action }: { message: string; action?: ReactNode }) {
+  const { translateText } = useI18n();
   return (
     <View style={styles.errorNotice}>
-      <Text style={styles.errorNoticeText}>{message}</Text>
+      <Text style={styles.errorNoticeText}>{translateText(message)}</Text>
       {action}
     </View>
   );
