@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { acceptedTakeSchema, recordingMetadataDraftSchema } from './recording';
+import { acceptedTakeSchema, elicitationPromptSelectionError, recordingMetadataDraftSchema } from './recording';
 
 describe('recording metadata validation', () => {
   it('requires at least one spoken language', () => {
@@ -58,5 +58,16 @@ describe('accepted take provenance', () => {
     if (!result.success) expect(result.error.issues.map((issue) => issue.path[0])).toEqual([
       'transport', 'importedAt', 'contentSha256', 'externalSubmissionId', 'elicitationPromptText',
     ]);
+  });
+});
+
+describe('elicitation prompt selection', () => {
+  it('returns a clear instruction when an example-shown import has no selected example', () => {
+    expect(elicitationPromptSelectionError({ promptExposure: 'example_shown', elicitationPromptText: null }))
+      .toBe('Choose the example this audio responds to before saving.');
+  });
+
+  it('does not require an example for instructions-only audio', () => {
+    expect(elicitationPromptSelectionError({ promptExposure: 'instructions_only', elicitationPromptText: null })).toBeNull();
   });
 });

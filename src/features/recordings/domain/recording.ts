@@ -89,3 +89,10 @@ export const acceptedTakeSchema = z.object({
 });
 
 export type AcceptedTake = z.infer<typeof acceptedTakeSchema>;
+
+export function elicitationPromptSelectionError(take: Pick<AcceptedTake, 'promptExposure' | 'elicitationPromptText'>): string | null {
+  if (take.promptExposure === 'example_shown' && !take.elicitationPromptText?.trim()) {
+    return 'Choose the example this audio responds to before saving.';
+  }
+  return null;
+}

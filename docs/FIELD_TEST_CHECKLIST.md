@@ -27,3 +27,5 @@ Record device model, Android version, APK identifier/SHA-256, workflow run or bu
 - Simulate cancellation and insufficient storage during export/restore; confirm local source data remains usable.
 - Verify private consent/administrative fields never appear in a default research export.
 - From a recording detail screen, remove an intentional duplicate and verify that it disappears from the library, dashboard counts, and research export while remaining in an administrative backup.
+- Import audio without choosing its matching example; verify that a plain-language message appears beside the selector instead of raw validation JSON.
+- Complete every active scenario target for one participant and verify the card turns gold; add verbatim transcripts to every retained recording and verify it turns green.

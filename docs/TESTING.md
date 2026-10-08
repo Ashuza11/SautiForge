@@ -9,7 +9,7 @@ npx expo-doctor
 npx expo export --platform android
 ```
 
-Current automated suite: 29 files, 92 tests.
+Current automated suite: 31 files, 99 tests.
 
 The `Android pilot APK` GitHub Actions workflow repeats type-checking/tests, runs Expo prebuild, builds `:app:assembleRelease` with Java 17, and publishes the APK plus SHA-256. A green workflow proves compilation and artifact creation, but not installation, microphone behavior, or offline device persistence.
 
@@ -19,10 +19,10 @@ Release assembly first passed in [run 35874820535](https://github.com/Ashuza11/S
 | --- | --- | --- |
 | Projects | Required fields and reusable project validation | Screen CRUD and restart persistence |
 | Scenarios | Versioned reusable prompt/reference validation plus bounded, unique, line-separated remote example sets | Screen CRUD, batch-example editing, and historical prompt snapshot inspection |
-| Participants | Pseudonymous required fields, generated speaker IDs, demographic bounds, common selector values, and preservation of custom values | Screen CRUD, selector interaction, and uniqueness error UX |
+| Participants | Pseudonymous required fields, generated speaker IDs, demographic bounds, common selector values, custom values, and collection/transcription progress derived from active scenarios and retained recordings | Screen CRUD, selector interaction, uniqueness error UX, and visual progress verification |
 | Consent | Recording gate, expiry, withdrawal, and each sharing category | Microphone gate and export exclusion on device |
 | Sessions | Environment/nullability, exact consent linkage, valid reopen transitions, consent-checked recovery, verified persistence, and atomic soft-removal of sessions and child recordings | Pause, close, resume/reopen/remove, and process restart |
-| Recordings | Spoken-language/quality validation, predefined code-switching values, repeat-playback reset, interrupted-take stop/discard/error handling, save compensation, non-empty accepted-file readability, imported format/provenance validation, multi-example remote prompt, exact example/source-file export provenance, and duplicate-content rejection | Permission, actual microphone, phone-call behavior, file verification, repeated playback, Android share target, ten-file WhatsApp/document-provider queue, explicit example matching, reboot, low storage |
+| Recordings | Spoken-language/quality validation, predefined code-switching values, repeat-playback reset, interrupted-take stop/discard/error handling, save compensation, non-empty accepted-file readability, imported format/provenance validation, clear missing-example feedback, multi-example remote prompt, exact example/source-file export provenance, and duplicate-content rejection | Permission, actual microphone, phone-call behavior, file verification, repeated playback, Android share target, ten-file WhatsApp/document-provider queue, explicit example matching, reboot, low storage |
 | Transcriptions | Independent verbatim/normalized text, optional transcript, revision provenance | Edit/history UI persistence |
 | Annotations | Versioned strict payload, optional/unknown values, privacy field rejection | Edit/history UI persistence |
 | Dashboard | Aggregate mapping and empty-state zeroes | Counts against device SQLite data |

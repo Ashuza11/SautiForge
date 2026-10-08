@@ -6,6 +6,7 @@ import { useRepositories } from '@/core/database/repositories';
 import type { Project } from '@/features/projects/domain/project';
 import type { Scenario } from '@/features/scenarios/domain/scenario';
 import type { Participant } from '@/features/participants/domain/participant';
+import type { ParticipantProgress } from '@/features/participants/domain/participant-progress';
 import { canRecord, type ConsentRecord } from '@/features/consent/domain/consent';
 import { strings } from '@/i18n/en';
 import { Button, Card, EmptyState, ErrorNotice, Heading, Screen, uiStyles } from '@/ui/components';
@@ -20,16 +21,18 @@ export default function ProjectDetailScreen() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [currentConsent, setCurrentConsent] = useState<Record<string, ConsentRecord | null>>({});
+  const [participantProgress, setParticipantProgress] = useState<Record<string, ParticipantProgress>>({});
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!projectId) return;
     try {
-      const [projectResult, scenarioResults, participantResults, activeProject] = await Promise.all([
+      const [projectResult, scenarioResults, participantResults, activeProject, progress] = await Promise.all([
         repositories.projects.get(projectId),
         repositories.scenarios.listByProject(projectId, true),
         repositories.participants.listByProject(projectId, true),
         repositories.projects.getActive(),
+        repositories.participants.getProgressByProject(projectId),
       ]);
       const consentPairs = await Promise.all(participantResults.map(async (participant) => [participant.id, await repositories.consent.getCurrent(participant.id)] as const));
       setProject(projectResult);
@@ -37,6 +40,7 @@ export default function ProjectDetailScreen() {
       setParticipants(participantResults);
       setActiveProjectId(activeProject?.id ?? null);
       setCurrentConsent(Object.fromEntries(consentPairs));
+      setParticipantProgress(progress);
       setError(projectResult ? null : 'Project not found.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The project could not be loaded.');
@@ -108,20 +112,26 @@ export default function ProjectDetailScreen() {
         <Text style={styles.sectionTitle}>Participants</Text>
         <Text style={styles.count}>{participants.length}</Text>
       </View>
-      {participants.length === 0 ? <EmptyState>No participants registered. Add a pseudonymous speaker before starting a session.</EmptyState> : participants.map((participant) => (
-        <Pressable key={participant.id} onPress={() => router.push(`/participants/${participant.id}`)}>
-          <Card>
-            <View style={uiStyles.row}>
-              <Text style={[uiStyles.title, uiStyles.grow]}>{participant.speakerCode}</Text>
-              <Text style={canRecord(currentConsent[participant.id] ?? null) ? uiStyles.badge : styles.consentRequired}>
-                {canRecord(currentConsent[participant.id] ?? null) ? 'CONSENT VALID' : 'CONSENT REQUIRED'}
-              </Text>
+      <Text style={uiStyles.muted}>Gold means every active scenario target is collected. Green means every retained recording also has a verbatim transcription.</Text>
+      {participants.length === 0 ? <EmptyState>No participants registered. Add a pseudonymous speaker before starting a session.</EmptyState> : participants.map((participant) => {
+        const progress = participantProgress[participant.id];
+        return (
+          <Pressable key={participant.id} onPress={() => router.push(`/participants/${participant.id}`)}>
+            <View style={[styles.participantCard, progress?.collectionComplete && styles.collectionCompleteCard, progress?.transcriptionComplete && styles.transcriptionCompleteCard]}>
+              <View style={uiStyles.row}>
+                <Text style={[uiStyles.title, uiStyles.grow]}>{participant.speakerCode}</Text>
+                <Text style={canRecord(currentConsent[participant.id] ?? null) ? uiStyles.badge : styles.consentRequired}>
+                  {canRecord(currentConsent[participant.id] ?? null) ? 'CONSENT VALID' : 'CONSENT REQUIRED'}
+                </Text>
+              </View>
+              <Text style={uiStyles.muted}>{participant.primaryLanguage}{participant.languageVariety ? ` · ${participant.languageVariety}` : ''}</Text>
+              {progress ? <Text style={uiStyles.muted}>{progress.recordingCount}/{progress.requiredRecordingCount} target recordings · {progress.transcribedRecordingCount}/{progress.recordingCount} transcribed</Text> : null}
+              {progress?.transcriptionComplete ? <Text style={styles.transcriptionCompleteBadge}>TRANSCRIPTION COMPLETE</Text> : progress?.collectionComplete ? <Text style={styles.collectionCompleteBadge}>COLLECTION COMPLETE</Text> : null}
+              {participant.status !== 'active' ? <Text style={styles.archivedBadge}>{participant.status.toUpperCase()}</Text> : null}
             </View>
-            <Text style={uiStyles.muted}>{participant.primaryLanguage}{participant.languageVariety ? ` · ${participant.languageVariety}` : ''}</Text>
-            {participant.status !== 'active' ? <Text style={styles.archivedBadge}>{participant.status.toUpperCase()}</Text> : null}
-          </Card>
-        </Pressable>
-      ))}
+          </Pressable>
+        );
+      })}
       {project.status === 'active' ? <Button label="Register participant" onPress={() => router.push(`/projects/${project.id}/participants/new`)} /> : null}
 
       <View style={styles.sectionHeader}>
@@ -152,6 +162,11 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
   sectionTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },
   count: { color: colors.primary, backgroundColor: colors.primarySoft, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3, overflow: 'hidden', fontWeight: '700' },
-  archivedBadge: { alignSelf: 'flex-start', color: colors.warning, backgroundColor: '#F6E9CF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, overflow: 'hidden', fontSize: 12, fontWeight: '700' },
+  archivedBadge: { alignSelf: 'flex-start', color: colors.warning, backgroundColor: colors.warningSoft, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, overflow: 'hidden', fontSize: 12, fontWeight: '700' },
   consentRequired: { alignSelf: 'flex-start', color: colors.danger, backgroundColor: '#FFF0F0', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, overflow: 'hidden', fontSize: 12, fontWeight: '700' },
+  participantCard: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 16, padding: spacing.md, gap: spacing.sm },
+  collectionCompleteCard: { backgroundColor: colors.warningSoft, borderColor: colors.warning },
+  transcriptionCompleteCard: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
+  collectionCompleteBadge: { alignSelf: 'flex-start', color: colors.warning, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, overflow: 'hidden', fontSize: 12, fontWeight: '700' },
+  transcriptionCompleteBadge: { alignSelf: 'flex-start', color: colors.primaryPressed, backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, overflow: 'hidden', fontSize: 12, fontWeight: '700' },
 });

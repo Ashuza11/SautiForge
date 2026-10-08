@@ -2,6 +2,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { newId, nowIso } from '@/domain/common';
 import { participantDraftSchema, participantSchema, type Participant, type ParticipantDraft } from '../domain/participant';
+import { buildParticipantProgress } from '../domain/participant-progress';
 import type { ParticipantRepository } from './participant-repository';
 
 type ParticipantRow = {
@@ -54,6 +55,45 @@ export class SQLiteParticipantRepository implements ParticipantRepository {
       projectId,
     );
     return rows.map(fromRow);
+  }
+
+  async getProgressByProject(projectId: string) {
+    const [participantRows, scenarioRows, recordingRows] = await Promise.all([
+      this.db.getAllAsync<{ id: string }>('SELECT id FROM participants WHERE project_id = ?', projectId),
+      this.db.getAllAsync<{ id: string; remote_examples_json: string }>(
+        `SELECT id, remote_examples_json FROM scenarios WHERE project_id = ? AND status = 'active'`,
+        projectId,
+      ),
+      this.db.getAllAsync<{ id: string; participant_id: string; scenario_id: string; transcribed: number }>(
+        `SELECT r.id, r.participant_id, r.scenario_id,
+         CASE WHEN EXISTS (
+           SELECT 1 FROM transcriptions t
+           WHERE t.recording_id = r.id
+             AND t.revision_number = (SELECT MAX(latest.revision_number) FROM transcriptions latest WHERE latest.recording_id = r.id)
+             AND t.source = 'human' AND t.verbatim_text IS NOT NULL AND trim(t.verbatim_text) <> ''
+         ) THEN 1 ELSE 0 END AS transcribed
+         FROM recordings r
+         WHERE r.project_id = ? AND r.archived_at IS NULL AND r.annotation_status <> 'rejected'`,
+        projectId,
+      ),
+    ]);
+    const targets = scenarioRows.map((scenario) => {
+      const examples = JSON.parse(scenario.remote_examples_json) as unknown;
+      return {
+        scenarioId: scenario.id,
+        requiredRecordingCount: Array.isArray(examples) && examples.length > 0 ? examples.length : 1,
+      };
+    });
+    return buildParticipantProgress(
+      participantRows.map((participant) => participant.id),
+      targets,
+      recordingRows.map((recording) => ({
+        id: recording.id,
+        participantId: recording.participant_id,
+        scenarioId: recording.scenario_id,
+        transcribed: recording.transcribed === 1,
+      })),
+    );
   }
 
   async get(id: string): Promise<Participant | null> {

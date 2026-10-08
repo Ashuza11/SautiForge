@@ -15,7 +15,7 @@ The first vertical slice includes:
 - First-run Kingwana pilot project and five editable scenario records.
 - Working offline project creation, editing, selection, and soft archival.
 - Working scenario creation, editing, versioning, structured reference data, and soft archival.
-- Pseudonymous participant registration/editing with automatically generated speaker IDs, selection lists for common demographic values, and free-text fallbacks for locally relevant answers.
+- Pseudonymous participant registration/editing with automatically generated speaker IDs, selection lists for common demographic values, free-text fallbacks, and gold/green collection and transcription completion indicators derived from retained recordings.
 - Append-only consent revisions, per-use approvals, visible history, and reusable recording/export authorization checks.
 - Consent-linked, resumable collection sessions with device/environment metadata, consent-checked recovery from accidental completion, and research-safe removal of incorrect sessions.
 - Real foreground microphone recording, visible timer/indicator, repeatable immediate playback, rerecord/discard confirmation, and verified accepted-file persistence in document storage.
@@ -25,7 +25,7 @@ The first vertical slice includes:
 - Settings and safety status for microphone permission, free space, versions, offline behavior, backup limits, and the latest storage check.
 - Consent-filtered research ZIP exports with JSON/JSONL/CSV metadata, original audio, SHA-256 manifest, and post-compression verification.
 - A visibly separate sensitive administrative backup and hash/schema/database/audio-verified restore with rollback on failure.
-- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 92 automated tests including brand-palette consistency, real in-memory SQLite migration/relationship checks, scenario example sets, privacy-minimized batch sharing and queue progression, imported-audio hashing, prompt provenance and duplicate prevention, metadata selectors, repeat playback, and accepted-audio readability guards.
+- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 99 automated tests including brand-palette consistency, participant progress, clear example-selection validation, real in-memory SQLite migration/relationship checks, scenario example sets, privacy-minimized batch sharing and queue progression, imported-audio hashing, prompt provenance and duplicate prevention, metadata selectors, repeat playback, and accepted-audio readability guards.
 - Android APK build profile in `eas.json`.
 - A verified GitHub Actions release build that produces a standalone pilot APK and SHA-256 sidecar.
 

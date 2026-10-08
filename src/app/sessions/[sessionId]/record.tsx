@@ -23,7 +23,7 @@ import { describeImportedAudio, importedDurationMs } from '@/features/recordings
 import { advanceImportedTakeQueue } from '@/features/recordings/domain/import-queue';
 import { appStateInterruptsRecording, stopAndDiscardInterruptedTake } from '@/features/recordings/domain/interruption';
 import { shouldRestartFinishedPlayback } from '@/features/recordings/domain/playback';
-import { recordingMetadataDraftSchema, type AcceptedTake } from '@/features/recordings/domain/recording';
+import { acceptedTakeSchema, elicitationPromptSelectionError, recordingMetadataDraftSchema, type AcceptedTake } from '@/features/recordings/domain/recording';
 import { codeSwitchingOptions } from '@/features/recordings/domain/recording-metadata-options';
 import { buildRemotePrompt } from '@/features/recordings/domain/remote-prompt';
 import type { Scenario } from '@/features/scenarios/domain/scenario';
@@ -57,6 +57,7 @@ export default function RecordScreen() {
   const [quality, setQuality] = useState('');
   const [notes, setNotes] = useState('');
   const [lastSubmissionId, setLastSubmissionId] = useState<string | null>(null);
+  const [exampleError, setExampleError] = useState<string | null>(null);
   const interruptedRef = useRef(false);
   const stoppingRef = useRef(false);
   const recorder = useAudioRecorder(recordingOptions, (status) => {
@@ -113,6 +114,7 @@ export default function RecordScreen() {
   }, [take]);
 
   const advanceImportQueue = useCallback(() => {
+    setExampleError(null);
     setImportQueue((current) => {
       const { next, remaining } = advanceImportedTakeQueue(current);
       setTake(next);
@@ -299,6 +301,7 @@ export default function RecordScreen() {
         throw cause;
       }
       const [first, ...remaining] = imported;
+      setExampleError(null);
       setTake(first ?? null);
       setImportQueue(remaining);
     } catch (cause) {
@@ -320,8 +323,19 @@ export default function RecordScreen() {
 
   const save = async () => {
     if (!take || !session || !scenario) return;
+    const promptSelectionError = elicitationPromptSelectionError(take);
+    setExampleError(promptSelectionError);
+    if (promptSelectionError) {
+      setError('Choose an example under “Example used for this recording”, then save again.');
+      return;
+    }
     if (take.captureSource === 'imported_file' && take.durationMs <= 0) {
       setError('Wait for the imported audio to load and show a valid duration before saving.');
+      return;
+    }
+    const parsedTake = acceptedTakeSchema.safeParse(take);
+    if (!parsedTake.success) {
+      setError(parsedTake.error.issues[0]?.message ?? 'The imported audio details are incomplete.');
       return;
     }
     const qualityRating = quality.trim() ? Number(quality) : null;
@@ -440,18 +454,28 @@ export default function RecordScreen() {
                   { label: 'Example shown', value: 'example_shown' },
                   { label: 'Scripted reading', value: 'scripted_reading' },
                 ]}
-                onValueChange={(promptExposure) => setTake((current) => current ? {
-                  ...current,
-                  promptExposure: promptExposure as AcceptedTake['promptExposure'],
-                  elicitationPromptText: promptExposure === 'example_shown' ? current.elicitationPromptText : null,
-                } : current)}
+                onValueChange={(promptExposure) => {
+                  setExampleError(null);
+                  setError(null);
+                  setTake((current) => current ? {
+                    ...current,
+                    promptExposure: promptExposure as AcceptedTake['promptExposure'],
+                    elicitationPromptText: promptExposure === 'example_shown' ? current.elicitationPromptText : null,
+                  } : current);
+                }}
               />
               {take.promptExposure === 'example_shown' ? (
                 <SelectField
                   label="Example used for this recording"
                   value={take.elicitationPromptText ?? ''}
                   options={scenario.remoteExamples.map((example, index) => ({ label: `${index + 1}. ${example}`, value: example }))}
-                  onValueChange={(elicitationPromptText) => setTake((current) => current ? { ...current, elicitationPromptText } : current)}
+                  onValueChange={(elicitationPromptText) => {
+                    setExampleError(null);
+                    setError(null);
+                    setTake((current) => current ? { ...current, elicitationPromptText } : current);
+                  }}
+                  placeholder="Select the matching example before saving"
+                  error={exampleError ?? undefined}
                 />
               ) : null}
               <Field
