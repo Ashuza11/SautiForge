@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { researchExportRecordsSchema, researchParticipantSchema, researchRecordingSchema } from './research-records';
+import { researchExportRecordsSchema, researchParticipantSchema, researchRecordingSchema, researchTranscriptionSchema } from './research-records';
 
 const time = '2026-09-23T08:00:00.000Z';
 const projectId = '6a7d8df7-d495-4f69-9934-dc48ce5ee8d1';
@@ -58,5 +58,25 @@ describe('research export record contracts', () => {
     });
     expect(parsed.elicitation_prompt_text).toBe('Mfano wa kwanza');
     expect(researchRecordingSchema.safeParse({ ...parsed, source_file_name: 'private-provider-name.opus' }).success).toBe(false);
+  });
+
+  it('exports the editable transcription context with its revision', () => {
+    const parsed = researchTranscriptionSchema.parse({
+      id: 'f113147b-c726-444c-a454-94f0ee1d1b6c',
+      recording_id: recordingId,
+      verbatim_text: 'Nimeuzisha unités mbili',
+      normalized_text: null,
+      scenario_context: 'Recording a sale',
+      elicitation_prompt_context: 'Uuzishe unités mbili',
+      language_tags_json: '["kingwana"]',
+      notes: null,
+      source: 'human',
+      revision_number: 1,
+      supersedes_id: null,
+      created_at: time,
+      created_by: null,
+    });
+    expect(parsed.scenario_context).toBe('Recording a sale');
+    expect(parsed.elicitation_prompt_context).toBe('Uuzishe unités mbili');
   });
 });

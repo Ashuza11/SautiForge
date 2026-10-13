@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ZodIssue } from 'zod';
 
 import { parseScenarioExamples, scenarioDraftSchema, type ScenarioDraft } from '../domain/scenario';
+import { useI18n } from '@/i18n';
 import { Button, ErrorNotice, Field, uiStyles } from '@/ui/components';
 import { colors, spacing } from '@/ui/theme';
 
@@ -32,6 +33,7 @@ type Props = {
 };
 
 export function ScenarioForm({ initial = blankScenario, onSave }: Props) {
+  const { strings, translateText } = useI18n();
   const [draft, setDraft] = useState(initial);
   const [referenceText, setReferenceText] = useState(initial.referenceData ? JSON.stringify(initial.referenceData, null, 2) : '');
   const [examplesText, setExamplesText] = useState(initial.remoteExamples.join('\n'));
@@ -49,7 +51,7 @@ export function ScenarioForm({ initial = blankScenario, onSave }: Props) {
         if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') throw new Error();
         referenceData = parsed as Record<string, unknown>;
       } catch {
-        setErrors((current) => ({ ...current, referenceData: 'Enter a valid JSON object, or leave this blank.' }));
+        setErrors((current) => ({ ...current, referenceData: strings.invalidJsonObject }));
         return;
       }
     }
@@ -57,12 +59,12 @@ export function ScenarioForm({ initial = blankScenario, onSave }: Props) {
     try {
       remoteExamples = parseScenarioExamples(examplesText);
     } catch {
-      setErrors((current) => ({ ...current, remoteExamples: 'Enter up to 25 unique examples, one per line (500 characters maximum each).' }));
+      setErrors((current) => ({ ...current, remoteExamples: strings.invalidScenarioExamples }));
       return;
     }
     const result = scenarioDraftSchema.safeParse({ ...draft, remoteExamples, referenceData });
     if (!result.success) {
-      setErrors(Object.fromEntries(result.error.issues.map((issue: ZodIssue) => [String(issue.path[0]), issue.message])));
+      setErrors(Object.fromEntries(result.error.issues.map((issue: ZodIssue) => [String(issue.path[0]), translateText(issue.message)])));
       return;
     }
     setErrors({});
@@ -70,7 +72,7 @@ export function ScenarioForm({ initial = blankScenario, onSave }: Props) {
     try {
       await onSave(result.data);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'The scenario could not be saved.');
+      setSubmitError(error instanceof Error ? translateText(error.message) : strings.scenarioSaveFailed);
     } finally {
       setSaving(false);
     }
@@ -79,12 +81,12 @@ export function ScenarioForm({ initial = blankScenario, onSave }: Props) {
   return (
     <View style={uiStyles.gap}>
       {submitError ? <ErrorNotice message={submitError} /> : null}
-      <Field label="Scenario title" value={draft.title} onChangeText={set('title')} error={errors.title} />
-      <Field label="Description" value={draft.description} onChangeText={set('description')} error={errors.description} multiline />
-      <Field label="Collection instructions" value={draft.collectionInstructions} onChangeText={set('collectionInstructions')} error={errors.collectionInstructions} multiline />
-      <Field label="Expected intent" value={draft.expectedIntent} onChangeText={set('expectedIntent')} error={errors.expectedIntent} autoCapitalize="none" />
+      <Field label={strings.scenarioTitle} value={draft.title} onChangeText={set('title')} error={errors.title} />
+      <Field label={strings.description} value={draft.description} onChangeText={set('description')} error={errors.description} multiline />
+      <Field label={strings.collectionInstructions} value={draft.collectionInstructions} onChangeText={set('collectionInstructions')} error={errors.collectionInstructions} multiline />
+      <Field label={strings.expectedIntent} value={draft.expectedIntent} onChangeText={set('expectedIntent')} error={errors.expectedIntent} autoCapitalize="none" />
       <View style={styles.methodBlock}>
-        <Text style={styles.label}>Collection method</Text>
+        <Text style={styles.label}>{strings.collectionMethod}</Text>
         <View style={uiStyles.row}>
           {methods.map((method) => (
             <Pressable
@@ -93,30 +95,28 @@ export function ScenarioForm({ initial = blankScenario, onSave }: Props) {
               accessibilityState={{ checked: draft.collectionMethod === method.value }}
               onPress={() => setDraft((current) => ({ ...current, collectionMethod: method.value }))}
               style={[styles.choice, draft.collectionMethod === method.value && styles.choiceSelected]}>
-              <Text style={[styles.choiceText, draft.collectionMethod === method.value && styles.choiceTextSelected]}>{method.label}</Text>
+              <Text style={[styles.choiceText, draft.collectionMethod === method.value && styles.choiceTextSelected]}>{translateText(method.label)}</Text>
             </Pressable>
           ))}
         </View>
       </View>
-      <Field label="Scenario version" value={draft.version} onChangeText={set('version')} error={errors.version} autoCapitalize="none" />
+      <Field label={strings.scenarioVersion} value={draft.version} onChangeText={set('version')} error={errors.version} autoCapitalize="none" />
       <Field
-        label="Remote collection examples (one per line)"
+        label={strings.remoteExamples}
         value={examplesText}
         onChangeText={setExamplesText}
         error={errors.remoteExamples}
         multiline
       />
-      <Text style={uiStyles.muted}>These examples can be shared together and linked individually to returned recordings.</Text>
       <Field
-        label="Structured reference data (optional JSON object)"
+        label={strings.referenceData}
         value={referenceText}
         onChangeText={setReferenceText}
         error={errors.referenceData}
         autoCapitalize="none"
         multiline
       />
-      <Text style={uiStyles.muted}>A recording will keep a snapshot of this version and prompt, even if the scenario changes later.</Text>
-      <Button label="Save scenario" onPress={submit} loading={saving} />
+      <Button label={strings.saveScenario} onPress={submit} loading={saving} />
     </View>
   );
 }

@@ -1,4 +1,4 @@
-import type { AcceptedTake, Recording, RecordingMetadataDraft } from '../domain/recording';
+import type { AcceptedTake, Recording, RecordingMetadataDraft, RecordingPromptCorrection, RecordingPromptCorrectionDraft } from '../domain/recording';
 
 export type RecordingSearch = {
   projectId?: string;
@@ -18,5 +18,7 @@ export interface RecordingRepository {
   get(id: string): Promise<Recording | null>;
   saveAcceptedTake(sessionId: string, scenarioId: string, take: AcceptedTake, metadata: RecordingMetadataDraft): Promise<Recording>;
   updateStatus(id: string, status: Recording['annotationStatus']): Promise<Recording>;
+  listPromptCorrections(id: string): Promise<RecordingPromptCorrection[]>;
+  correctElicitationPrompt(id: string, correction: RecordingPromptCorrectionDraft): Promise<Recording>;
   archive(id: string): Promise<void>;
 }

@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { SQLiteProvider } from 'expo-sqlite';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -14,7 +14,6 @@ function LoadingDatabase() {
   return (
     <View style={styles.loading}>
       <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={styles.loadingText}>Preparing secure local storage…</Text>
     </View>
   );
 }
@@ -75,5 +74,4 @@ async function initializeDatabase(database: Parameters<typeof migrateDatabase>[0
 
 const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: colors.background },
-  loadingText: { color: colors.muted, fontSize: 15 },
 });

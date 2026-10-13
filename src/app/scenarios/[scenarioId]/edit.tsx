@@ -4,9 +4,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useRepositories } from '@/core/database/repositories';
 import type { Scenario, ScenarioDraft } from '@/features/scenarios/domain/scenario';
 import { ScenarioForm } from '@/features/scenarios/presentation/scenario-form';
+import { useI18n } from '@/i18n';
 import { EmptyState, ErrorNotice, Heading, Screen } from '@/ui/components';
 
 export default function EditScenarioScreen() {
+  const { strings, translateText } = useI18n();
   const params = useLocalSearchParams<{ scenarioId: string }>();
   const scenarioId = Array.isArray(params.scenarioId) ? params.scenarioId[0] : params.scenarioId;
   const { scenarios } = useRepositories();
@@ -15,15 +17,15 @@ export default function EditScenarioScreen() {
 
   useEffect(() => {
     if (!scenarioId) return;
-    scenarios.get(scenarioId).then(setScenario).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Scenario could not be loaded.'));
-  }, [scenarioId, scenarios]);
+    scenarios.get(scenarioId).then(setScenario).catch((cause: unknown) => setError(cause instanceof Error ? translateText(cause.message) : strings.scenarioLoadFailed));
+  }, [scenarioId, scenarios, strings, translateText]);
 
   if (error) return <Screen><ErrorNotice message={error} /></Screen>;
-  if (!scenario) return <Screen><EmptyState>Loading scenario…</EmptyState></Screen>;
+  if (!scenario) return <Screen><EmptyState>{strings.loadingScenario}</EmptyState></Screen>;
   const initial: ScenarioDraft = { ...scenario };
   const save = async (draft: ScenarioDraft) => {
     await scenarios.update(scenario.id, draft);
     router.back();
   };
-  return <Screen><Heading>Edit scenario</Heading><ScenarioForm initial={initial} onSave={save} /></Screen>;
+  return <Screen><Heading>{strings.editScenario}</Heading><ScenarioForm initial={initial} onSave={save} /></Screen>;
 }

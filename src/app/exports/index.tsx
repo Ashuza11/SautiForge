@@ -6,19 +6,20 @@ import type { File } from 'expo-file-system';
 import { useRepositories } from '@/core/database/repositories';
 import type { SharingCategory } from '@/features/consent/domain/consent';
 import type { Project } from '@/features/projects/domain/project';
+import { useI18n } from '@/i18n';
 import { Button, Card, ErrorNotice, Heading, Screen, uiStyles } from '@/ui/components';
 import { colors, spacing } from '@/ui/theme';
 
 type ReadyArchive = { file: File; exportId: string; label: string };
 
-const categories: Array<{ value: SharingCategory; label: string; explanation: string }> = [
-  { value: 'internal_research', label: 'Internal research', explanation: 'Includes recordings currently approved for internal research.' },
-  { value: 'restricted_annotation', label: 'Restricted annotation', explanation: 'Includes only recordings approved for controlled annotator sharing.' },
-  { value: 'public_release', label: 'Public release', explanation: 'Includes only recordings explicitly approved for public release.' },
-];
-
 export default function ExportScreen() {
   const repositories = useRepositories();
+  const { strings, translateText } = useI18n();
+  const categories: Array<{ value: SharingCategory; label: string; explanation: string }> = [
+    { value: 'internal_research', label: strings.internalResearch, explanation: strings.internalResearchExport },
+    { value: 'restricted_annotation', label: strings.restrictedAnnotation, explanation: strings.restrictedExport },
+    { value: 'public_release', label: strings.publicRelease, explanation: strings.publicExport },
+  ];
   const [project, setProject] = useState<Project | null>(null);
   const [category, setCategory] = useState<SharingCategory>('internal_research');
   const [busy, setBusy] = useState<string | null>(null);
@@ -27,32 +28,32 @@ export default function ExportScreen() {
   const [ready, setReady] = useState<ReadyArchive | null>(null);
 
   useFocusEffect(useCallback(() => {
-    void repositories.projects.getActive().then(setProject).catch((cause) => setError(errorMessage(cause)));
-  }, [repositories.projects]));
+    void repositories.projects.getActive().then(setProject).catch((cause) => setError(errorMessage(cause, translateText, strings.operationFailed)));
+  }, [repositories.projects, strings.operationFailed, translateText]));
 
   const createResearch = async () => {
     if (!project) return;
     setBusy('research'); setError(null); setMessage(null); setReady(null);
     try {
       const result = await repositories.exports.createResearchDataset(project.id, category);
-      setReady({ file: result.archive, exportId: result.exportId, label: 'research dataset' });
-      setMessage(`ZIP verified: ${result.includedRecordings} recording(s) included, ${result.excludedRecordings} excluded by current consent.`);
-    } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(null); }
+      setReady({ file: result.archive, exportId: result.exportId, label: strings.researchDataset });
+      setMessage(`${strings.zipVerified}: ${result.includedRecordings} ${strings.included}, ${result.excludedRecordings} ${strings.excluded}.`);
+    } catch (cause) { setError(errorMessage(cause, translateText, strings.operationFailed)); } finally { setBusy(null); }
   };
 
   const createBackup = () => Alert.alert(
-    'Create sensitive backup?',
-    'This separate ZIP contains consent records, administrative notes, and all audio. It is not encrypted by SautiForge. Store it only in an access-controlled location.',
-    [{ text: 'Cancel', style: 'cancel' }, { text: 'Create backup', onPress: () => void runBackup() }],
+    strings.createSensitiveBackup,
+    strings.sensitiveBackupWarning,
+    [{ text: strings.cancel, style: 'cancel' }, { text: strings.createPrivateBackup, onPress: () => void runBackup() }],
   );
 
   const runBackup = async () => {
     setBusy('backup'); setError(null); setMessage(null); setReady(null);
     try {
       const result = await repositories.exports.createAdministrativeBackup();
-      setReady({ file: result.archive, exportId: result.exportId, label: 'administrative backup' });
-      setMessage(`Private backup verified with ${result.includedRecordings} recording(s). Save it outside the app now.`);
-    } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(null); }
+      setReady({ file: result.archive, exportId: result.exportId, label: strings.administrativeBackup });
+      setMessage(`${strings.backupVerified}: ${result.includedRecordings} ${strings.recordings.toLowerCase()}.`);
+    } catch (cause) { setError(errorMessage(cause, translateText, strings.operationFailed)); } finally { setBusy(null); }
   };
 
   const save = async () => {
@@ -60,70 +61,70 @@ export default function ExportScreen() {
     setBusy('save'); setError(null);
     try {
       const destination = await repositories.exports.saveOutsideApp(ready.file, ready.exportId);
-      setMessage(`${ready.label} saved and verified at ${destination}`);
-    } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(null); }
+      setMessage(`${ready.label} ${strings.savedAt} ${destination}`);
+    } catch (cause) { setError(errorMessage(cause, translateText, strings.operationFailed)); } finally { setBusy(null); }
   };
 
   const share = async () => {
     if (!ready) return;
     setBusy('share'); setError(null);
-    try { await repositories.exports.share(ready.file); setMessage('Android sharing completed. Confirm receipt at the destination.'); }
-    catch (cause) { setError(errorMessage(cause)); } finally { setBusy(null); }
+    try { await repositories.exports.share(ready.file); setMessage(strings.sharingCompleted); }
+    catch (cause) { setError(errorMessage(cause, translateText, strings.operationFailed)); } finally { setBusy(null); }
   };
 
   const confirmRestore = () => Alert.alert(
-    'Replace local data?',
-    'Restore validates every hash and the SQLite database before replacing local data. Existing local database records will be replaced. Keep a current backup first.',
-    [{ text: 'Cancel', style: 'cancel' }, { text: 'Select backup', style: 'destructive', onPress: () => void restore() }],
+    strings.replaceLocalData,
+    strings.restoreWarning,
+    [{ text: strings.cancel, style: 'cancel' }, { text: strings.selectBackup, style: 'destructive', onPress: () => void restore() }],
   );
 
   const restore = async () => {
     setBusy('restore'); setError(null); setMessage(null); setReady(null);
     try {
       const result = await repositories.exports.pickAndRestoreAdministrativeBackup();
-      setMessage(`Restore verified and completed with ${result.recordings} recording(s). Close and reopen SautiForge before continuing work.`);
-    } catch (cause) { setError(errorMessage(cause)); } finally { setBusy(null); }
+      setMessage(`${strings.restoreCompleted}: ${result.recordings} ${strings.recordings.toLowerCase()}. ${strings.restartApp}.`);
+    } catch (cause) { setError(errorMessage(cause, translateText, strings.operationFailed)); } finally { setBusy(null); }
   };
 
   return (
     <Screen>
-      <Heading subtitle="Portable, verified archives created entirely on this device">Export and backup</Heading>
+      <Heading>{strings.exports}</Heading>
       {error ? <ErrorNotice message={error} /> : null}
       {message ? <Card><Text style={styles.success}>{message}</Text></Card> : null}
 
       <Card>
-        <Text style={uiStyles.title}>Research dataset</Text>
-        <Text style={uiStyles.body}>{project ? project.title : 'Select an active project on the home screen first.'}</Text>
-        <Text style={uiStyles.muted}>Consent and private administrative notes are excluded. Current consent is checked when the archive is created.</Text>
+        <Text style={uiStyles.title}>{strings.researchDataset}</Text>
+        <Text style={uiStyles.body}>{project ? project.title : strings.selectActiveProject}</Text>
+        <Text style={uiStyles.muted}>{strings.privateDataExcluded}</Text>
         {categories.map((item) => (
           <Button key={item.value} label={`${category === item.value ? '✓ ' : ''}${item.label}`} variant="secondary" onPress={() => setCategory(item.value)} disabled={Boolean(busy)} />
         ))}
         <Text style={styles.hint}>{categories.find((item) => item.value === category)?.explanation}</Text>
-        <Button label="Create verified research ZIP" onPress={() => void createResearch()} loading={busy === 'research'} disabled={!project || Boolean(busy)} />
+        <Button label={strings.createResearchZip} onPress={() => void createResearch()} loading={busy === 'research'} disabled={!project || Boolean(busy)} />
       </Card>
 
       {ready ? (
         <Card>
-          <Text style={uiStyles.title}>Archive ready in temporary app storage</Text>
+          <Text style={uiStyles.title}>{strings.archiveReady}</Text>
           <Text style={uiStyles.muted}>{ready.file.name} · {formatBytes(ready.file.size ?? 0)}</Text>
           <View style={styles.actions}>
-            <Button label="Save to folder" onPress={() => void save()} loading={busy === 'save'} disabled={Boolean(busy)} />
-            <Button label="Share ZIP" variant="secondary" onPress={() => void share()} loading={busy === 'share'} disabled={Boolean(busy)} />
+            <Button label={strings.saveToFolder} onPress={() => void save()} loading={busy === 'save'} disabled={Boolean(busy)} />
+            <Button label={strings.shareZip} variant="secondary" onPress={() => void share()} loading={busy === 'share'} disabled={Boolean(busy)} />
           </View>
         </Card>
       ) : null}
 
       <Card>
-        <Text style={uiStyles.title}>Restricted administrative backup</Text>
-        <Text style={styles.warning}>Sensitive: includes the complete database, consent records, administrative notes, and all audio. The ZIP is not app-encrypted.</Text>
-        <Button label="Create private backup" variant="secondary" onPress={createBackup} loading={busy === 'backup'} disabled={Boolean(busy)} />
-        <Button label="Restore verified backup" variant="danger" onPress={confirmRestore} loading={busy === 'restore'} disabled={Boolean(busy)} />
+        <Text style={uiStyles.title}>{strings.administrativeBackup}</Text>
+        <Text style={styles.warning}>{strings.sensitiveBackupShort}</Text>
+        <Button label={strings.createPrivateBackup} variant="secondary" onPress={createBackup} loading={busy === 'backup'} disabled={Boolean(busy)} />
+        <Button label={strings.restoreBackup} variant="danger" onPress={confirmRestore} loading={busy === 'restore'} disabled={Boolean(busy)} />
       </Card>
     </Screen>
   );
 }
 
-function errorMessage(cause: unknown): string { return cause instanceof Error ? cause.message : 'The operation failed without a readable error.'; }
+function errorMessage(cause: unknown, translateText: (text: string) => string, fallback: string): string { return cause instanceof Error ? translateText(cause.message) : fallback; }
 function formatBytes(bytes: number): string { return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`; }
 
 const styles = StyleSheet.create({

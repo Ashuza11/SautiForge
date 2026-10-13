@@ -11,7 +11,7 @@ import { colors, spacing } from '@/ui/theme';
 
 export default function HomeScreen() {
   const repositories = useRepositories();
-  const { strings } = useI18n();
+  const { strings, translateText } = useI18n();
   const projectRepository = repositories.projects;
   const [projects, setProjects] = useState<Project[]>([]);
   const [active, setActive] = useState<Project | null>(null);
@@ -26,9 +26,9 @@ export default function HomeScreen() {
       setSummary(selected ? await repositories.dashboard.getProjectSummary(selected.id) : null);
       setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : strings.projectsLoadFailed);
+      setError(cause instanceof Error ? translateText(cause.message) : strings.projectsLoadFailed);
     }
-  }, [projectRepository, repositories.dashboard, strings.projectsLoadFailed]);
+  }, [projectRepository, repositories.dashboard, strings.projectsLoadFailed, translateText]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
@@ -37,13 +37,13 @@ export default function HomeScreen() {
       await projectRepository.setActive(project.id);
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : strings.activeProjectChangeFailed);
+      setError(cause instanceof Error ? translateText(cause.message) : strings.activeProjectChangeFailed);
     }
   };
 
   return (
     <Screen>
-      <Heading subtitle={strings.tagline}>{strings.appName}</Heading>
+      <Heading>{strings.appName}</Heading>
       {error ? <ErrorNotice message={error} action={<Button label={strings.retry} variant="secondary" onPress={() => void load()} />} /> : null}
 
       <Text style={styles.sectionLabel}>{strings.activeProject}</Text>
@@ -86,7 +86,6 @@ export default function HomeScreen() {
       <Button label={strings.openRecordingLibrary} variant="secondary" onPress={() => router.push('/library')} />
       <Button label={strings.exportOrRestore} variant="secondary" onPress={() => router.push('/exports')} />
       <Button label={strings.settingsAndSafety} variant="secondary" onPress={() => router.push('/settings')} />
-      <Text style={styles.privacy}>{strings.offlineByDesign}</Text>
     </Screen>
   );
 }
@@ -103,7 +102,6 @@ function formatDuration(milliseconds: number, minuteShort: string, hourShort: st
 const styles = StyleSheet.create({
   sectionHeader: { marginTop: spacing.sm },
   sectionLabel: { color: colors.ink, fontSize: 13, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
-  privacy: { color: colors.muted, textAlign: 'center', fontSize: 12, lineHeight: 18, marginVertical: spacing.md },
   archivedBadge: { alignSelf: 'flex-start', color: colors.warning, backgroundColor: '#F6E9CF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, overflow: 'hidden', fontSize: 12, fontWeight: '700' },
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   stat: { minWidth: '30%', flexGrow: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: spacing.sm },

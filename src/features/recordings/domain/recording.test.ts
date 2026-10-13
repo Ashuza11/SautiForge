@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { acceptedTakeSchema, elicitationPromptSelectionError, recordingMetadataDraftSchema } from './recording';
+import { acceptedTakeSchema, elicitationPromptSelectionError, recordingMetadataDraftSchema, recordingPromptCorrectionDraftSchema, recordingSnapshotExamples } from './recording';
 
 describe('recording metadata validation', () => {
   it('requires at least one spoken language', () => {
@@ -69,5 +69,16 @@ describe('elicitation prompt selection', () => {
 
   it('does not require an example for instructions-only audio', () => {
     expect(elicitationPromptSelectionError({ promptExposure: 'instructions_only', elicitationPromptText: null })).toBeNull();
+  });
+});
+
+describe('saved prompt correction validation', () => {
+  it('requires a meaningful reason and reads examples from the frozen scenario snapshot', () => {
+    expect(recordingPromptCorrectionDraftSchema.safeParse({
+      correctedPromptText: 'Example two', reason: '', correctedBy: null,
+    }).success).toBe(false);
+    expect(recordingSnapshotExamples({
+      scenarioPromptSnapshot: { remoteExamples: ['Example one', 'Example two'] },
+    })).toEqual(['Example one', 'Example two']);
   });
 });

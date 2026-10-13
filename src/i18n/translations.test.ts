@@ -12,4 +12,23 @@ describe('interface translations', () => {
     expect(Object.keys(translated).sort()).toEqual(Object.keys(strings).sort());
     expect(Object.values(translated).every((value) => value.trim().length > 0)).toBe(true);
   });
+
+  it.each([
+    ['French', frenchStrings],
+    ['Kiswahili', swahiliStrings],
+  ])('%s translates the critical collection workflow', (_name, translated) => {
+    const criticalKeys = [
+      'newParticipant',
+      'saveConsent',
+      'startSession',
+      'startRecording',
+      'selectExampleUsedError',
+      'recordingSaved',
+      'saveTranscription',
+      'createResearchZip',
+      'removeRecordingQuestion',
+    ] as const;
+
+    for (const key of criticalKeys) expect(translated[key]).not.toBe(strings[key]);
+  });
 });

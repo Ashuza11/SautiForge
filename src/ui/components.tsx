@@ -125,7 +125,7 @@ export function SelectField({ label, value, options, onValueChange, placeholder 
       {error ? <Text style={styles.error}>{translateText(error)}</Text> : null}
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <View style={styles.modalRoot}>
-          <Pressable accessibilityLabel="Close options" style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
+          <Pressable accessibilityLabel={translateText('Close options')} style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
           <View style={styles.optionSheet}>
             <Text style={styles.optionTitle}>{translateText(label)}</Text>
             <ScrollView keyboardShouldPersistTaps="handled">

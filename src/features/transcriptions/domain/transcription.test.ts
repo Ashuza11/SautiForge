@@ -14,4 +14,18 @@ describe('transcription validation', () => {
     expect(transcriptionSchema.safeParse({ ...base, revisionNumber: 1 }).success).toBe(true);
     expect(transcriptionSchema.safeParse({ ...base, revisionNumber: 0 }).success).toBe(false);
   });
+
+  it('keeps editable scenario and example context on each revision', () => {
+    const draft = transcriptionDraftSchema.parse({
+      verbatimText: null,
+      normalizedText: null,
+      scenarioContext: 'Recording a sale',
+      elicitationPromptContext: 'Niliuzisha unités mbili',
+      languageTags: ['kingwana'],
+      notes: null,
+      createdBy: null,
+    });
+    expect(draft.scenarioContext).toBe('Recording a sale');
+    expect(draft.elicitationPromptContext).toBe('Niliuzisha unités mbili');
+  });
 });

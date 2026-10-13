@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Platform, View } from 'react-native';
 import * as Device from 'expo-device';
 import type { ZodIssue } from 'zod';
 
 import { nullableText } from '@/domain/common';
+import { useI18n } from '@/i18n';
 import { Button, ErrorNotice, Field, uiStyles } from '@/ui/components';
 import { sessionDraftSchema, type SessionDraft } from '../domain/session';
 
 export function SessionForm({ onSave }: { onSave: (draft: SessionDraft) => Promise<void> }) {
+  const { strings, translateText } = useI18n();
   const [environment, setEnvironment] = useState('Indoor shop');
   const [city, setCity] = useState('Bukavu');
   const [notes, setNotes] = useState('');
@@ -33,7 +35,7 @@ export function SessionForm({ onSave }: { onSave: (draft: SessionDraft) => Promi
       },
     });
     if (!result.success) {
-      setErrors(Object.fromEntries(result.error.issues.map((issue: ZodIssue) => [String(issue.path[0]), issue.message])));
+      setErrors(Object.fromEntries(result.error.issues.map((issue: ZodIssue) => [String(issue.path[0]), translateText(issue.message)])));
       return;
     }
     setErrors({});
@@ -42,7 +44,7 @@ export function SessionForm({ onSave }: { onSave: (draft: SessionDraft) => Promi
     try {
       await onSave(result.data);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'The session could not be started.');
+      setSubmitError(error instanceof Error ? translateText(error.message) : strings.sessionStartFailed);
     } finally {
       setSaving(false);
     }
@@ -51,11 +53,10 @@ export function SessionForm({ onSave }: { onSave: (draft: SessionDraft) => Promi
   return (
     <View style={uiStyles.gap}>
       {submitError ? <ErrorNotice message={submitError} /> : null}
-      <Field label="Collection environment" value={environment} onChangeText={setEnvironment} error={errors.collectionEnvironment} placeholder="e.g. Indoor shop" />
-      <Field label="City-level location (optional)" value={city} onChangeText={setCity} error={errors.city} />
-      <Field label="Researcher notes (optional)" value={notes} onChangeText={setNotes} error={errors.researcherNotes} multiline />
-      <Text style={uiStyles.muted}>Device model and operating-system metadata are captured automatically. Precise location is not collected.</Text>
-      <Button label="Start session" onPress={submit} loading={saving} />
+      <Field label={strings.recordingEnvironment} value={environment} onChangeText={setEnvironment} error={errors.collectionEnvironment} placeholder={strings.indoorShopExample} />
+      <Field label={strings.cityOptional} value={city} onChangeText={setCity} error={errors.city} />
+      <Field label={strings.researcherNotes} value={notes} onChangeText={setNotes} error={errors.researcherNotes} multiline />
+      <Button label={strings.startSession} onPress={submit} loading={saving} />
     </View>
   );
 }

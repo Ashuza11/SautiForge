@@ -5,6 +5,8 @@ export const transcriptionSchema = z.object({
   recordingId: z.string().uuid(),
   verbatimText: z.string().nullable(),
   normalizedText: z.string().nullable(),
+  scenarioContext: z.string().trim().min(1).max(500).nullable().default(null),
+  elicitationPromptContext: z.string().trim().min(1).max(1000).nullable().default(null),
   languageTags: z.array(z.string().min(1)),
   notes: z.string().nullable(),
   source: z.enum(['human', 'automatic']),
@@ -17,6 +19,8 @@ export const transcriptionSchema = z.object({
 export const transcriptionDraftSchema = transcriptionSchema.pick({
   verbatimText: true,
   normalizedText: true,
+  scenarioContext: true,
+  elicitationPromptContext: true,
   languageTags: true,
   notes: true,
   createdBy: true,

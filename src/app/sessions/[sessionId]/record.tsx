@@ -24,10 +24,11 @@ import { advanceImportedTakeQueue } from '@/features/recordings/domain/import-qu
 import { appStateInterruptsRecording, stopAndDiscardInterruptedTake } from '@/features/recordings/domain/interruption';
 import { shouldRestartFinishedPlayback } from '@/features/recordings/domain/playback';
 import { acceptedTakeSchema, elicitationPromptSelectionError, recordingMetadataDraftSchema, type AcceptedTake } from '@/features/recordings/domain/recording';
-import { codeSwitchingOptions } from '@/features/recordings/domain/recording-metadata-options';
+import { codeSwitchingOptions, CUSTOM_METADATA_VALUE, noiseLevelOptions, recordingEnvironmentOptions } from '@/features/recordings/domain/recording-metadata-options';
 import { buildRemotePrompt } from '@/features/recordings/domain/remote-prompt';
 import type { Scenario } from '@/features/scenarios/domain/scenario';
 import type { CollectionSession } from '@/features/sessions/domain/session';
+import { useI18n } from '@/i18n';
 import { Button, Card, EmptyState, ErrorNotice, Field, Heading, Screen, SelectField, uiStyles } from '@/ui/components';
 import { colors, spacing } from '@/ui/theme';
 
@@ -39,6 +40,7 @@ export default function RecordScreen() {
   const sessionId = Array.isArray(params.sessionId) ? params.sessionId[0] : params.sessionId;
   const scenarioId = Array.isArray(params.scenarioId) ? params.scenarioId[0] : params.scenarioId;
   const repositories = useRepositories();
+  const { strings, translateText } = useI18n();
   const [session, setSession] = useState<CollectionSession | null>(null);
   const [scenario, setScenario] = useState<Scenario | null>(null);
   const [participant, setParticipant] = useState<Participant | null>(null);
@@ -63,7 +65,7 @@ export default function RecordScreen() {
   const recorder = useAudioRecorder(recordingOptions, (status) => {
     if (status.hasError) {
       interruptedRef.current = true;
-      setError(status.error ?? 'Recording was interrupted. The take will not be saved.');
+      setError(status.error ?? strings.interruptedTakeDiscarded);
     }
   });
   const recorderState = useAudioRecorderState(recorder, 100);
@@ -77,13 +79,13 @@ export default function RecordScreen() {
           repositories.sessions.get(sessionId),
           repositories.scenarios.get(scenarioId),
         ]);
-        if (!sessionResult || sessionResult.status !== 'in_progress') throw new Error('An active session is required.');
-        if (!scenarioResult || scenarioResult.projectId !== sessionResult.projectId || scenarioResult.status !== 'active') throw new Error('An active scenario from this project is required.');
+        if (!sessionResult || sessionResult.status !== 'in_progress') throw new Error(strings.activeSessionRequired);
+        if (!scenarioResult || scenarioResult.projectId !== sessionResult.projectId || scenarioResult.status !== 'active') throw new Error(strings.activeScenarioRequired);
         const [participantResult, allowed] = await Promise.all([
           repositories.participants.get(sessionResult.participantId),
           repositories.consent.participantCanRecord(sessionResult.participantId),
         ]);
-        if (!participantResult || !allowed) throw new Error('Valid recording consent is required.');
+        if (!participantResult || !allowed) throw new Error(strings.validConsentRequired);
         if (!active) return;
         setSession(sessionResult);
         setScenario(scenarioResult);
@@ -94,24 +96,24 @@ export default function RecordScreen() {
         const permission = await getRecordingPermissionsAsync();
         if (active) setPermissionDenied(permission.status === 'denied' && !permission.canAskAgain);
       } catch (cause) {
-        if (active) setError(cause instanceof Error ? cause.message : 'Recording screen could not be prepared.');
+        if (active) setError(cause instanceof Error ? translateText(cause.message) : strings.recorderPrepareFailed);
       }
     }
     void load();
     return () => { active = false; };
-  }, [repositories, scenarioId, sessionId]);
+  }, [repositories, scenarioId, sessionId, strings, translateText]);
 
   const confirmDiscard = useCallback((afterDiscard: () => void) => {
     if (!take) return afterDiscard();
-    Alert.alert('Discard this take?', 'The unsaved audio will be permanently removed.', [
-      { text: 'Keep take', style: 'cancel' },
-      { text: 'Discard', style: 'destructive', onPress: () => {
+    Alert.alert(strings.discardTakeQuestion, strings.unsavedAudioWarning, [
+      { text: strings.keepTake, style: 'cancel' },
+      { text: strings.discard, style: 'destructive', onPress: () => {
         discardFile(take.sourceUri);
         setTake(null);
         afterDiscard();
       } },
     ]);
-  }, [take]);
+  }, [strings, take]);
 
   const advanceImportQueue = useCallback(() => {
     setExampleError(null);
@@ -125,9 +127,9 @@ export default function RecordScreen() {
   const confirmExit = useCallback((afterDiscard: () => void) => {
     const count = (take ? 1 : 0) + importQueue.length;
     if (!count) return afterDiscard();
-    Alert.alert('Discard unsaved audio?', `${count} unsaved audio file${count === 1 ? '' : 's'} will be permanently removed.`, [
-      { text: 'Keep reviewing', style: 'cancel' },
-      { text: 'Discard all', style: 'destructive', onPress: () => {
+    Alert.alert(strings.discardUnsavedQuestion, `${count} ${strings.unsavedFilesWarning}`, [
+      { text: strings.keepReviewing, style: 'cancel' },
+      { text: strings.discardAll, style: 'destructive', onPress: () => {
         if (take) discardFile(take.sourceUri);
         for (const queued of importQueue) discardFile(queued.sourceUri);
         setTake(null);
@@ -135,7 +137,7 @@ export default function RecordScreen() {
         afterDiscard();
       } },
     ]);
-  }, [importQueue, take]);
+  }, [importQueue, strings, take]);
 
   const updateImportedDuration = useCallback((durationMs: number) => {
     setTake((current) => current && current.durationMs !== durationMs ? { ...current, durationMs } : current);
@@ -144,7 +146,7 @@ export default function RecordScreen() {
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (recorderState.isRecording) {
-        Alert.alert('Recording in progress', 'Stop the recording before leaving this screen.');
+        Alert.alert(strings.recordingInProgress, strings.stopBeforeLeaving);
         return true;
       }
       if (take || importQueue.length) {
@@ -154,18 +156,18 @@ export default function RecordScreen() {
       return false;
     });
     return () => subscription.remove();
-  }, [confirmExit, importQueue.length, recorderState.isRecording, take]);
+  }, [confirmExit, importQueue.length, recorderState.isRecording, strings, take]);
 
   const start = async () => {
     setError(null);
     if (!session || !scenario || !participant) return;
     try {
-      if (!(await repositories.consent.participantCanRecord(participant.id))) throw new Error('Recording consent is no longer valid.');
-      if (!hasRecordingSpace()) throw new Error('Less than 50 MB of free storage remains. Free space before recording.');
+      if (!(await repositories.consent.participantCanRecord(participant.id))) throw new Error(strings.recordingConsentInvalid);
+      if (!hasRecordingSpace()) throw new Error(strings.lowStorageRecording);
       const permission = await requestRecordingPermissionsAsync();
       if (!permission.granted) {
         setPermissionDenied(true);
-        throw new Error('Microphone permission was denied. No recording was started.');
+        throw new Error(strings.microphoneDenied);
       }
       setPermissionDenied(false);
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, allowsBackgroundRecording: false });
@@ -174,7 +176,7 @@ export default function RecordScreen() {
       setStartedAt(nowIso());
       recorder.record();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Recording could not start.');
+      setError(cause instanceof Error ? translateText(cause.message) : strings.recordingStartFailed);
     }
   };
 
@@ -192,16 +194,16 @@ export default function RecordScreen() {
         if (uri) discardFile(uri);
         setTake(null);
         setStartedAt(null);
-        setError('Recording stopped because SautiForge left the foreground. The interrupted take was discarded; record again.');
+        setError(strings.interruptedTakeDiscarded);
         return;
       }
-      if (!uri) throw new Error('The recorder did not return an audio file.');
+      if (!uri) throw new Error(strings.noAudioFile);
       await verifyReadableAudioFile(new File(uri));
       if (interruptedRef.current) {
         discardFile(uri);
         setTake(null);
         setStartedAt(null);
-        setError('Recording stopped because SautiForge left the foreground. The interrupted take was discarded; record again.');
+        setError(strings.interruptedTakeDiscarded);
         return;
       }
       setTake({
@@ -224,7 +226,7 @@ export default function RecordScreen() {
         sourceFileName: null,
       });
     } catch (cause) {
-      const cleanup = await stopAndDiscardInterruptedTake({
+      await stopAndDiscardInterruptedTake({
         stop: async () => {
           if (recorder.getStatus().isRecording) await recorder.stop();
         },
@@ -233,30 +235,29 @@ export default function RecordScreen() {
       });
       setTake(null);
       setStartedAt(null);
-      const detail = cleanup.errors.length ? ` Cleanup details: ${cleanup.errors.join('; ')}.` : '';
-      setError(`${cause instanceof Error ? cause.message : 'Recording could not be stopped safely.'} The take was not saved.${detail}`);
+      setError(`${cause instanceof Error ? translateText(cause.message) : strings.recordingStopFailed} ${strings.takeNotSaved}`);
     } finally {
       try {
         await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
       } catch (cause) {
-        setError((current) => `${current ?? 'Recording stopped.'} Audio reset failed: ${cause instanceof Error ? cause.message : 'unknown error'}`);
+        setError((current) => `${current ?? strings.recordingStopped} ${strings.audioResetFailed}`);
       }
       stoppingRef.current = false;
       setStopping(false);
     }
-  }, [recorder, startedAt]);
+  }, [recorder, startedAt, strings, translateText]);
 
   const shareRemotePrompt = async () => {
     if (!session || !scenario || !participant) return;
     try {
-      if (!(await repositories.consent.participantCanRecord(participant.id))) throw new Error('Valid recording consent is required before sending a collection task.');
+      if (!(await repositories.consent.participantCanRecord(participant.id))) throw new Error(strings.consentRequiredToShare);
       const submissionId = `SUB-${newId().replaceAll('-', '').slice(0, 12).toUpperCase()}`;
       const message = buildRemotePrompt(scenario.remoteExamples);
-      await Share.share({ message, title: `SautiForge: ${scenario.title}` }, { dialogTitle: 'Share remote collection task' });
+      await Share.share({ message, title: `SautiForge: ${scenario.title}` }, { dialogTitle: strings.shareRemoteTask });
       setLastSubmissionId(submissionId);
-      Alert.alert('Share sheet opened', `Submission code ${submissionId} is tracked inside SautiForge and was not included in the message. Android cannot confirm that the message was delivered.`);
+      Alert.alert(strings.shareSheetOpened, `${strings.submissionCode}: ${submissionId}. ${strings.deliveryNotConfirmed}`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The remote collection task could not be shared.');
+      setError(cause instanceof Error ? translateText(cause.message) : strings.shareTaskFailed);
     }
   };
 
@@ -264,11 +265,11 @@ export default function RecordScreen() {
     if (!session || !scenario || !participant) return;
     setError(null);
     try {
-      if (!(await repositories.consent.participantCanRecord(participant.id))) throw new Error('Valid recording consent is required before importing audio.');
-      if (!hasRecordingSpace()) throw new Error('Less than 50 MB of free storage remains. Free space before importing audio.');
+      if (!(await repositories.consent.participantCanRecord(participant.id))) throw new Error(strings.consentRequiredToImport);
+      if (!hasRecordingSpace()) throw new Error(strings.lowStorageImport);
       const result = await DocumentPicker.getDocumentAsync({ type: 'audio/*', copyToCacheDirectory: true, multiple: true });
       if (result.canceled) return;
-      if (!result.assets.length) throw new Error('Android did not return any selected audio files.');
+      if (!result.assets.length) throw new Error(strings.noSelectedAudio);
       const submissionId = lastSubmissionId ?? `SUB-${newId().replaceAll('-', '').slice(0, 12).toUpperCase()}`;
       const imported: AcceptedTake[] = [];
       try {
@@ -305,7 +306,7 @@ export default function RecordScreen() {
       setTake(first ?? null);
       setImportQueue(remaining);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The external audio file could not be imported.');
+      setError(cause instanceof Error ? translateText(cause.message) : strings.importAudioFailed);
     }
   };
 
@@ -326,16 +327,16 @@ export default function RecordScreen() {
     const promptSelectionError = elicitationPromptSelectionError(take);
     setExampleError(promptSelectionError);
     if (promptSelectionError) {
-      setError('Choose an example under “Example used for this recording”, then save again.');
+      setError(strings.chooseExampleBeforeSaving);
       return;
     }
     if (take.captureSource === 'imported_file' && take.durationMs <= 0) {
-      setError('Wait for the imported audio to load and show a valid duration before saving.');
+      setError(strings.waitForAudioDuration);
       return;
     }
     const parsedTake = acceptedTakeSchema.safeParse(take);
     if (!parsedTake.success) {
-      setError(parsedTake.error.issues[0]?.message ?? 'The imported audio details are incomplete.');
+      setError(translateText(parsedTake.error.issues[0]?.message ?? strings.importedAudioIncomplete));
       return;
     }
     const qualityRating = quality.trim() ? Number(quality) : null;
@@ -350,7 +351,7 @@ export default function RecordScreen() {
       annotationStatus: 'needs_transcription',
     });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Recording metadata is invalid.');
+      setError(translateText(parsed.error.issues[0]?.message ?? strings.invalidRecordingMetadata));
       return;
     }
     setSaving(true);
@@ -360,59 +361,57 @@ export default function RecordScreen() {
       discardFile(take.sourceUri);
       if (take.captureSource === 'imported_file' && importQueue.length) {
         advanceImportQueue();
-        Alert.alert('Recording saved', `${saved.displayId} was verified. Review the next imported file; ${importQueue.length} file${importQueue.length === 1 ? '' : 's'} remain including the next file.`);
+        Alert.alert(strings.recordingSaved, `${saved.displayId} ${strings.verified}. ${importQueue.length} ${strings.filesRemain}.`);
       } else {
         setTake(null);
-        Alert.alert('Recording saved', `${saved.displayId} and its audio file were verified in local storage.`, [
-          { text: 'Next recording', onPress: () => router.back() },
+        Alert.alert(strings.recordingSaved, `${saved.displayId} ${strings.savedAndVerified}`, [
+          { text: strings.nextRecording, onPress: () => router.back() },
         ]);
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Recording was not saved. The original take is still available.');
+      setError(cause instanceof Error ? translateText(cause.message) : strings.recordingSaveFailed);
     } finally {
       setSaving(false);
     }
   };
 
   if (!session || !scenario || !participant) {
-    return <Screen>{error ? <ErrorNotice message={error} /> : <EmptyState>Preparing recorder…</EmptyState>}</Screen>;
+    return <Screen>{error ? <ErrorNotice message={error} /> : <EmptyState>{strings.preparingRecorder}</EmptyState>}</Screen>;
   }
 
   return (
     <Screen>
-      <Heading subtitle={`Speaker ${participant.speakerCode} · scenario v${scenario.version}`}>{scenario.title}</Heading>
+      <Heading subtitle={`${strings.speakerShort} ${participant.speakerCode} · ${strings.scenarioShort} v${scenario.version}`}>{scenario.title}</Heading>
       <Card>
         <Text style={uiStyles.body}>{scenario.collectionInstructions}</Text>
-        <Text style={uiStyles.muted}>Expected intent: {scenario.expectedIntent}</Text>
       </Card>
-      {error ? <ErrorNotice message={error} action={permissionDenied ? <Button label="Open Android settings" variant="secondary" onPress={() => void Linking.openSettings()} /> : undefined} /> : null}
+      {error ? <ErrorNotice message={error} action={permissionDenied ? <Button label={strings.openAndroidSettings} variant="secondary" onPress={() => void Linking.openSettings()} /> : undefined} /> : null}
 
       {!take ? (
         <>
           <Card>
             <Text accessibilityLiveRegion="polite" style={styles.timer}>{formatDuration(recorderState.durationMillis)}</Text>
             <View style={[styles.indicator, recorderState.isRecording && styles.indicatorActive]} />
-            <Text style={styles.recordingState}>{recorderState.isRecording ? 'RECORDING' : 'Ready to record'}</Text>
+            <Text style={styles.recordingState}>{recorderState.isRecording ? strings.recordingNow : strings.readyToRecord}</Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={recorderState.isRecording ? 'Stop recording' : 'Start recording'}
+              accessibilityLabel={recorderState.isRecording ? strings.stopRecording : strings.startRecording}
               disabled={stopping}
               onPress={() => void (recorderState.isRecording ? stop(false) : start())}
               style={[styles.recordButton, recorderState.isRecording && styles.stopButton, stopping && styles.buttonDisabled]}>
               <View style={recorderState.isRecording ? styles.stopIcon : styles.recordIcon} />
             </Pressable>
-            <Text style={uiStyles.muted}>Recording stays in the foreground. Pause/resume is disabled until it is verified on the target Android device.</Text>
           </Card>
           {!recorderState.isRecording ? (
             <Card>
-              <Text style={uiStyles.title}>Remote or externally recorded contribution</Text>
-              <Text style={uiStyles.body}>Share all {scenario.remoteExamples.length} configured fictional example{scenario.remoteExamples.length === 1 ? '' : 's'} together. Each example is numbered and bold; research identifiers remain inside SautiForge.</Text>
+              <Text style={uiStyles.title}>{strings.remoteContribution}</Text>
+              <Text style={uiStyles.body}>{scenario.remoteExamples.length} {strings.configuredExamples}</Text>
               {scenario.remoteExamples.map((example, index) => <Text key={`${index}-${example}`} style={uiStyles.muted}>{index + 1}. {example}</Text>)}
-              {!scenario.remoteExamples.length ? <Text style={uiStyles.muted}>Edit this scenario and add examples before sharing.</Text> : null}
-              <Button label="Share all examples" variant="secondary" onPress={() => void shareRemotePrompt()} disabled={!scenario.remoteExamples.length} />
-              {lastSubmissionId ? <Text style={uiStyles.muted}>Internally tracked submission code: {lastSubmissionId}</Text> : null}
-              <Button label="Import returned audio files" variant="secondary" onPress={() => void importExternalAudio()} />
-              <Text style={uiStyles.muted}>Use fictional or sanitized content only. Opening the share sheet does not prove delivery. SautiForge does not read WhatsApp chats or groups.</Text>
+              {!scenario.remoteExamples.length ? <Text style={uiStyles.muted}>{strings.addExamplesBeforeSharing}</Text> : null}
+              <Button label={strings.shareExamples} variant="secondary" onPress={() => void shareRemotePrompt()} disabled={!scenario.remoteExamples.length} />
+              {lastSubmissionId ? <Text style={uiStyles.muted}>{strings.submissionCode}: {lastSubmissionId}</Text> : null}
+              <Button label={strings.importAudio} variant="secondary" onPress={() => void importExternalAudio()} />
+              <Text style={uiStyles.muted}>{strings.sanitizedContentOnly}</Text>
             </Card>
           ) : null}
         </>
@@ -425,34 +424,34 @@ export default function RecordScreen() {
               uri={take.sourceUri}
               onDurationMs={take.captureSource === 'imported_file' ? updateImportedDuration : undefined}
             />
-            <Text style={uiStyles.muted}>Source: {take.captureSource === 'imported_file' ? `Imported file · ${take.container.toUpperCase()}` : 'Device microphone'}</Text>
-            {take.sourceFileName ? <Text style={uiStyles.muted}>File: {take.sourceFileName} · {importQueue.length} waiting after this file</Text> : null}
-            <Button label={take.captureSource === 'imported_file' ? 'Discard imported file' : 'Rerecord'} variant="secondary" onPress={() => confirmDiscard(() => take.captureSource === 'imported_file' ? advanceImportQueue() : setStartedAt(null))} />
+            <Text style={uiStyles.muted}>{strings.source}: {take.captureSource === 'imported_file' ? `${strings.importedAudio} · ${take.container.toUpperCase()}` : strings.deviceMicrophone}</Text>
+            {take.sourceFileName ? <Text style={uiStyles.muted}>{take.sourceFileName} · {importQueue.length} {strings.filesWaiting}</Text> : null}
+            <Button label={take.captureSource === 'imported_file' ? strings.discardImported : strings.rerecord} variant="secondary" onPress={() => confirmDiscard(() => take.captureSource === 'imported_file' ? advanceImportQueue() : setStartedAt(null))} />
           </Card>
-          <Heading subtitle="Confirm inherited values or correct them for this take.">Recording metadata</Heading>
-          <Field label="Spoken languages, comma separated" value={languages} onChangeText={setLanguages} />
-          <Field label="Language variety (optional)" value={variety} onChangeText={setVariety} />
-          <SelectField label="Code switching" value={codeSwitching} options={[...codeSwitchingOptions]} onValueChange={setCodeSwitching} />
+          <Heading>{strings.recordingMetadata}</Heading>
+          <Field label={strings.spokenLanguages} value={languages} onChangeText={setLanguages} />
+          <Field label={strings.languageVarietyOptional} value={variety} onChangeText={setVariety} />
+          <SelectField label={strings.codeSwitching} value={codeSwitching} options={codeSwitchingOptions.map((option) => ({ ...option, label: translateText(option.label) }))} onValueChange={setCodeSwitching} />
           {take.captureSource === 'imported_file' ? (
             <>
               <SelectField
-                label="How the audio arrived"
+                label={strings.audioArrival}
                 value={take.transport ?? 'whatsapp_manual'}
                 options={[
-                  { label: 'WhatsApp — manual import', value: 'whatsapp_manual' },
-                  { label: 'Another messaging app', value: 'other_messaging' },
-                  { label: 'File transfer', value: 'file_transfer' },
-                  { label: 'Other', value: 'other' },
+                  { label: strings.whatsappManual, value: 'whatsapp_manual' },
+                  { label: strings.otherMessaging, value: 'other_messaging' },
+                  { label: strings.fileTransfer, value: 'file_transfer' },
+                  { label: strings.other, value: 'other' },
                 ]}
                 onValueChange={(transport) => setTake((current) => current ? { ...current, transport: transport as AcceptedTake['transport'] } : current)}
               />
               <SelectField
-                label="Prompt exposure"
+                label={strings.promptExposure}
                 value={take.promptExposure}
                 options={[
-                  { label: 'Instructions only', value: 'instructions_only' },
-                  { label: 'Example shown', value: 'example_shown' },
-                  { label: 'Scripted reading', value: 'scripted_reading' },
+                  { label: strings.instructionsOnly, value: 'instructions_only' },
+                  { label: strings.exampleShown, value: 'example_shown' },
+                  { label: strings.scriptedReading, value: 'scripted_reading' },
                 ]}
                 onValueChange={(promptExposure) => {
                   setExampleError(null);
@@ -466,7 +465,7 @@ export default function RecordScreen() {
               />
               {take.promptExposure === 'example_shown' ? (
                 <SelectField
-                  label="Example used for this recording"
+                  label={strings.exampleUsed}
                   value={take.elicitationPromptText ?? ''}
                   options={scenario.remoteExamples.map((example, index) => ({ label: `${index + 1}. ${example}`, value: example }))}
                   onValueChange={(elicitationPromptText) => {
@@ -474,31 +473,45 @@ export default function RecordScreen() {
                     setError(null);
                     setTake((current) => current ? { ...current, elicitationPromptText } : current);
                   }}
-                  placeholder="Select the matching example before saving"
+                  placeholder={strings.selectMatchingExample}
                   error={exampleError ?? undefined}
                 />
               ) : null}
               <Field
-                label="Pseudonymous submission code"
+                label={strings.submissionCode}
                 value={take.externalSubmissionId ?? ''}
                 onChangeText={(externalSubmissionId) => setTake((current) => current ? { ...current, externalSubmissionId: nullableText(externalSubmissionId) } : current)}
                 autoCapitalize="characters"
               />
             </>
           ) : null}
-          <Field label="Recording environment" value={environment} onChangeText={setEnvironment} />
-          <Field label="Noise level" value={noiseLevel} onChangeText={setNoiseLevel} placeholder="low, medium, high, unknown" />
-          <Field label="Quality rating 1–5 (optional)" value={quality} onChangeText={setQuality} keyboardType="number-pad" />
-          <Field label="Notes (optional)" value={notes} onChangeText={setNotes} multiline />
-          <Button label="Accept and save verified take" onPress={() => void save()} loading={saving} />
+          <SelectField
+            label={strings.recordingEnvironment}
+            value={recordingEnvironmentOptions.some((option) => option.value === environment) ? environment : CUSTOM_METADATA_VALUE}
+            options={recordingEnvironmentOptions.map((option) => ({ ...option, label: translateText(option.label) }))}
+            onValueChange={(value) => setEnvironment(value === CUSTOM_METADATA_VALUE ? '' : value)}
+          />
+          {!recordingEnvironmentOptions.some((option) => option.value === environment) ? (
+            <Field label={strings.customEnvironment} value={environment} onChangeText={setEnvironment} />
+          ) : null}
+          <SelectField
+            label={strings.noiseLevel}
+            value={noiseLevel}
+            options={noiseLevelOptions.map((option) => ({ ...option, label: translateText(option.label) }))}
+            onValueChange={setNoiseLevel}
+          />
+          <Field label={strings.qualityRating} value={quality} onChangeText={setQuality} keyboardType="number-pad" />
+          <Field label={strings.notesOptional} value={notes} onChangeText={setNotes} multiline />
+          <Button label={strings.acceptTake} onPress={() => void save()} loading={saving} />
         </>
       )}
-      <Button label="Cancel" variant="secondary" onPress={() => confirmExit(() => router.back())} disabled={recorderState.isRecording || stopping} />
+      <Button label={strings.cancel} variant="secondary" onPress={() => confirmExit(() => router.back())} disabled={recorderState.isRecording || stopping} />
     </Screen>
   );
 }
 
 function TakePlayer({ uri, onDurationMs }: { uri: string; onDurationMs?: (durationMs: number) => void }) {
+  const { strings } = useI18n();
   const player = useAudioPlayer(uri);
   const status = useAudioPlayerStatus(player);
   useEffect(() => {
@@ -509,7 +522,7 @@ function TakePlayer({ uri, onDurationMs }: { uri: string; onDurationMs?: (durati
     if (shouldRestartFinishedPlayback(status.didJustFinish)) player.seekTo(0);
     player.play();
   };
-  return <Button label={status.playing ? 'Pause playback' : 'Play take'} variant="secondary" onPress={() => status.playing ? player.pause() : play()} />;
+  return <Button label={status.playing ? strings.pausePlayback : strings.playTake} variant="secondary" onPress={() => status.playing ? player.pause() : play()} />;
 }
 
 function formatDuration(milliseconds: number): string {

@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DATABASE_NAME = 'sautiforge.db';
-export const DATABASE_VERSION = 5;
+export const DATABASE_VERSION = 7;
 export const DATABASE_OPEN_PRAGMAS = 'PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;';
 export const DATABASE_CREATE_PRAGMAS = 'PRAGMA journal_mode = WAL;';
 
@@ -205,6 +205,26 @@ ALTER TABLE recordings ADD COLUMN elicitation_prompt_text TEXT;
 ALTER TABLE recordings ADD COLUMN source_file_name TEXT;
 `;
 
+export const MIGRATION_6_SQL = `
+CREATE TABLE IF NOT EXISTS recording_prompt_corrections (
+  id TEXT PRIMARY KEY NOT NULL,
+  recording_id TEXT NOT NULL REFERENCES recordings(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+  previous_prompt_text TEXT NOT NULL,
+  corrected_prompt_text TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  corrected_by TEXT,
+  created_at TEXT NOT NULL,
+  CHECK (previous_prompt_text <> corrected_prompt_text)
+);
+CREATE INDEX IF NOT EXISTS idx_recording_prompt_corrections
+  ON recording_prompt_corrections(recording_id, created_at DESC);
+`;
+
+export const MIGRATION_7_SQL = `
+ALTER TABLE transcriptions ADD COLUMN scenario_context TEXT;
+ALTER TABLE transcriptions ADD COLUMN elicitation_prompt_context TEXT;
+`;
+
 const KINGWANA_PROJECT_ID = '6a7d8df7-d495-4f69-9934-dc48ce5ee8d1';
 const SEEDED_AT = '2026-01-01T00:00:00.000Z';
 
@@ -306,6 +326,22 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
       await transaction.execAsync('PRAGMA user_version = 5');
     });
     currentVersion = 5;
+  }
+
+  if (currentVersion === 5) {
+    await db.withExclusiveTransactionAsync(async (transaction) => {
+      await transaction.execAsync(MIGRATION_6_SQL);
+      await transaction.execAsync('PRAGMA user_version = 6');
+    });
+    currentVersion = 6;
+  }
+
+  if (currentVersion === 6) {
+    await db.withExclusiveTransactionAsync(async (transaction) => {
+      await transaction.execAsync(MIGRATION_7_SQL);
+      await transaction.execAsync('PRAGMA user_version = 7');
+    });
+    currentVersion = 7;
   }
 
   await db.execAsync(DATABASE_OPEN_PRAGMAS);

@@ -159,7 +159,7 @@ export class ExportService {
          version, remote_examples_json, reference_data_json, status, created_at, updated_at FROM scenarios WHERE project_id = ?`, projectId,
       );
       const transcriptions = await this.db.getAllAsync<Record<string, unknown>>(
-        `SELECT id, recording_id, verbatim_text, normalized_text, language_tags_json, notes, source,
+        `SELECT id, recording_id, verbatim_text, normalized_text, scenario_context, elicitation_prompt_context, language_tags_json, notes, source,
          revision_number, supersedes_id, created_at, created_by FROM transcriptions
          WHERE recording_id IN (${placeholders(recordingIds)}) ORDER BY recording_id, revision_number`, ...recordingIds,
       );

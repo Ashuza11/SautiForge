@@ -59,6 +59,47 @@ const metadata = {
   annotationStatus: 'needs_transcription' as const,
 };
 
+const importedRecordingRow = {
+  id: '0d050af7-474d-4ac7-b1e2-f9e05ecbdc79',
+  display_id: 'SF-20260924-0D050AF7',
+  project_id: context.project_id,
+  session_id: context.session_id,
+  participant_id: context.participant_id,
+  scenario_id: context.scenario_id,
+  consent_record_id: 'e8047f61-d626-4b05-b163-48346bc6aecb',
+  scenario_version: '1.0.0',
+  scenario_prompt_snapshot_json: JSON.stringify({ title: 'Recording a sale', remoteExamples: ['Example one', 'Example two'] }),
+  relative_audio_path: 'recordings/project/imported.opus',
+  collection_method: 'elicited_prompt',
+  recorded_at: '2026-09-24T09:59:00.000+02:00',
+  duration_ms: 1200,
+  file_size_bytes: 2048,
+  container: 'ogg',
+  codec: 'opus',
+  sample_rate_hz: 48000,
+  channel_count: 1,
+  spoken_languages_json: '["Kingwana"]',
+  language_variety: 'Bukavu',
+  code_switching_status: 'none',
+  recording_environment: 'Indoor shop',
+  noise_level: 'low',
+  quality_rating: 4,
+  notes: null,
+  annotation_status: 'needs_transcription',
+  archived_at: null,
+  created_at: '2026-09-24T09:59:00.000+02:00',
+  updated_at: '2026-09-24T09:59:00.000+02:00',
+  capture_source: 'imported_file',
+  transport: 'whatsapp_manual',
+  prompt_exposure: 'example_shown',
+  imported_at: '2026-09-24T09:59:00.000+02:00',
+  source_mime_type: 'audio/ogg',
+  content_sha256: 'a'.repeat(64),
+  external_submission_id: 'SUB-ABC123',
+  elicitation_prompt_text: 'Example one',
+  source_file_name: 'voice-note.opus',
+};
+
 function repositoryFor(runAsync: ReturnType<typeof vi.fn>) {
   const getFirstAsync = vi.fn().mockResolvedValueOnce(context).mockResolvedValueOnce(null);
   const db = { getFirstAsync, runAsync };
@@ -168,5 +209,64 @@ describe('accepted recording persistence', () => {
     await expect(repositoryFor(runAsync).saveAcceptedTake(context.session_id, context.scenario_id, take, metadata))
       .rejects.toThrow(/audio was retained for recovery.*database locked/i);
     expect(removeAudio).not.toHaveBeenCalled();
+  });
+});
+
+describe('saved example correction', () => {
+  it('atomically stores an audit revision, updates the current association, and verifies it', async () => {
+    const correctedRow = { ...importedRecordingRow, elicitation_prompt_text: 'Example two', updated_at: '2026-09-24T10:00:00.000+02:00' };
+    const transaction = {
+      getFirstAsync: vi.fn().mockResolvedValueOnce(importedRecordingRow).mockResolvedValueOnce(correctedRow),
+      runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
+    };
+    const db = {
+      withExclusiveTransactionAsync: vi.fn(async (operation) => operation(transaction)),
+    };
+    const repository = new SQLiteRecordingRepository(db as never, {} as never);
+
+    const result = await repository.correctElicitationPrompt(importedRecordingRow.id, {
+      correctedPromptText: 'Example two',
+      reason: 'Selected the adjacent example during import.',
+      correctedBy: 'RES-01',
+    });
+
+    expect(result.elicitationPromptText).toBe('Example two');
+    expect(transaction.runAsync).toHaveBeenCalledTimes(2);
+    expect(String(transaction.runAsync.mock.calls[0]?.[0])).toContain('INSERT INTO recording_prompt_corrections');
+    expect(String(transaction.runAsync.mock.calls[1]?.[0])).toContain('UPDATE recordings SET elicitation_prompt_text');
+  });
+
+  it('rejects an example that was not part of the stored scenario version', async () => {
+    const transaction = {
+      getFirstAsync: vi.fn().mockResolvedValue(importedRecordingRow),
+      runAsync: vi.fn(),
+    };
+    const db = { withExclusiveTransactionAsync: vi.fn(async (operation) => operation(transaction)) };
+    const repository = new SQLiteRecordingRepository(db as never, {} as never);
+
+    await expect(repository.correctElicitationPrompt(importedRecordingRow.id, {
+      correctedPromptText: 'A later edited example',
+      reason: 'Testing invalid provenance.',
+      correctedBy: null,
+    })).rejects.toThrow(/scenario version stored/);
+    expect(transaction.runAsync).not.toHaveBeenCalled();
+  });
+
+  it('returns validated correction history in newest-first query order', async () => {
+    const db = { getAllAsync: vi.fn().mockResolvedValue([{
+      id: 'de0a9676-92cc-4b18-997a-3fafce18b700',
+      recording_id: importedRecordingRow.id,
+      previous_prompt_text: 'Example one',
+      corrected_prompt_text: 'Example two',
+      reason: 'Wrong selection.',
+      corrected_by: 'RES-01',
+      created_at: '2026-09-24T10:00:00.000+02:00',
+    }]) };
+    const repository = new SQLiteRecordingRepository(db as never, {} as never);
+
+    await expect(repository.listPromptCorrections(importedRecordingRow.id)).resolves.toMatchObject([
+      { previousPromptText: 'Example one', correctedPromptText: 'Example two', correctedBy: 'RES-01' },
+    ]);
+    expect(String(db.getAllAsync.mock.calls[0]?.[0])).toContain('ORDER BY created_at DESC');
   });
 });

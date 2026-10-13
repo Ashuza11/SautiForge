@@ -7,6 +7,7 @@ import type { Participant } from '@/features/participants/domain/participant';
 import type { Project } from '@/features/projects/domain/project';
 import type { Recording } from '@/features/recordings/domain/recording';
 import type { Scenario } from '@/features/scenarios/domain/scenario';
+import { useI18n } from '@/i18n';
 import { Button, Card, EmptyState, ErrorNotice, Field, Heading, Screen, uiStyles } from '@/ui/components';
 import { colors, spacing } from '@/ui/theme';
 
@@ -14,6 +15,7 @@ const statuses: Array<Recording['annotationStatus'] | 'all'> = ['all', 'recorded
 
 export default function LibraryScreen() {
   const repositories = useRepositories();
+  const { localeTag, strings, translateText } = useI18n();
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -56,62 +58,62 @@ export default function LibraryScreen() {
       setParticipants(projectParticipants);
       setScenarios(projectScenarios);
       setRecordings(results);
-      if (!fromValid || !toValid) setError('Dates must use YYYY-MM-DD. Invalid dates are not applied.');
-      else if (recordedFrom && recordedTo && recordedFrom > recordedTo) setError('The start date must not be after the end date.');
+      if (!fromValid || !toValid) setError(strings.invalidDate);
+      else if (recordedFrom && recordedTo && recordedFrom > recordedTo) setError(strings.invalidDateRange);
       else setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Recordings could not be loaded.');
+      setError(cause instanceof Error ? translateText(cause.message) : strings.recordingsLoadFailed);
     }
-  }, [language, participantId, projectId, quality, query, recordedFrom, recordedTo, repositories, scenarioId, status]);
+  }, [language, participantId, projectId, quality, query, recordedFrom, recordedTo, repositories, scenarioId, status, strings, translateText]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   return (
     <Screen>
-      <Heading subtitle="Searches the active project's verified local recordings.">Recording library</Heading>
+      <Heading>{strings.recordingLibrary}</Heading>
       {error ? <ErrorNotice message={error} /> : null}
       <Card>
-        <Text style={styles.label}>Project</Text>
+        <Text style={styles.label}>{strings.project}</Text>
         <View style={uiStyles.row}>
           {projects.map((project) => <FilterChoice key={project.id} label={project.title} selected={projectId === project.id} onPress={() => { setProjectId(project.id); setParticipantId(undefined); setScenarioId(undefined); }} />)}
         </View>
-        <Field label="Search" value={query} onChangeText={setQuery} placeholder="Recording ID, speaker, scenario, or notes" />
-        <Field label="Spoken language" value={language} onChangeText={setLanguage} placeholder="Leave blank for all" />
-        <Text style={styles.label}>Participant</Text>
+        <Field label={strings.search} value={query} onChangeText={setQuery} placeholder={strings.librarySearchPlaceholder} />
+        <Field label={strings.spokenLanguage} value={language} onChangeText={setLanguage} placeholder={strings.leaveBlankForAll} />
+        <Text style={styles.label}>{strings.participant}</Text>
         <View style={uiStyles.row}>
-          <FilterChoice label="All" selected={!participantId} onPress={() => setParticipantId(undefined)} />
+          <FilterChoice label={strings.all} selected={!participantId} onPress={() => setParticipantId(undefined)} />
           {participants.map((participant) => <FilterChoice key={participant.id} label={participant.speakerCode} selected={participantId === participant.id} onPress={() => setParticipantId(participant.id)} />)}
         </View>
-        <Text style={styles.label}>Scenario</Text>
+        <Text style={styles.label}>{strings.scenarios}</Text>
         <View style={uiStyles.row}>
-          <FilterChoice label="All" selected={!scenarioId} onPress={() => setScenarioId(undefined)} />
+          <FilterChoice label={strings.all} selected={!scenarioId} onPress={() => setScenarioId(undefined)} />
           {scenarios.map((scenario) => <FilterChoice key={scenario.id} label={scenario.title} selected={scenarioId === scenario.id} onPress={() => setScenarioId(scenario.id)} />)}
         </View>
-        <Text style={styles.label}>Annotation status</Text>
+        <Text style={styles.label}>{strings.annotationStatus}</Text>
         <View style={uiStyles.row}>
-          {statuses.map((option) => <FilterChoice key={option} label={option.replaceAll('_', ' ')} selected={status === option} onPress={() => setStatus(option)} />)}
+          {statuses.map((option) => <FilterChoice key={option} label={option === 'all' ? strings.all : translateText(option.replaceAll('_', ' '))} selected={status === option} onPress={() => setStatus(option)} />)}
         </View>
-        <Text style={styles.label}>Quality rating</Text>
+        <Text style={styles.label}>{strings.quality}</Text>
         <View style={uiStyles.row}>
-          <FilterChoice label="All" selected={!quality} onPress={() => setQuality(undefined)} />
+          <FilterChoice label={strings.all} selected={!quality} onPress={() => setQuality(undefined)} />
           {[1, 2, 3, 4, 5].map((rating) => <FilterChoice key={rating} label={`${rating}/5`} selected={quality === rating} onPress={() => setQuality(rating)} />)}
         </View>
         <View style={styles.dateRow}>
-          <View style={uiStyles.grow}><Field label="From date" value={recordedFrom} onChangeText={setRecordedFrom} placeholder="YYYY-MM-DD" autoCapitalize="none" /></View>
-          <View style={uiStyles.grow}><Field label="To date" value={recordedTo} onChangeText={setRecordedTo} placeholder="YYYY-MM-DD" autoCapitalize="none" /></View>
+          <View style={uiStyles.grow}><Field label={strings.fromDate} value={recordedFrom} onChangeText={setRecordedFrom} placeholder="YYYY-MM-DD" autoCapitalize="none" /></View>
+          <View style={uiStyles.grow}><Field label={strings.toDate} value={recordedTo} onChangeText={setRecordedTo} placeholder="YYYY-MM-DD" autoCapitalize="none" /></View>
         </View>
-        <Button label="Apply filters" onPress={() => void load()} />
-        <Button label="Clear filters" variant="secondary" onPress={() => { setParticipantId(undefined); setScenarioId(undefined); setQuery(''); setLanguage(''); setStatus('all'); setQuality(undefined); setRecordedFrom(''); setRecordedTo(''); }} />
+        <Button label={strings.applyFilters} onPress={() => void load()} />
+        <Button label={strings.clearFilters} variant="secondary" onPress={() => { setParticipantId(undefined); setScenarioId(undefined); setQuery(''); setLanguage(''); setStatus('all'); setQuality(undefined); setRecordedFrom(''); setRecordedTo(''); }} />
       </Card>
-      {recordings.length === 0 ? <EmptyState>No recordings match these filters.</EmptyState> : recordings.map((recording) => (
+      {recordings.length === 0 ? <EmptyState>{strings.noMatchingRecordings}</EmptyState> : recordings.map((recording) => (
         <Pressable key={recording.id} onPress={() => router.push(`/recordings/${recording.id}`)}>
           <Card>
             <View style={uiStyles.row}>
               <Text style={[uiStyles.title, uiStyles.grow]}>{recording.displayId}</Text>
-              <Text style={uiStyles.badge}>{recording.annotationStatus.replaceAll('_', ' ')}</Text>
+              <Text style={uiStyles.badge}>{translateText(recording.annotationStatus.replaceAll('_', ' '))}</Text>
             </View>
-            <Text style={uiStyles.body}>{String(recording.scenarioPromptSnapshot.title ?? 'Scenario')}</Text>
+            <Text style={uiStyles.body}>{String(recording.scenarioPromptSnapshot.title ?? strings.scenarios)}</Text>
             <Text style={uiStyles.muted}>{recording.spokenLanguages.join(', ')} · {formatDuration(recording.durationMs)} · {formatBytes(recording.fileSizeBytes)}</Text>
-            <Text style={uiStyles.muted}>{new Date(recording.recordedAt).toLocaleString()}</Text>
+            <Text style={uiStyles.muted}>{new Date(recording.recordedAt).toLocaleString(localeTag)}</Text>
           </Card>
         </Pressable>
       ))}

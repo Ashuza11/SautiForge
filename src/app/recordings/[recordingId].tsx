@@ -6,13 +6,16 @@ import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useRepositories } from '@/core/database/repositories';
 import { nullableText } from '@/domain/common';
 import { businessAnnotationPayloadSchema, type BusinessAnnotationPayload } from '@/features/annotations/domain/annotation';
+import { currencyOptions, paymentMethodOptions, preserveAnnotationValue, transactionIntentOptions, type AnnotationSelectOption } from '@/features/annotations/domain/business-annotation-options';
 import { getRecordingFile } from '@/features/recordings/data/audio-file-store';
-import { annotationStatusSchema, type Recording } from '@/features/recordings/domain/recording';
+import { annotationStatusSchema, recordingSnapshotExamples, type Recording, type RecordingPromptCorrection } from '@/features/recordings/domain/recording';
 import type { Transcription } from '@/features/transcriptions/domain/transcription';
-import { Button, Card, EmptyState, ErrorNotice, Field, Heading, Screen, uiStyles } from '@/ui/components';
+import { useI18n } from '@/i18n';
+import { Button, Card, EmptyState, ErrorNotice, Field, Heading, Screen, SelectField, uiStyles } from '@/ui/components';
 import { colors } from '@/ui/theme';
 
 const statusOptions = annotationStatusSchema.options;
+const CUSTOM_CONTEXT_VALUE = '__custom_context__';
 const emptyBusiness: BusinessAnnotationPayload = {
   transactionIntent: null, productOrService: null, quantity: null, amount: null, currency: null,
   amountPaid: null, outstandingDebt: null, paymentMethod: null, transactionReference: null,
@@ -22,10 +25,14 @@ export default function RecordingDetailScreen() {
   const params = useLocalSearchParams<{ recordingId: string }>();
   const recordingId = Array.isArray(params.recordingId) ? params.recordingId[0] : params.recordingId;
   const repositories = useRepositories();
+  const { localeTag, strings, translateText } = useI18n();
   const [recording, setRecording] = useState<Recording | null>(null);
+  const [promptCorrections, setPromptCorrections] = useState<RecordingPromptCorrection[]>([]);
   const [transcriptionHistory, setTranscriptionHistory] = useState<Transcription[]>([]);
   const [verbatim, setVerbatim] = useState('');
   const [normalized, setNormalized] = useState('');
+  const [scenarioContext, setScenarioContext] = useState('');
+  const [promptContext, setPromptContext] = useState('');
   const [languageTags, setLanguageTags] = useState('');
   const [transcriptionNotes, setTranscriptionNotes] = useState('');
   const [annotator, setAnnotator] = useState('');
@@ -34,33 +41,48 @@ export default function RecordingDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [savingTranscript, setSavingTranscript] = useState(false);
   const [savingAnnotation, setSavingAnnotation] = useState(false);
+  const [correctedPrompt, setCorrectedPrompt] = useState('');
+  const [correctionReason, setCorrectionReason] = useState('');
+  const [correctedBy, setCorrectedBy] = useState('');
+  const [savingCorrection, setSavingCorrection] = useState(false);
 
   const load = useCallback(async () => {
     if (!recordingId) return;
     try {
-      const [recordingResult, transcripts, annotation] = await Promise.all([
+      const [recordingResult, transcripts, annotation, corrections] = await Promise.all([
         repositories.recordings.get(recordingId),
         repositories.transcriptions.listRevisions(recordingId),
         repositories.annotations.getCurrentBusiness(recordingId),
+        repositories.recordings.listPromptCorrections(recordingId),
       ]);
-      if (!recordingResult) throw new Error('Recording not found.');
+      if (!recordingResult) throw new Error(strings.recordingNotFound);
       setRecording(recordingResult);
       setTranscriptionHistory(transcripts);
+      setPromptCorrections(corrections);
+      setCorrectedPrompt(recordingResult.elicitationPromptText ?? '');
       const current = transcripts[0];
       setVerbatim(current?.verbatimText ?? '');
       setNormalized(current?.normalizedText ?? '');
+      setScenarioContext(current?.scenarioContext ?? String(recordingResult.scenarioPromptSnapshot.title ?? ''));
+      setPromptContext(current?.elicitationPromptContext ?? recordingResult.elicitationPromptText ?? '');
       setLanguageTags(current?.languageTags.join(', ') ?? recordingResult.spokenLanguages.join(', '));
       setTranscriptionNotes(current?.notes ?? '');
       setAnnotator(current?.createdBy ?? '');
       if (annotation) {
         setBusiness(businessAnnotationPayloadSchema.parse(annotation.payload));
         setAnnotationRevision(annotation.revisionNumber);
+      } else {
+        setBusiness({
+          ...emptyBusiness,
+          transactionIntent: nullableText(String(recordingResult.scenarioPromptSnapshot.expectedIntent ?? '')),
+        });
+        setAnnotationRevision(null);
       }
       setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Recording detail could not be loaded.');
+      setError(cause instanceof Error ? translateText(cause.message) : strings.recordingLoadFailed);
     }
-  }, [recordingId, repositories]);
+  }, [recordingId, repositories, strings, translateText]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const saveTranscript = async () => {
@@ -71,15 +93,17 @@ export default function RecordingDetailScreen() {
       await repositories.transcriptions.createRevision(recording.id, {
         verbatimText: nullableText(verbatim),
         normalizedText: nullableText(normalized),
+        scenarioContext: nullableText(scenarioContext),
+        elicitationPromptContext: nullableText(promptContext),
         languageTags: languageTags.split(',').map((value) => value.trim()).filter(Boolean),
         notes: nullableText(transcriptionNotes),
         createdBy: nullableText(annotator),
       });
       if (verbatim.trim()) await repositories.recordings.updateStatus(recording.id, 'transcribed');
       await load();
-      Alert.alert('Transcription saved', 'A new human revision was stored; prior revisions were preserved.');
+      Alert.alert(strings.transcriptionSaved, strings.revisionSaved);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Transcription was not saved.');
+      setError(cause instanceof Error ? translateText(cause.message) : strings.transcriptionSaveFailed);
     } finally {
       setSavingTranscript(false);
     }
@@ -92,9 +116,9 @@ export default function RecordingDetailScreen() {
     try {
       await repositories.annotations.createBusinessRevision(recording.id, businessAnnotationPayloadSchema.parse(business), nullableText(annotator));
       await load();
-      Alert.alert('Annotation saved', 'A new human annotation revision was stored.');
+      Alert.alert(strings.annotationSaved, strings.revisionSaved);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Annotation was not saved.');
+      setError(cause instanceof Error ? translateText(cause.message) : strings.annotationSaveFailed);
     } finally {
       setSavingAnnotation(false);
     }
@@ -105,26 +129,63 @@ export default function RecordingDetailScreen() {
     try {
       setRecording(await repositories.recordings.updateStatus(recording.id, status));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Status was not changed.');
+      setError(cause instanceof Error ? translateText(cause.message) : strings.statusChangeFailed);
+    }
+  };
+
+  const confirmPromptCorrection = () => {
+    if (!recording) return;
+    if (!correctionReason.trim()) {
+      setError(strings.correctionReasonRequired);
+      return;
+    }
+    Alert.alert(strings.confirmExampleCorrection, strings.exampleCorrectionWarning, [
+      { text: strings.cancel, style: 'cancel' },
+      { text: strings.saveExampleCorrection, onPress: () => void savePromptCorrection() },
+    ]);
+  };
+
+  const savePromptCorrection = async () => {
+    if (!recording) return;
+    setSavingCorrection(true);
+    setError(null);
+    try {
+      await repositories.recordings.correctElicitationPrompt(recording.id, {
+        correctedPromptText: correctedPrompt,
+        reason: correctionReason,
+        correctedBy: nullableText(correctedBy),
+      });
+      setCorrectionReason('');
+      await load();
+      Alert.alert(strings.exampleCorrectionSaved, strings.exampleCorrectionSavedDetail);
+    } catch (cause) {
+      setError(cause instanceof Error ? translateText(cause.message) : strings.exampleCorrectionFailed);
+    } finally {
+      setSavingCorrection(false);
     }
   };
 
   const archive = () => {
     if (!recording) return;
-    Alert.alert('Remove recording from dataset?', 'This recording will disappear from the active library, counts, and research dataset exports. A restricted recovery copy is retained for research integrity.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: async () => {
+    Alert.alert(strings.removeRecordingQuestion, strings.removeRecordingWarning, [
+      { text: strings.cancel, style: 'cancel' },
+      { text: strings.remove, style: 'destructive', onPress: async () => {
         try { await repositories.recordings.archive(recording.id); router.replace('/library'); }
-        catch (cause) { setError(cause instanceof Error ? cause.message : 'Recording could not be archived.'); }
+        catch (cause) { setError(cause instanceof Error ? translateText(cause.message) : strings.recordingRemoveFailed); }
       } },
     ]);
   };
 
-  if (!recording) return <Screen>{error ? <ErrorNotice message={error} /> : <EmptyState>Loading recording…</EmptyState>}</Screen>;
+  if (!recording) return <Screen>{error ? <ErrorNotice message={error} /> : <EmptyState>{strings.loadingRecording}</EmptyState>}</Screen>;
   let audioUri: string | null = null;
   let audioError: string | null = null;
   try { audioUri = getRecordingFile(recording.relativeAudioPath).uri; }
-  catch (cause) { audioError = cause instanceof Error ? cause.message : 'Audio is unavailable.'; }
+  catch (cause) { audioError = cause instanceof Error ? translateText(cause.message) : strings.audioUnavailable; }
+  const snapshotExamples = recordingSnapshotExamples(recording);
+  const canCorrectPrompt = recording.captureSource === 'imported_file'
+    && recording.promptExposure === 'example_shown'
+    && Boolean(recording.elicitationPromptText)
+    && snapshotExamples.length > 1;
 
   return (
     <Screen>
@@ -133,63 +194,122 @@ export default function RecordingDetailScreen() {
       {audioError ? <ErrorNotice message={audioError} /> : null}
       <Card>
         <Text style={uiStyles.title}>{String(recording.scenarioPromptSnapshot.title ?? 'Scenario')}</Text>
-        <Text style={uiStyles.muted}>Scenario version {recording.scenarioVersion} · {new Date(recording.recordedAt).toLocaleString()}</Text>
-        <Text style={uiStyles.body}>Languages: {recording.spokenLanguages.join(', ')}</Text>
-        <Text style={uiStyles.muted}>Codec: {recording.codec ?? 'unavailable'} · {recording.sampleRateHz ?? 'unavailable'} Hz · {recording.channelCount ?? 'unavailable'} channels</Text>
-        <Text style={uiStyles.muted}>Source: {recording.captureSource === 'imported_file' ? 'Imported audio' : 'Device microphone'} · prompt: {recording.promptExposure.replaceAll('_', ' ')}</Text>
+        <Text style={uiStyles.muted}>{strings.version} {recording.scenarioVersion} · {new Date(recording.recordedAt).toLocaleString(localeTag)}</Text>
+        <Text style={uiStyles.body}>{strings.languages}: {recording.spokenLanguages.join(', ')}</Text>
+        <Text style={uiStyles.muted}>{strings.codec}: {recording.codec ?? strings.unavailable} · {recording.sampleRateHz ?? strings.unavailable} Hz · {recording.channelCount ?? strings.unavailable} {strings.channels}</Text>
+        <Text style={uiStyles.muted}>{strings.source}: {recording.captureSource === 'imported_file' ? strings.importedAudio : strings.deviceMicrophone} · {translateText(recording.promptExposure.replaceAll('_', ' '))}</Text>
         {recording.captureSource === 'imported_file' ? (
           <>
-            <Text style={uiStyles.muted}>Transport: {recording.transport?.replaceAll('_', ' ') ?? 'unavailable'} · submission: {recording.externalSubmissionId ?? 'unavailable'}</Text>
-            <Text style={uiStyles.muted}>Source file: {recording.sourceFileName ?? 'unavailable'}</Text>
-            {recording.elicitationPromptText ? <Text style={uiStyles.body}>Example used: {recording.elicitationPromptText}</Text> : null}
+            <Text style={uiStyles.muted}>{strings.transport}: {recording.transport ? translateText(recording.transport.replaceAll('_', ' ')) : strings.unavailable} · {strings.submission}: {recording.externalSubmissionId ?? strings.unavailable}</Text>
+            <Text style={uiStyles.muted}>{strings.sourceFile}: {recording.sourceFileName ?? strings.unavailable}</Text>
+            {recording.elicitationPromptText ? <Text style={uiStyles.body}>{strings.exampleUsed}: {recording.elicitationPromptText}</Text> : null}
           </>
         ) : null}
         {audioUri ? <StoredAudioPlayer uri={audioUri} /> : null}
       </Card>
 
-      <Heading subtitle="Status changes are separate from transcript revisions.">Review state</Heading>
+      <Heading>{strings.reviewState}</Heading>
       <View style={uiStyles.row}>
         {statusOptions.map((status) => (
           <Pressable key={status} onPress={() => void updateStatus(status)} style={[styles.choice, recording.annotationStatus === status && styles.choiceSelected]}>
-            <Text style={[styles.choiceText, recording.annotationStatus === status && styles.choiceTextSelected]}>{status.replaceAll('_', ' ')}</Text>
+            <Text style={[styles.choiceText, recording.annotationStatus === status && styles.choiceTextSelected]}>{translateText(status.replaceAll('_', ' '))}</Text>
           </Pressable>
         ))}
       </View>
 
-      <Heading subtitle={`${transcriptionHistory.length} human revision${transcriptionHistory.length === 1 ? '' : 's'} stored. Verbatim text should preserve the spoken variety.`}>Transcription</Heading>
-      <Field label="Verbatim transcription (optional)" value={verbatim} onChangeText={setVerbatim} multiline />
-      <Field label="Normalized text (optional, independent)" value={normalized} onChangeText={setNormalized} multiline />
-      <Field label="Language tags, comma separated" value={languageTags} onChangeText={setLanguageTags} />
-      <Field label="Annotation notes (optional)" value={transcriptionNotes} onChangeText={setTranscriptionNotes} multiline />
-      <Field label="Annotator code (optional)" value={annotator} onChangeText={setAnnotator} />
-      <Button label="Save transcription revision" onPress={() => void saveTranscript()} loading={savingTranscript} />
+      <Heading subtitle={`${transcriptionHistory.length} ${strings.savedRevisions}`}>{strings.transcription}</Heading>
+      <Field label={strings.transcriptionScenario} value={scenarioContext} onChangeText={setScenarioContext} />
+      {snapshotExamples.length ? (
+        <SelectField
+          label={strings.transcriptionExample}
+          value={snapshotExamples.includes(promptContext) ? promptContext : CUSTOM_CONTEXT_VALUE}
+          options={[
+            ...snapshotExamples.map((example, index) => ({ label: `${index + 1}. ${example}`, value: example })),
+            { label: strings.otherEditableValue, value: CUSTOM_CONTEXT_VALUE },
+          ]}
+          onValueChange={(value) => setPromptContext(value === CUSTOM_CONTEXT_VALUE ? '' : value)}
+        />
+      ) : null}
+      {!snapshotExamples.length || !snapshotExamples.includes(promptContext) ? (
+        <Field label={strings.transcriptionExample} value={promptContext} onChangeText={setPromptContext} multiline />
+      ) : null}
+      <Field label={strings.verbatimText} value={verbatim} onChangeText={setVerbatim} multiline />
+      <Field label={strings.normalizedText} value={normalized} onChangeText={setNormalized} multiline />
+      <Field label={strings.languageTags} value={languageTags} onChangeText={setLanguageTags} />
+      <Field label={strings.annotationNotes} value={transcriptionNotes} onChangeText={setTranscriptionNotes} multiline />
+      <Field label={strings.annotatorCode} value={annotator} onChangeText={setAnnotator} />
+      <Button label={strings.saveTranscription} onPress={() => void saveTranscript()} loading={savingTranscript} />
 
-      <Heading subtitle={`Business annotation revision ${annotationRevision ?? 0}. Leave irrelevant fields blank; enter “unknown”, “ambiguous”, or “unavailable” explicitly when needed.`}>Structured business labels</Heading>
-      <BusinessField label="Transaction intent" field="transactionIntent" value={business.transactionIntent} setBusiness={setBusiness} />
-      <BusinessField label="Product or service" field="productOrService" value={business.productOrService} setBusiness={setBusiness} />
-      <BusinessField label="Quantity" field="quantity" value={business.quantity} setBusiness={setBusiness} />
-      <BusinessField label="Amount" field="amount" value={business.amount} setBusiness={setBusiness} />
-      <BusinessField label="Currency" field="currency" value={business.currency} setBusiness={setBusiness} />
-      <BusinessField label="Amount paid" field="amountPaid" value={business.amountPaid} setBusiness={setBusiness} />
-      <BusinessField label="Outstanding debt" field="outstandingDebt" value={business.outstandingDebt} setBusiness={setBusiness} />
-      <BusinessField label="Payment method" field="paymentMethod" value={business.paymentMethod} setBusiness={setBusiness} />
-      <BusinessField label="Transaction reference" field="transactionReference" value={business.transactionReference} setBusiness={setBusiness} />
-      <Button label="Save business annotation revision" onPress={() => void saveAnnotation()} loading={savingAnnotation} />
-      <Heading subtitle="Use this for duplicate, incorrect, or mismatched takes. Removal is non-destructive and excludes the recording from normal dataset exports.">Correct a collection mistake</Heading>
-      <Button label="Remove recording from dataset" variant="danger" onPress={archive} />
+      <Heading subtitle={`${strings.revision} ${annotationRevision ?? 0}`}>{strings.businessLabels}</Heading>
+      <BusinessSelectField label={strings.transactionIntent} field="transactionIntent" value={business.transactionIntent} options={transactionIntentOptions} setBusiness={setBusiness} />
+      <BusinessField label={strings.productService} field="productOrService" value={business.productOrService} setBusiness={setBusiness} />
+      <BusinessField label={strings.quantity} field="quantity" value={business.quantity} setBusiness={setBusiness} />
+      <BusinessField label={strings.amount} field="amount" value={business.amount} setBusiness={setBusiness} />
+      <BusinessSelectField label={strings.currency} field="currency" value={business.currency} options={currencyOptions} setBusiness={setBusiness} />
+      <BusinessField label={strings.amountPaid} field="amountPaid" value={business.amountPaid} setBusiness={setBusiness} />
+      <BusinessField label={strings.outstandingDebt} field="outstandingDebt" value={business.outstandingDebt} setBusiness={setBusiness} />
+      <BusinessSelectField label={strings.paymentMethod} field="paymentMethod" value={business.paymentMethod} options={paymentMethodOptions} setBusiness={setBusiness} />
+      <BusinessField label={strings.transactionReference} field="transactionReference" value={business.transactionReference} setBusiness={setBusiness} />
+      <Button label={strings.saveBusinessAnnotation} onPress={() => void saveAnnotation()} loading={savingAnnotation} />
+      {canCorrectPrompt ? (
+        <>
+          <Heading subtitle={strings.exampleCorrectionSubtitle}>{strings.correctExampleAssociation}</Heading>
+          <SelectField
+            label={strings.correctExample}
+            value={correctedPrompt}
+            options={snapshotExamples.map((example, index) => ({ label: `${index + 1}. ${example}`, value: example }))}
+            onValueChange={setCorrectedPrompt}
+          />
+          <Field label={strings.correctionReason} value={correctionReason} onChangeText={setCorrectionReason} multiline />
+          <Field label={strings.correctedBy} value={correctedBy} onChangeText={setCorrectedBy} />
+          <Button
+            label={strings.saveExampleCorrection}
+            onPress={confirmPromptCorrection}
+            loading={savingCorrection}
+            disabled={correctedPrompt === recording.elicitationPromptText}
+          />
+          {promptCorrections.length ? (
+            <Card>
+              <Text style={uiStyles.title}>{strings.correctionHistory}</Text>
+              {promptCorrections.map((correction) => (
+                <View key={correction.id} style={styles.correctionEntry}>
+                  <Text style={uiStyles.body}>{correction.previousPromptText} → {correction.correctedPromptText}</Text>
+                  <Text style={uiStyles.muted}>{correction.reason}</Text>
+                  <Text style={uiStyles.muted}>{new Date(correction.createdAt).toLocaleString(localeTag)} · {correction.correctedBy ?? strings.researcherNotRecorded}</Text>
+                </View>
+              ))}
+            </Card>
+          ) : null}
+        </>
+      ) : null}
+      <Heading>{strings.correctMistake}</Heading>
+      <Button label={strings.removeRecording} variant="danger" onPress={archive} />
     </Screen>
   );
 }
 
 function StoredAudioPlayer({ uri }: { uri: string }) {
+  const { strings } = useI18n();
   const player = useAudioPlayer(uri);
   const status = useAudioPlayerStatus(player);
   const play = () => { if (status.didJustFinish) player.seekTo(0); player.play(); };
-  return <Button label={status.playing ? 'Pause audio' : 'Play audio'} variant="secondary" onPress={() => status.playing ? player.pause() : play()} />;
+  return <Button label={status.playing ? strings.pauseAudio : strings.playAudio} variant="secondary" onPress={() => status.playing ? player.pause() : play()} />;
 }
 
 function BusinessField({ label, field, value, setBusiness }: { label: string; field: keyof BusinessAnnotationPayload; value: string | null; setBusiness: React.Dispatch<React.SetStateAction<BusinessAnnotationPayload>> }) {
   return <Field label={label} value={value ?? ''} onChangeText={(text) => setBusiness((current) => ({ ...current, [field]: nullableText(text) }))} />;
+}
+
+function BusinessSelectField({ label, field, value, options, setBusiness }: { label: string; field: keyof BusinessAnnotationPayload; value: string | null; options: AnnotationSelectOption[]; setBusiness: React.Dispatch<React.SetStateAction<BusinessAnnotationPayload>> }) {
+  const { translateText } = useI18n();
+  return (
+    <SelectField
+      label={label}
+      value={value ?? ''}
+      options={preserveAnnotationValue(options, value).map((option) => ({ ...option, label: translateText(option.label) }))}
+      onValueChange={(selected) => setBusiness((current) => ({ ...current, [field]: nullableText(selected) }))}
+    />
+  );
 }
 
 const formatDuration = (milliseconds: number) => `${Math.floor(milliseconds / 60000)}:${Math.floor((milliseconds % 60000) / 1000).toString().padStart(2, '0')}`;
@@ -200,4 +320,5 @@ const styles = StyleSheet.create({
   choiceSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
   choiceText: { color: colors.ink, textTransform: 'capitalize', fontSize: 13 },
   choiceTextSelected: { color: '#FFFFFF', fontWeight: '700' },
+  correctionEntry: { borderTopColor: colors.border, borderTopWidth: 1, marginTop: 10, paddingTop: 10, gap: 4 },
 });

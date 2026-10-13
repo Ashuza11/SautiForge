@@ -46,7 +46,7 @@ export function I18nProvider({ children }: PropsWithChildren) {
   }, [settings]);
 
   const translateText = useCallback((text: string) => {
-    const key = (Object.keys(englishStrings) as Array<keyof Translations>)
+    const key = (Object.keys(englishStrings) as Array<keyof Translations>).reverse()
       .find((candidate) => englishStrings[candidate] === text);
     return key ? translations[language][key] : text;
   }, [language]);

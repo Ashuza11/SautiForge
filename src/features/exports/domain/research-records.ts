@@ -52,7 +52,8 @@ export const researchRecordingSchema = z.object({
 }).strict();
 
 export const researchTranscriptionSchema = z.object({
-  id, recording_id: id, verbatim_text: nullableText, normalized_text: nullableText, language_tags_json: jsonText,
+  id, recording_id: id, verbatim_text: nullableText, normalized_text: nullableText, scenario_context: nullableText,
+  elicitation_prompt_context: nullableText, language_tags_json: jsonText,
   notes: nullableText, source: z.enum(['human', 'automatic']), revision_number: z.number().int().positive(),
   supersedes_id: id.nullable(), created_at: timestamp, created_by: nullableText,
 }).strict();

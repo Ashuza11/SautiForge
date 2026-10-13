@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 
-import { DATABASE_CREATE_PRAGMAS, DATABASE_OPEN_PRAGMAS, DATABASE_VERSION, MIGRATION_1_SQL, MIGRATION_2_SQL, MIGRATION_3_SQL, MIGRATION_4_SQL, MIGRATION_5_SQL } from './migrations';
+import { DATABASE_CREATE_PRAGMAS, DATABASE_OPEN_PRAGMAS, DATABASE_VERSION, MIGRATION_1_SQL, MIGRATION_2_SQL, MIGRATION_3_SQL, MIGRATION_4_SQL, MIGRATION_5_SQL, MIGRATION_6_SQL, MIGRATION_7_SQL } from './migrations';
 
 const requiredTables = [
   'projects',
@@ -17,7 +17,7 @@ const requiredTables = [
 
 describe('database migration 1', () => {
   it('has an explicit schema version', () => {
-    expect(DATABASE_VERSION).toBe(5);
+    expect(DATABASE_VERSION).toBe(7);
   });
 
   it.each(requiredTables)('creates the %s table', (table) => {
@@ -51,6 +51,18 @@ describe('database migration 1', () => {
     expect(MIGRATION_5_SQL).toContain('source_file_name');
   });
 
+  it('adds an append-only recording prompt correction audit trail in migration 6', () => {
+    expect(MIGRATION_6_SQL).toContain('CREATE TABLE IF NOT EXISTS recording_prompt_corrections');
+    expect(MIGRATION_6_SQL).toContain('previous_prompt_text');
+    expect(MIGRATION_6_SQL).toContain('corrected_prompt_text');
+    expect(MIGRATION_6_SQL).toContain('REFERENCES recordings(id)');
+  });
+
+  it('adds editable transcription context in migration 7', () => {
+    expect(MIGRATION_7_SQL).toContain('scenario_context');
+    expect(MIGRATION_7_SQL).toContain('elicitation_prompt_context');
+  });
+
   it('executes the complete migration chain in SQLite', () => {
     const db = new DatabaseSync(':memory:');
     try {
@@ -60,9 +72,13 @@ describe('database migration 1', () => {
       db.exec(MIGRATION_3_SQL);
       db.exec(MIGRATION_4_SQL);
       db.exec(MIGRATION_5_SQL);
+      db.exec(MIGRATION_6_SQL);
+      db.exec(MIGRATION_7_SQL);
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => String(row.name));
-      expect(tables).toEqual(expect.arrayContaining(requiredTables));
+      expect(tables).toEqual(expect.arrayContaining([...requiredTables, 'recording_prompt_corrections']));
       expect(db.prepare('PRAGMA foreign_keys').get()).toMatchObject({ foreign_keys: 1 });
+      const transcriptionColumns = db.prepare('PRAGMA table_info(transcriptions)').all().map((row) => String(row.name));
+      expect(transcriptionColumns).toEqual(expect.arrayContaining(['scenario_context', 'elicitation_prompt_context']));
     } finally { db.close(); }
   });
 
@@ -75,6 +91,8 @@ describe('database migration 1', () => {
       db.exec(MIGRATION_3_SQL);
       db.exec(MIGRATION_4_SQL);
       db.exec(MIGRATION_5_SQL);
+      db.exec(MIGRATION_6_SQL);
+      db.exec(MIGRATION_7_SQL);
       const timestamp = '2026-09-23T08:00:00.000Z';
       db.prepare(`INSERT INTO projects (id, title, description, target_language, language_variety, research_domain,
         collection_location, protocol_version, status, created_at, updated_at) VALUES (?, ?, '', ?, ?, ?, ?, ?, 'active', ?, ?)`)

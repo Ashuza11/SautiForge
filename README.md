@@ -10,7 +10,7 @@ The first vertical slice includes:
 
 - Expo SDK 57, React Native, TypeScript, and Expo Router application structure.
 - A consistent high-contrast green brand palette shared by the icon, launch screen, primary controls, selections, and progress indicators.
-- A verified, device-persisted interface language selector for English, French, and Kiswahili; navigation, dashboard, settings, and shared workflow controls update offline without changing research-entered content.
+- A verified, device-persisted interface language selector for English, French, and Kiswahili; collection forms, dropdowns, validation, alerts, navigation, review, export, and settings update offline without changing research-entered content.
 - A versioned `expo-sqlite` database with foreign keys and WAL journaling.
 - All MVP entity tables, stable UUID keys, timestamps, constraints, and indexes.
 - First-run Kingwana pilot project and five editable scenario records.
@@ -20,13 +20,13 @@ The first vertical slice includes:
 - Append-only consent revisions, per-use approvals, visible history, and reusable recording/export authorization checks.
 - Consent-linked, resumable collection sessions with device/environment metadata, consent-checked recovery from accidental completion, and research-safe removal of incorrect sessions.
 - Real foreground microphone recording, visible timer/indicator, repeatable immediate playback, rerecord/discard confirmation, and verified accepted-file persistence in document storage.
-- Manual remote collection support: save up to 25 examples per scenario, share the numbered examples together in bold with brief speaking guidance, keep research linkage internal, select multiple returned audio files, and review and explicitly match every file to its eliciting example before saving. Original format, source filename, transport, prompt exposure, pseudonymous submission, and SHA-256 provenance are retained. SautiForge does not read WhatsApp chats or groups.
-- Dashboard counts, a recording library filterable by project/participant/scenario/language/date/quality/status, detail playback, soft archive, status changes, human transcription revision history, and versioned business annotations.
+- Manual remote collection support: save up to 25 examples per scenario, share the numbered examples together in bold with brief speaking guidance, keep research linkage internal, select multiple returned audio files, and review and explicitly match every file to its eliciting example before saving. A saved imported recording can be reassigned to another example from its frozen scenario version with a reasoned administrative audit trail. Original format, source filename, transport, prompt exposure, pseudonymous submission, and SHA-256 provenance are retained. SautiForge does not read WhatsApp chats or groups.
+- Dashboard counts, a recording library filterable by project/participant/scenario/language/date/quality/status, detail playback, soft archive, status changes, human transcription revisions with prefilled editable scenario/example context, and versioned business annotations with common-value selectors.
 - Startup storage reconciliation that reports missing audio and quarantines zero-byte or unreferenced recording files for recovery.
 - Settings and safety status for microphone permission, free space, versions, offline behavior, backup limits, and the latest storage check.
 - Consent-filtered research ZIP exports with JSON/JSONL/CSV metadata, original audio, SHA-256 manifest, and post-compression verification.
 - A visibly separate sensitive administrative backup and hash/schema/database/audio-verified restore with rollback on failure.
-- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 105 automated tests including translation completeness and language persistence, brand-palette consistency, participant progress, clear example-selection validation, real in-memory SQLite migration/relationship checks, scenario example sets, privacy-minimized batch sharing and queue progression, imported-audio hashing, prompt provenance and duplicate prevention, metadata selectors, repeat playback, and accepted-audio readability guards.
+- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 119 automated tests including translation completeness and critical-workflow localization, language persistence, brand-palette consistency, participant progress, clear example-selection and correction validation, real in-memory SQLite migration/relationship checks, scenario example sets, privacy-minimized batch sharing and queue progression, imported-audio hashing, prompt provenance and duplicate prevention, metadata and annotation selectors, transcription context persistence, repeat playback, and accepted-audio readability guards.
 - Android APK build profile in `eas.json`.
 - A verified GitHub Actions release build that produces a standalone pilot APK and SHA-256 sidecar.
 

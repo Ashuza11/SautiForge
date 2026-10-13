@@ -16,7 +16,7 @@ export default function ProjectDetailScreen() {
   const params = useLocalSearchParams<{ projectId: string }>();
   const projectId = Array.isArray(params.projectId) ? params.projectId[0] : params.projectId;
   const repositories = useRepositories();
-  const { strings } = useI18n();
+  const { strings, translateText } = useI18n();
   const [project, setProject] = useState<Project | null>(null);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -42,24 +42,24 @@ export default function ProjectDetailScreen() {
       setActiveProjectId(activeProject?.id ?? null);
       setCurrentConsent(Object.fromEntries(consentPairs));
       setParticipantProgress(progress);
-      setError(projectResult ? null : 'Project not found.');
+      setError(projectResult ? null : strings.projectNotFound);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The project could not be loaded.');
+      setError(cause instanceof Error ? translateText(cause.message) : strings.projectLoadFailed);
     }
-  }, [projectId, repositories]);
+  }, [projectId, repositories, strings, translateText]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const archiveProject = () => {
     if (!project) return;
-    Alert.alert('Archive project?', 'Existing research records will be preserved. This project will no longer appear in the active list.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Archive', style: 'destructive', onPress: async () => {
+    Alert.alert(strings.archiveProjectQuestion, strings.archiveProjectWarning, [
+      { text: strings.cancel, style: 'cancel' },
+      { text: strings.archive, style: 'destructive', onPress: async () => {
         try {
           await repositories.projects.archive(project.id);
           router.replace('/');
         } catch (cause) {
-          setError(cause instanceof Error ? cause.message : 'The project could not be archived.');
+          setError(cause instanceof Error ? translateText(cause.message) : strings.projectArchiveFailed);
         }
       } },
     ]);
@@ -72,49 +72,47 @@ export default function ProjectDetailScreen() {
       setActiveProjectId(project.id);
       setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The active collection project could not be changed.');
+      setError(cause instanceof Error ? translateText(cause.message) : strings.activeProjectChangeFailed);
     }
   };
 
   const archiveScenario = (scenario: Scenario) => {
-    Alert.alert('Archive scenario?', 'The scenario will be hidden from new collection. Historical recordings will retain their snapshot.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Archive', style: 'destructive', onPress: async () => {
+    Alert.alert(strings.archiveScenarioQuestion, strings.archiveScenarioWarning, [
+      { text: strings.cancel, style: 'cancel' },
+      { text: strings.archive, style: 'destructive', onPress: async () => {
         try {
           await repositories.scenarios.archive(scenario.id);
           await load();
         } catch (cause) {
-          setError(cause instanceof Error ? cause.message : 'The scenario could not be archived.');
+          setError(cause instanceof Error ? translateText(cause.message) : strings.scenarioArchiveFailed);
         }
       } },
     ]);
   };
 
-  if (!project) return <Screen>{error ? <ErrorNotice message={error} /> : <EmptyState>Loading project…</EmptyState>}</Screen>;
+  if (!project) return <Screen>{error ? <ErrorNotice message={error} /> : <EmptyState>{strings.loadingProject}</EmptyState>}</Screen>;
 
   return (
     <Screen>
       <Heading subtitle={`${project.targetLanguage} · ${project.languageVariety}`}>{project.title}</Heading>
       {error ? <ErrorNotice message={error} /> : null}
       <Card>
-        {project.status === 'archived' ? <Text style={styles.archivedBadge}>ARCHIVED</Text> : null}
+        {project.status === 'archived' ? <Text style={styles.archivedBadge}>{strings.archived}</Text> : null}
         {activeProjectId === project.id ? <Text style={uiStyles.badge}>{strings.currentCollectionProject}</Text> : null}
-        <Text style={uiStyles.body}>{project.description || 'No description'}</Text>
+        <Text style={uiStyles.body}>{project.description || strings.noDescription}</Text>
         <View style={uiStyles.divider} />
         <Text style={uiStyles.muted}>{strings.domain}: {project.researchDomain}</Text>
         <Text style={uiStyles.muted}>{strings.location}: {project.collectionLocation}</Text>
         <Text style={uiStyles.muted}>{strings.protocol}: {project.protocolVersion}</Text>
-        <Text style={uiStyles.muted}>The current collection project controls the dashboard and where new participants, sessions, and recordings are created. It does not change existing records.</Text>
         {project.status === 'active' && activeProjectId !== project.id ? <Button label={strings.selectProject} variant="secondary" onPress={() => void selectForCollection()} /> : null}
-        <Button label="Edit project" variant="secondary" onPress={() => router.push(`/projects/${project.id}/edit`)} />
+        <Button label={strings.editProject} variant="secondary" onPress={() => router.push(`/projects/${project.id}/edit`)} />
       </Card>
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{strings.participants}</Text>
         <Text style={styles.count}>{participants.length}</Text>
       </View>
-      <Text style={uiStyles.muted}>{strings.progressLegend}</Text>
-      {participants.length === 0 ? <EmptyState>No participants registered. Add a pseudonymous speaker before starting a session.</EmptyState> : participants.map((participant) => {
+      {participants.length === 0 ? <EmptyState>{strings.noParticipants}</EmptyState> : participants.map((participant) => {
         const progress = participantProgress[participant.id];
         return (
           <Pressable key={participant.id} onPress={() => router.push(`/participants/${participant.id}`)}>
@@ -128,12 +126,12 @@ export default function ProjectDetailScreen() {
               <Text style={uiStyles.muted}>{participant.primaryLanguage}{participant.languageVariety ? ` · ${participant.languageVariety}` : ''}</Text>
               {progress ? <Text style={uiStyles.muted}>{progress.recordingCount}/{progress.requiredRecordingCount} {strings.targetRecordings} · {progress.transcribedRecordingCount}/{progress.recordingCount} {strings.transcribed}</Text> : null}
               {progress?.transcriptionComplete ? <Text style={styles.transcriptionCompleteBadge}>{strings.transcriptionComplete}</Text> : progress?.collectionComplete ? <Text style={styles.collectionCompleteBadge}>{strings.collectionComplete}</Text> : null}
-              {participant.status !== 'active' ? <Text style={styles.archivedBadge}>{participant.status.toUpperCase()}</Text> : null}
+              {participant.status !== 'active' ? <Text style={styles.archivedBadge}>{translateText(participant.status).toUpperCase()}</Text> : null}
             </View>
           </Pressable>
         );
       })}
-      {project.status === 'active' ? <Button label="Register participant" onPress={() => router.push(`/projects/${project.id}/participants/new`)} /> : null}
+      {project.status === 'active' ? <Button label={strings.registerParticipant} onPress={() => router.push(`/projects/${project.id}/participants/new`)} /> : null}
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{strings.scenarios}</Text>
@@ -146,15 +144,15 @@ export default function ProjectDetailScreen() {
               <Text style={[uiStyles.title, uiStyles.grow]}>{scenario.title}</Text>
               <Text style={uiStyles.badge}>v{scenario.version}</Text>
             </View>
-            {scenario.status === 'archived' ? <Text style={styles.archivedBadge}>ARCHIVED</Text> : null}
+            {scenario.status === 'archived' ? <Text style={styles.archivedBadge}>{strings.archived}</Text> : null}
             <Text style={uiStyles.body}>{scenario.description}</Text>
-            <Text style={uiStyles.muted}>{scenario.collectionMethod.replaceAll('_', ' ')}</Text>
-            {scenario.status === 'active' ? <Button label="Archive scenario" variant="secondary" onPress={() => archiveScenario(scenario)} /> : null}
+            <Text style={uiStyles.muted}>{translateText(scenario.collectionMethod.replaceAll('_', ' '))}</Text>
+            {scenario.status === 'active' ? <Button label={strings.archiveScenario} variant="secondary" onPress={() => archiveScenario(scenario)} /> : null}
           </Card>
         </Pressable>
       ))}
       <Button label={strings.newScenario} onPress={() => router.push(`/projects/${project.id}/scenarios/new`)} />
-      {project.status === 'active' ? <Button label="Archive project" variant="danger" onPress={archiveProject} /> : null}
+      {project.status === 'active' ? <Button label={strings.archiveProject} variant="danger" onPress={archiveProject} /> : null}
     </Screen>
   );
 }

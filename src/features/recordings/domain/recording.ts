@@ -59,6 +59,27 @@ export const recordingMetadataDraftSchema = recordingSchema.pick({
 export type Recording = z.infer<typeof recordingSchema>;
 export type RecordingMetadataDraft = z.infer<typeof recordingMetadataDraftSchema>;
 
+export const recordingPromptCorrectionDraftSchema = z.object({
+  correctedPromptText: z.string().trim().min(1, 'Select the correct example.').max(1000),
+  reason: z.string().trim().min(3, 'Explain why this association is being corrected.').max(1000),
+  correctedBy: z.string().trim().min(1).max(160).nullable(),
+});
+
+export const recordingPromptCorrectionSchema = recordingPromptCorrectionDraftSchema.extend({
+  id: z.string().uuid(),
+  recordingId: z.string().uuid(),
+  previousPromptText: z.string().trim().min(1).max(1000),
+  createdAt: z.string().datetime({ offset: true }),
+});
+
+export type RecordingPromptCorrectionDraft = z.infer<typeof recordingPromptCorrectionDraftSchema>;
+export type RecordingPromptCorrection = z.infer<typeof recordingPromptCorrectionSchema>;
+
+export function recordingSnapshotExamples(recording: Pick<Recording, 'scenarioPromptSnapshot'>): string[] {
+  return z.array(z.string().trim().min(1).max(500)).max(25)
+    .parse(recording.scenarioPromptSnapshot.remoteExamples ?? []);
+}
+
 export const acceptedTakeSchema = z.object({
   sourceUri: z.string().min(1),
   durationMs: z.number().int().nonnegative(),

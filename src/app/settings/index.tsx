@@ -17,7 +17,7 @@ type PermissionState = { status: string; canAskAgain: boolean };
 
 export default function SettingsScreen() {
   const repositories = useRepositories();
-  const { language, localeTag, setLanguage, strings } = useI18n();
+  const { language, localeTag, setLanguage, strings, translateText } = useI18n();
   const [project, setProject] = useState<Project | null>(null);
   const [permission, setPermission] = useState<PermissionState | null>(null);
   const [recovery, setRecovery] = useState<StorageRecoveryReport | null>(null);
@@ -31,15 +31,15 @@ export default function SettingsScreen() {
       setPermission({ status: microphone.status, canAskAgain: microphone.canAskAgain });
       setRecovery(lastRecovery);
       setError(null);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : strings.settingsLoadFailed); }
-  }, [repositories.projects, repositories.settings, strings.settingsLoadFailed]);
+    } catch (cause) { setError(cause instanceof Error ? translateText(cause.message) : strings.settingsLoadFailed); }
+  }, [repositories.projects, repositories.settings, strings.settingsLoadFailed, translateText]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const requestMicrophone = async () => {
     try {
       const result = await requestRecordingPermissionsAsync();
       setPermission({ status: result.status, canAskAgain: result.canAskAgain });
-    } catch (cause) { setError(cause instanceof Error ? cause.message : strings.microphoneRequestFailed); }
+    } catch { setError(strings.microphoneRequestFailed); }
   };
 
   const changeLanguage = async (value: string) => {
@@ -49,7 +49,7 @@ export default function SettingsScreen() {
       await setLanguage(value as InterfaceLanguage);
       setLanguageSaved(true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : strings.languageSaveFailed);
+      setError(cause instanceof Error ? translateText(cause.message) : strings.languageSaveFailed);
     }
   };
 
@@ -63,7 +63,7 @@ export default function SettingsScreen() {
 
   return (
     <Screen>
-      <Heading subtitle={strings.settingsSubtitle}>{strings.settingsAndSafety}</Heading>
+      <Heading>{strings.settingsAndSafety}</Heading>
       {error ? <ErrorNotice message={error} /> : null}
       <Card>
         <Text style={uiStyles.title}>{strings.collectionContext}</Text>
@@ -85,7 +85,6 @@ export default function SettingsScreen() {
       <Card>
         <Text style={uiStyles.title}>{strings.microphonePermission}</Text>
         <Text style={permission?.status === 'granted' ? styles.ok : styles.warning}>{permissionLabel}</Text>
-        <Text style={uiStyles.muted}>{strings.permissionExplanation}</Text>
         {permission?.status !== 'granted' && permission?.canAskAgain ? <Button label={strings.requestMicrophonePermission} onPress={() => void requestMicrophone()} /> : null}
         {permission?.status === 'denied' && !permission.canAskAgain ? <Button label={strings.openAndroidSettings} variant="secondary" onPress={() => void Linking.openSettings()} /> : null}
       </Card>
@@ -94,7 +93,7 @@ export default function SettingsScreen() {
         <Text style={recovery?.missingPaths.length || recovery?.errors.length ? styles.warning : styles.ok}>
           {recovery ? `${recovery.verifiedFiles} ${strings.verified} · ${recovery.missingPaths.length} ${strings.missing} · ${recovery.quarantinedPaths.length} ${strings.quarantined}` : strings.noCheckResult}
         </Text>
-        {recovery ? <Text style={uiStyles.muted}>{strings.lastChecked} {new Date(recovery.checkedAt).toLocaleString(localeTag)}. {strings.recoveryExplanation}</Text> : null}
+        {recovery ? <Text style={uiStyles.muted}>{strings.lastChecked} {new Date(recovery.checkedAt).toLocaleString(localeTag)}</Text> : null}
         {recovery?.missingPaths.map((path) => <Text key={path} style={styles.warning}>{strings.missing}: {path}</Text>)}
         {recovery?.errors.map((message) => <Text key={message} style={styles.warning}>{message}</Text>)}
       </Card>
@@ -103,10 +102,6 @@ export default function SettingsScreen() {
         <Text style={styles.warning}>{strings.protectionWarning}</Text>
         <Text style={uiStyles.body}>{strings.protectionInstructions}</Text>
         <Button label={strings.exportOrRestoreData} variant="secondary" onPress={() => router.push('/exports')} />
-      </Card>
-      <Card>
-        <Text style={uiStyles.title}>{strings.offlineOperation}</Text>
-        <Text style={uiStyles.body}>{strings.offlineExplanation}</Text>
       </Card>
     </Screen>
   );

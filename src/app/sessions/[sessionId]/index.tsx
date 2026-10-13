@@ -7,6 +7,7 @@ import type { Participant } from '@/features/participants/domain/participant';
 import type { Recording } from '@/features/recordings/domain/recording';
 import type { Scenario } from '@/features/scenarios/domain/scenario';
 import type { CollectionSession } from '@/features/sessions/domain/session';
+import { useI18n } from '@/i18n';
 import { Button, Card, EmptyState, ErrorNotice, Heading, Screen, uiStyles } from '@/ui/components';
 import { colors, spacing } from '@/ui/theme';
 
@@ -14,6 +15,7 @@ export default function SessionDetailScreen() {
   const params = useLocalSearchParams<{ sessionId: string }>();
   const sessionId = Array.isArray(params.sessionId) ? params.sessionId[0] : params.sessionId;
   const repositories = useRepositories();
+  const { localeTag, strings, translateText } = useI18n();
   const [session, setSession] = useState<CollectionSession | null>(null);
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
@@ -25,7 +27,7 @@ export default function SessionDetailScreen() {
     if (!sessionId) return;
     try {
       const sessionResult = await repositories.sessions.get(sessionId);
-      if (!sessionResult) throw new Error('Session not found.');
+      if (!sessionResult) throw new Error(strings.sessionNotFound);
       const [participantResult, scenarioResults, recordingResults, consentResult] = await Promise.all([
         repositories.participants.get(sessionResult.participantId),
         repositories.scenarios.listByProject(sessionResult.projectId),
@@ -39,9 +41,9 @@ export default function SessionDetailScreen() {
       setConsentValid(consentResult);
       setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Session could not be loaded.');
+      setError(cause instanceof Error ? translateText(cause.message) : strings.sessionLoadFailed);
     }
-  }, [repositories, sessionId]);
+  }, [repositories, sessionId, strings, translateText]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const updateState = async (action: 'resume' | 'reopen' | 'pause' | 'complete') => {
@@ -53,46 +55,46 @@ export default function SessionDetailScreen() {
       if (action === 'complete') await repositories.sessions.complete(session.id);
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Session state could not be changed.');
+      setError(cause instanceof Error ? translateText(cause.message) : strings.sessionStateFailed);
     }
   };
 
-  const confirmComplete = () => Alert.alert('Complete session?', 'You can review its recordings later, but cannot add new takes.', [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'Complete', onPress: () => void updateState('complete') },
+  const confirmComplete = () => Alert.alert(strings.completeSessionQuestion, strings.completeSessionWarning, [
+    { text: strings.cancel, style: 'cancel' },
+    { text: strings.complete, onPress: () => void updateState('complete') },
   ]);
 
   const confirmReopen = () => Alert.alert(
-    'Reopen completed session?',
-    'The completion time will be cleared and new takes can be added. Existing recordings will remain attached.',
+    strings.reopenSessionQuestion,
+    strings.reopenSessionWarning,
     [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Reopen session', onPress: () => void updateState('reopen') },
+      { text: strings.cancel, style: 'cancel' },
+      { text: strings.reopenSession, onPress: () => void updateState('reopen') },
     ],
   );
 
   const removeIncorrectSession = () => {
     if (!session) return;
     Alert.alert(
-      'Remove incorrect session?',
+      strings.removeSessionQuestion,
       recordings.length > 0
-        ? `This session and its ${recordings.length} recording${recordings.length === 1 ? '' : 's'} will be hidden and excluded from research dataset exports. A restricted administrative backup will still retain them for recovery and audit.`
-        : 'This session will be hidden and excluded from research dataset exports. A restricted administrative backup will still retain it for recovery and audit.',
+        ? `${strings.removeSessionWithRecordings} ${recordings.length}. ${strings.recoveryCopyRetained}`
+        : `${strings.removeSessionWarning} ${strings.recoveryCopyRetained}`,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove session', style: 'destructive', onPress: async () => {
+        { text: strings.cancel, style: 'cancel' },
+        { text: strings.removeSession, style: 'destructive', onPress: async () => {
           try {
             await repositories.sessions.archive(session.id);
             router.back();
           } catch (cause) {
-            setError(cause instanceof Error ? cause.message : 'The incorrect session could not be removed.');
+            setError(cause instanceof Error ? translateText(cause.message) : strings.sessionRemoveFailed);
           }
         } },
       ],
     );
   };
 
-  if (!session) return <Screen>{error ? <ErrorNotice message={error} /> : <EmptyState>Loading session…</EmptyState>}</Screen>;
+  if (!session) return <Screen>{error ? <ErrorNotice message={error} /> : <EmptyState>{strings.loadingSession}</EmptyState>}</Screen>;
   const canCollect = session.status === 'in_progress' && consentValid && participant?.status === 'active';
   const counts = recordings.reduce<Record<string, number>>((accumulator, recording) => {
     accumulator[recording.scenarioId] = (accumulator[recording.scenarioId] ?? 0) + 1;
@@ -101,33 +103,31 @@ export default function SessionDetailScreen() {
 
   return (
     <Screen>
-      <Heading subtitle={`${participant?.speakerCode ?? 'Unknown speaker'} · ${session.collectionEnvironment}`}>Collection session</Heading>
+      <Heading subtitle={`${participant?.speakerCode ?? strings.unknownSpeaker} · ${translateText(session.collectionEnvironment)}`}>{strings.collectionSession}</Heading>
       {error ? <ErrorNotice message={error} /> : null}
       <Card>
         <View style={uiStyles.row}>
-          <Text style={session.status === 'completed' ? uiStyles.badge : styles.stateBadge}>{session.status.replaceAll('_', ' ').toUpperCase()}</Text>
-          <Text style={consentValid ? uiStyles.badge : styles.blockedBadge}>{consentValid ? 'CONSENT VALID' : 'CONSENT BLOCKED'}</Text>
+          <Text style={session.status === 'completed' ? uiStyles.badge : styles.stateBadge}>{translateText(session.status.replaceAll('_', ' ')).toUpperCase()}</Text>
+          <Text style={consentValid ? uiStyles.badge : styles.blockedBadge}>{consentValid ? strings.consentValid : strings.consentBlocked}</Text>
         </View>
-        <Text style={uiStyles.muted}>Started {new Date(session.startedAt).toLocaleString()}</Text>
-        <Text style={uiStyles.muted}>{session.city || 'No city recorded'} · {recordings.length} recording{recordings.length === 1 ? '' : 's'}</Text>
-        {session.status === 'paused' && consentValid ? <Button label="Resume session" onPress={() => void updateState('resume')} /> : null}
-        {session.status === 'in_progress' ? <Button label="Pause and finish later" variant="secondary" onPress={() => void updateState('pause')} /> : null}
-        {session.status === 'in_progress' || session.status === 'paused' ? <Button label="Complete session" variant="secondary" onPress={confirmComplete} /> : null}
-        {session.status === 'completed' && consentValid ? <Button label="Reopen completed session" variant="secondary" onPress={confirmReopen} /> : null}
+        <Text style={uiStyles.muted}>{strings.started}: {new Date(session.startedAt).toLocaleString(localeTag)}</Text>
+        <Text style={uiStyles.muted}>{session.city || strings.noCity} · {recordings.length} {strings.recordings.toLowerCase()}</Text>
+        {session.status === 'paused' && consentValid ? <Button label={strings.resumeSession} onPress={() => void updateState('resume')} /> : null}
+        {session.status === 'in_progress' ? <Button label={strings.pauseSession} variant="secondary" onPress={() => void updateState('pause')} /> : null}
+        {session.status === 'in_progress' || session.status === 'paused' ? <Button label={strings.completeSession} variant="secondary" onPress={confirmComplete} /> : null}
+        {session.status === 'completed' && consentValid ? <Button label={strings.reopenSession} variant="secondary" onPress={confirmReopen} /> : null}
       </Card>
 
       {recordings.length > 0 ? (
         <Card>
-          <Text style={uiStyles.title}>Transcription and annotation</Text>
-          <Text style={uiStyles.body}>You can annotate now or after finishing every scenario. Open a recording in the library to replay it, enter verbatim and normalized text, add language tags and business labels, and save revision history.</Text>
-          <Text style={uiStyles.muted}>If only one recording used the wrong scenario, archive that recording in the library and record it again under the correct scenario. Remove the whole session only when the session itself is incorrect.</Text>
-          <Button label="Review, transcribe and annotate recordings" variant="secondary" onPress={() => router.push('/library')} />
+          <Text style={uiStyles.title}>{strings.transcriptionAndAnnotation}</Text>
+          <Button label={strings.reviewRecordings} variant="secondary" onPress={() => router.push('/library')} />
         </Card>
       ) : null}
 
-      <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Choose a scenario</Text></View>
-      {!consentValid ? <ErrorNotice message="Recording is disabled. Review the participant's current consent before continuing." /> : null}
-      {scenarios.length === 0 ? <EmptyState>No active scenarios are configured for this project.</EmptyState> : scenarios.map((scenario) => (
+      <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>{strings.chooseScenario}</Text></View>
+      {!consentValid ? <ErrorNotice message={strings.reviewConsentBeforeRecording} /> : null}
+      {scenarios.length === 0 ? <EmptyState>{strings.noActiveScenarios}</EmptyState> : scenarios.map((scenario) => (
         <Pressable
           key={scenario.id}
           disabled={!canCollect}
@@ -136,14 +136,14 @@ export default function SessionDetailScreen() {
           <Card>
             <View style={uiStyles.row}>
               <Text style={[uiStyles.title, uiStyles.grow]}>{scenario.title}</Text>
-              <Text style={uiStyles.badge}>{counts[scenario.id] ?? 0} takes</Text>
+              <Text style={uiStyles.badge}>{counts[scenario.id] ?? 0} {strings.takes}</Text>
             </View>
             <Text style={uiStyles.body}>{scenario.collectionInstructions}</Text>
-            <Text style={uiStyles.muted}>Version {scenario.version}</Text>
+            <Text style={uiStyles.muted}>{strings.version} {scenario.version}</Text>
           </Card>
         </Pressable>
       ))}
-      <Button label="Remove incorrect session" variant="danger" onPress={removeIncorrectSession} />
+      <Button label={strings.removeSession} variant="danger" onPress={removeIncorrectSession} />
     </Screen>
   );
 }

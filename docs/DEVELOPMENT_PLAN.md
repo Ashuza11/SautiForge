@@ -4,17 +4,17 @@
 
 - Expo SDK 57 TypeScript/Router application and APK build profile.
 - GitHub Actions pilot APK workflow with verification, release assembly, SHA-256, and short-lived downloadable artifacts; first successful release assembly recorded in `BUILD_VERIFICATION.md`.
-- SQLite schema version 5, migration chain, constraints, seed project, and five editable Kingwana scenarios.
+- SQLite schema version 7, migration chain, constraints, prompt-correction audit history, editable transcription context, seed project, and five editable Kingwana scenarios.
 - Offline projects, scenarios, pseudonymous participants, immutable consent revisions, resumable sessions, consent-checked reopening, and atomic soft-removal of incorrect sessions and their recordings.
 - Real foreground audio capture, immediate playback, accept/rerecord/discard, document-storage persistence, and verified database save.
 - Consent-gated Android batch sharing of persistent scenario examples with internal-only research linkage, plus multi-file external-audio selection, sequential playback/review, explicit example matching, original-container preservation, SHA-256 duplicate detection, and transport/prompt provenance. This does not read WhatsApp chats or confirm delivery.
-- Dashboard, searchable recording library, detail playback, workflow status, soft archive, human transcription revisions, and versioned business annotations.
+- Dashboard, searchable recording library, detail playback, workflow status, soft archive, human transcription revisions with editable scenario/example context, and versioned business annotations with common-value selectors.
 - Complete library filters for project, participant, scenario, language, date range, quality, and annotation status.
 - Settings/safety status for microphone permission, free storage, versions, offline behavior, and startup recording-file reconciliation.
 - Consent-filtered research ZIP, portable JSON/JSONL/CSV metadata, SHA-256 manifest, post-compression extraction verification, Android folder/share flows, and export history.
 - Separate sensitive administrative backup and verified rollback-capable restore.
 - Portable computer-side export validator for post-transfer size, SHA-256, path, count, and audio-reference checks.
-- Automated tests across every feature module and the portable validator, including translation completeness and verified interface-language persistence, green brand-palette consistency across launch and interface configuration, participant collection/transcription progress, clear example-selection validation, executed SQLite migrations/relationships, scenario example validation, participant and recording-metadata selectors, session state recovery/removal, privacy-minimized batch sharing and queue progression, external-audio validation/hashing/provenance/duplicate checks, repeat playback, full library query construction, recording interruption/save recovery, accepted-file readability, strict privacy-minimized export contracts, restore preflight, and manifest references (33 files, 105 tests).
+- Automated tests across every feature module and the portable validator, including translation completeness, critical-workflow localization and verified interface-language persistence, green brand-palette consistency across launch and interface configuration, participant collection/transcription progress, clear example-selection and audited-correction validation, executed SQLite migrations/relationships, scenario example validation, participant, recording-metadata and annotation selectors, transcription context persistence/export, session state recovery/removal, privacy-minimized batch sharing and queue progression, external-audio validation/hashing/provenance/duplicate checks, repeat playback, full library query construction, recording interruption/save recovery, accepted-file readability, strict privacy-minimized export contracts, restore preflight, and manifest references (35 files, 119 tests).
 
 ## Required before field-ready status
 

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ZodIssue } from 'zod';
 
 import { nullableText, nowIso } from '@/domain/common';
+import { useI18n } from '@/i18n';
 import { Button, ErrorNotice, Field, uiStyles } from '@/ui/components';
 import { colors, spacing } from '@/ui/theme';
 import { consentDraftSchema, type ConsentDraft, type ConsentRecord } from '../domain/consent';
@@ -10,6 +11,7 @@ import { consentDraftSchema, type ConsentDraft, type ConsentRecord } from '../do
 type ConsentUse = 'internalResearch' | 'restrictedAnnotation' | 'publicRelease';
 
 export function ConsentForm({ current, onSave }: { current: ConsentRecord | null; onSave: (draft: ConsentDraft) => Promise<void> }) {
+  const { strings, translateText } = useI18n();
   const [status, setStatus] = useState<ConsentDraft['status']>(current?.status ?? 'granted');
   const [uses, setUses] = useState({
     internalResearch: current?.internalResearch ?? true,
@@ -43,7 +45,7 @@ export function ConsentForm({ current, onSave }: { current: ConsentRecord | null
       consentProtocolVersion: protocolVersion,
     });
     if (!result.success) {
-      setErrors(Object.fromEntries(result.error.issues.map((issue: ZodIssue) => [String(issue.path[0]), issue.message])));
+      setErrors(Object.fromEntries(result.error.issues.map((issue: ZodIssue) => [String(issue.path[0]), translateText(issue.message)])));
       return;
     }
     setErrors({});
@@ -52,7 +54,7 @@ export function ConsentForm({ current, onSave }: { current: ConsentRecord | null
     try {
       await onSave(result.data);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Consent could not be saved.');
+      setSubmitError(error instanceof Error ? translateText(error.message) : strings.consentSaveFailed);
     } finally {
       setSaving(false);
     }
@@ -61,25 +63,25 @@ export function ConsentForm({ current, onSave }: { current: ConsentRecord | null
   return (
     <View style={uiStyles.gap}>
       {submitError ? <ErrorNotice message={submitError} /> : null}
-      <Text style={styles.label}>Consent decision</Text>
+      <Text style={styles.label}>{strings.consentDecision}</Text>
       <View style={uiStyles.row}>
         {(['granted', 'declined', 'withdrawn'] as const).map((option) => (
           <Pressable key={option} onPress={() => selectStatus(option)} style={[styles.choice, status === option && styles.choiceSelected]}>
-            <Text style={[styles.choiceText, status === option && styles.choiceTextSelected]}>{option}</Text>
+            <Text style={[styles.choiceText, status === option && styles.choiceTextSelected]}>{translateText(option)}</Text>
           </Pressable>
         ))}
       </View>
       {errors.status ? <Text style={styles.error}>{errors.status}</Text> : null}
-      <Text style={styles.label}>Approved uses</Text>
-      <ConsentToggle label="Internal research and recording" selected={uses.internalResearch} onPress={() => toggleUse('internalResearch')} disabled={status !== 'granted'} />
-      <ConsentToggle label="Restricted annotation sharing" selected={uses.restrictedAnnotation} onPress={() => toggleUse('restrictedAnnotation')} disabled={status !== 'granted'} />
-      <ConsentToggle label="Public dataset release" selected={uses.publicRelease} onPress={() => toggleUse('publicRelease')} disabled={status !== 'granted'} />
+      <Text style={styles.label}>{strings.approvedUses}</Text>
+      <ConsentToggle label={strings.internalResearchRecording} selected={uses.internalResearch} onPress={() => toggleUse('internalResearch')} disabled={status !== 'granted'} />
+      <ConsentToggle label={strings.restrictedSharing} selected={uses.restrictedAnnotation} onPress={() => toggleUse('restrictedAnnotation')} disabled={status !== 'granted'} />
+      <ConsentToggle label={strings.publicRelease} selected={uses.publicRelease} onPress={() => toggleUse('publicRelease')} disabled={status !== 'granted'} />
       {errors.publicRelease ? <Text style={styles.error}>{errors.publicRelease}</Text> : null}
-      <Field label="Consent protocol version" value={protocolVersion} onChangeText={setProtocolVersion} error={errors.consentProtocolVersion} autoCapitalize="none" />
-      <Field label="Recorded by (optional researcher code)" value={recordedBy} onChangeText={setRecordedBy} error={errors.recordedBy} />
-      <Field label="Consent notes (optional, administrative)" value={notes} onChangeText={setNotes} error={errors.notes} multiline />
-      <Text style={uiStyles.muted}>Saving creates a new historical record. It never edits or deletes the previous decision.</Text>
-      <Button label="Save consent revision" onPress={submit} loading={saving} />
+      <Field label={strings.consentProtocol} value={protocolVersion} onChangeText={setProtocolVersion} error={errors.consentProtocolVersion} autoCapitalize="none" />
+      <Field label={strings.recordedBy} value={recordedBy} onChangeText={setRecordedBy} error={errors.recordedBy} />
+      <Field label={strings.consentNotes} value={notes} onChangeText={setNotes} error={errors.notes} multiline />
+      <Text style={uiStyles.muted}>{strings.consentRevisionNote}</Text>
+      <Button label={strings.saveConsent} onPress={submit} loading={saving} />
     </View>
   );
 }

@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 import type { ZodIssue } from 'zod';
 
 import { newId, nullableText } from '@/domain/common';
+import { useI18n } from '@/i18n';
 import { Button, ErrorNotice, Field, SelectField, uiStyles } from '@/ui/components';
 import { participantDraftSchema, speakerCodeFromId, type ParticipantDraft } from '../domain/participant';
 import {
@@ -41,6 +42,7 @@ function toEditable(initial?: ParticipantDraft): EditableParticipant {
 }
 
 export function ParticipantForm({ initial, onSave }: { initial?: ParticipantDraft; onSave: (draft: ParticipantDraft) => Promise<void> }) {
+  const { strings, translateText } = useI18n();
   const [values, setValues] = useState(() => toEditable(initial));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -65,7 +67,7 @@ export function ParticipantForm({ initial, onSave }: { initial?: ParticipantDraf
       status: initial?.status ?? 'active',
     });
     if (!result.success) {
-      setErrors(Object.fromEntries(result.error.issues.map((issue: ZodIssue) => [String(issue.path[0]), issue.message])));
+      setErrors(Object.fromEntries(result.error.issues.map((issue: ZodIssue) => [String(issue.path[0]), translateText(issue.message)])));
       return;
     }
     setErrors({});
@@ -74,7 +76,7 @@ export function ParticipantForm({ initial, onSave }: { initial?: ParticipantDraf
     try {
       await onSave(result.data);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'The participant could not be saved.');
+      setSubmitError(error instanceof Error ? translateText(error.message) : strings.participantSaveFailed);
     } finally {
       setSaving(false);
     }
@@ -83,12 +85,12 @@ export function ParticipantForm({ initial, onSave }: { initial?: ParticipantDraf
   return (
     <View style={uiStyles.gap}>
       {submitError ? <ErrorNotice message={submitError} /> : null}
-      <Field label="Pseudonymous speaker ID" value={values.speakerCode} editable={false} error={errors.speakerCode} />
-      <Text style={uiStyles.muted}>Generated automatically. It does not contain the participant's name, phone number, or customer identifier.</Text>
+      <Field label={strings.speakerId} value={values.speakerCode} editable={false} error={errors.speakerCode} />
+      <Text style={uiStyles.muted}>{strings.generatedAutomatically}</Text>
       <SelectField
-        label="Primary language"
+        label={strings.primaryLanguage}
         value={customPrimaryLanguage ? OTHER_PARTICIPANT_VALUE : values.primaryLanguage}
-        options={primaryLanguageOptions}
+        options={primaryLanguageOptions.map((option) => ({ ...option, label: translateText(option.label) }))}
         onValueChange={(value) => {
           const custom = value === OTHER_PARTICIPANT_VALUE;
           setCustomPrimaryLanguage(custom);
@@ -96,14 +98,14 @@ export function ParticipantForm({ initial, onSave }: { initial?: ParticipantDraf
         }}
         error={errors.primaryLanguage}
       />
-      {customPrimaryLanguage ? <Field label="Enter primary language" value={values.primaryLanguage} onChangeText={set('primaryLanguage')} error={errors.primaryLanguage} autoFocus /> : null}
-      <Field label="Self-described language variety (optional)" value={values.languageVariety} onChangeText={set('languageVariety')} error={errors.languageVariety} />
-      <Field label="Other languages (optional)" value={values.otherLanguages} onChangeText={set('otherLanguages')} error={errors.otherLanguages} placeholder="e.g. French, Mashi" />
-      <SelectField label="Age bracket (optional)" value={values.ageBracket} options={ageBracketOptions} onValueChange={set('ageBracket')} error={errors.ageBracket} />
+      {customPrimaryLanguage ? <Field label={strings.enterPrimaryLanguage} value={values.primaryLanguage} onChangeText={set('primaryLanguage')} error={errors.primaryLanguage} autoFocus /> : null}
+      <Field label={strings.languageVarietySelf} value={values.languageVariety} onChangeText={set('languageVariety')} error={errors.languageVariety} />
+      <Field label={strings.otherLanguages} value={values.otherLanguages} onChangeText={set('otherLanguages')} error={errors.otherLanguages} placeholder={strings.languageExample} />
+      <SelectField label={strings.ageBracket} value={values.ageBracket} options={ageBracketOptions.map((option) => ({ ...option, label: translateText(option.label) }))} onValueChange={set('ageBracket')} error={errors.ageBracket} />
       <SelectField
-        label="Self-described gender (optional)"
+        label={strings.genderOptional}
         value={customGender ? OTHER_PARTICIPANT_VALUE : values.genderSelfDescribed}
-        options={genderOptions}
+        options={genderOptions.map((option) => ({ ...option, label: translateText(option.label) }))}
         onValueChange={(value) => {
           const custom = value === OTHER_PARTICIPANT_VALUE;
           setCustomGender(custom);
@@ -111,11 +113,11 @@ export function ParticipantForm({ initial, onSave }: { initial?: ParticipantDraf
         }}
         error={errors.genderSelfDescribed}
       />
-      {customGender ? <Field label="Self-described gender" value={values.genderSelfDescribed} onChangeText={set('genderSelfDescribed')} error={errors.genderSelfDescribed} autoFocus /> : null}
+      {customGender ? <Field label={strings.gender} value={values.genderSelfDescribed} onChangeText={set('genderSelfDescribed')} error={errors.genderSelfDescribed} autoFocus /> : null}
       <SelectField
-        label="Business category (optional)"
+        label={strings.businessCategory}
         value={customBusinessCategory ? OTHER_PARTICIPANT_VALUE : values.businessCategory}
-        options={businessCategoryOptions}
+        options={businessCategoryOptions.map((option) => ({ ...option, label: translateText(option.label) }))}
         onValueChange={(value) => {
           const custom = value === OTHER_PARTICIPANT_VALUE;
           setCustomBusinessCategory(custom);
@@ -123,10 +125,10 @@ export function ParticipantForm({ initial, onSave }: { initial?: ParticipantDraf
         }}
         error={errors.businessCategory}
       />
-      {customBusinessCategory ? <Field label="Enter business category" value={values.businessCategory} onChangeText={set('businessCategory')} error={errors.businessCategory} autoFocus /> : null}
-      <Field label="Years of business experience (optional)" value={values.yearsBusinessExperience} onChangeText={set('yearsBusinessExperience')} error={errors.yearsBusinessExperience} keyboardType="decimal-pad" />
-      <Field label="Research notes (optional, non-identifying)" value={values.researchNotes} onChangeText={set('researchNotes')} error={errors.researchNotes} multiline />
-      <Button label="Save participant" onPress={submit} loading={saving} />
+      {customBusinessCategory ? <Field label={strings.enterBusinessCategory} value={values.businessCategory} onChangeText={set('businessCategory')} error={errors.businessCategory} autoFocus /> : null}
+      <Field label={strings.businessExperience} value={values.yearsBusinessExperience} onChangeText={set('yearsBusinessExperience')} error={errors.yearsBusinessExperience} keyboardType="decimal-pad" />
+      <Field label={strings.researchNotes} value={values.researchNotes} onChangeText={set('researchNotes')} error={errors.researchNotes} multiline />
+      <Button label={strings.saveParticipant} onPress={submit} loading={saving} />
     </View>
   );
 }

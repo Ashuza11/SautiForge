@@ -7,7 +7,19 @@ import type { CollectionSession } from '@/features/sessions/domain/session';
 import { copyAcceptedTake } from './audio-file-store';
 import { buildRecordingSearchWhere } from './recording-search';
 import type { RecordingRepository, RecordingSearch } from './recording-repository';
-import { acceptedTakeSchema, recordingMetadataDraftSchema, recordingSchema, type AcceptedTake, type Recording, type RecordingMetadataDraft } from '../domain/recording';
+import {
+  acceptedTakeSchema,
+  recordingMetadataDraftSchema,
+  recordingPromptCorrectionDraftSchema,
+  recordingPromptCorrectionSchema,
+  recordingSchema,
+  recordingSnapshotExamples,
+  type AcceptedTake,
+  type Recording,
+  type RecordingMetadataDraft,
+  type RecordingPromptCorrection,
+  type RecordingPromptCorrectionDraft,
+} from '../domain/recording';
 
 type ContextRow = {
   session_id: string;
@@ -38,6 +50,16 @@ type RecordingRow = {
   elicitation_prompt_text: string | null; source_file_name: string | null;
 };
 
+type PromptCorrectionRow = {
+  id: string;
+  recording_id: string;
+  previous_prompt_text: string;
+  corrected_prompt_text: string;
+  reason: string;
+  corrected_by: string | null;
+  created_at: string;
+};
+
 const columns = `id, display_id, project_id, session_id, participant_id, scenario_id, consent_record_id, scenario_version,
   scenario_prompt_snapshot_json, relative_audio_path, collection_method, recorded_at, duration_ms, file_size_bytes,
   container, codec, sample_rate_hz, channel_count, spoken_languages_json, language_variety, code_switching_status,
@@ -62,6 +84,18 @@ function fromRow(row: RecordingRow): Recording {
     recordingEnvironment: row.recording_environment, noiseLevel: row.noise_level, qualityRating: row.quality_rating,
     notes: row.notes, annotationStatus: row.annotation_status, archivedAt: row.archived_at,
     createdAt: row.created_at, updatedAt: row.updated_at,
+  });
+}
+
+function correctionFromRow(row: PromptCorrectionRow): RecordingPromptCorrection {
+  return recordingPromptCorrectionSchema.parse({
+    id: row.id,
+    recordingId: row.recording_id,
+    previousPromptText: row.previous_prompt_text,
+    correctedPromptText: row.corrected_prompt_text,
+    reason: row.reason,
+    correctedBy: row.corrected_by,
+    createdAt: row.created_at,
   });
 }
 
@@ -194,6 +228,70 @@ export class SQLiteRecordingRepository implements RecordingRepository {
     const recording = await this.get(id);
     if (!recording) throw new Error('Recording was not readable after saving.');
     return recording;
+  }
+
+  async listPromptCorrections(id: string): Promise<RecordingPromptCorrection[]> {
+    const rows = await this.db.getAllAsync<PromptCorrectionRow>(
+      `SELECT id, recording_id, previous_prompt_text, corrected_prompt_text, reason, corrected_by, created_at
+       FROM recording_prompt_corrections WHERE recording_id = ? ORDER BY created_at DESC`,
+      id,
+    );
+    return rows.map(correctionFromRow);
+  }
+
+  async correctElicitationPrompt(id: string, input: RecordingPromptCorrectionDraft): Promise<Recording> {
+    const correction = recordingPromptCorrectionDraftSchema.parse(input);
+    const saved: { value: Recording | null } = { value: null };
+    await this.db.withExclusiveTransactionAsync(async (transaction) => {
+      const row = await transaction.getFirstAsync<RecordingRow>(
+        `SELECT ${columns} FROM recordings WHERE id = ? AND archived_at IS NULL`,
+        id,
+      );
+      if (!row) throw new Error('Active recording not found.');
+      const recording = fromRow(row);
+      if (recording.captureSource !== 'imported_file' || recording.promptExposure !== 'example_shown') {
+        throw new Error('Only imported recordings made from a shown example can be corrected here.');
+      }
+      if (!recording.elicitationPromptText) throw new Error('This recording has no existing example association to correct.');
+      const availableExamples = recordingSnapshotExamples(recording);
+      if (!availableExamples.includes(correction.correctedPromptText)) {
+        throw new Error('Select an example from the scenario version stored with this recording.');
+      }
+      if (correction.correctedPromptText === recording.elicitationPromptText) {
+        throw new Error('Select a different example before saving the correction.');
+      }
+
+      const correctionId = newId();
+      const timestamp = nowIso();
+      await transaction.runAsync(
+        `INSERT INTO recording_prompt_corrections
+         (id, recording_id, previous_prompt_text, corrected_prompt_text, reason, corrected_by, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        correctionId,
+        recording.id,
+        recording.elicitationPromptText,
+        correction.correctedPromptText,
+        correction.reason,
+        correction.correctedBy,
+        timestamp,
+      );
+      const result = await transaction.runAsync(
+        `UPDATE recordings SET elicitation_prompt_text = ?, updated_at = ?
+         WHERE id = ? AND archived_at IS NULL AND elicitation_prompt_text = ?`,
+        correction.correctedPromptText,
+        timestamp,
+        recording.id,
+        recording.elicitationPromptText,
+      );
+      if (result.changes !== 1) throw new Error('The recording changed while the correction was being saved. Try again.');
+      const verified = await transaction.getFirstAsync<RecordingRow>(`SELECT ${columns} FROM recordings WHERE id = ?`, id);
+      if (!verified || verified.elicitation_prompt_text !== correction.correctedPromptText) {
+        throw new Error('The corrected example could not be verified after saving.');
+      }
+      saved.value = fromRow(verified);
+    });
+    if (!saved.value) throw new Error('The corrected example was not readable after saving.');
+    return saved.value;
   }
 
   async archive(id: string): Promise<void> {
