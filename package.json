@@ -17,6 +17,7 @@
     "expo-sharing": "~57.0.22",
     "expo-splash-screen": "~57.0.9",
     "expo-sqlite": "~57.0.3",
+    "fflate": "^0.8.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -28,7 +29,9 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "@types/react-dom": "19.2.3",
     "typescript": "~6.0.3",
+    "vite": "^7.3.7",
     "vitest": "^3.2.4"
   },
   "scripts": {
@@ -39,6 +42,9 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "web:dev": "vite --config web/vite.config.ts",
+    "web:build": "vite build --config web/vite.config.ts",
+    "web:preview": "vite preview --config web/vite.config.ts",
     "validate:export": "node scripts/validate-export.mjs"
   },
   "private": true

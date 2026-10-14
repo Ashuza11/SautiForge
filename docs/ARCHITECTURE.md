@@ -4,6 +4,8 @@
 
 SautiForge is a single offline-first Expo application. Screens depend on repository interfaces; SQLite implementations live below those interfaces. This keeps presentation code independent from storage details and leaves room for a later opt-in synchronization adapter without building a backend now.
 
+The repository also contains a separate static React/Vite web workspace for computer-assisted review and annotation. Its first slice reuses the mobile export schemas, validates a selected research ZIP entirely in the browser, and exposes audio and metadata without a server. It rejects administrative backups. It does not modify the Android database or the original ZIP.
+
 The interface language is an app-level presentation preference stored in `app_settings`. The i18n provider exposes complete English, French, and Kiswahili dictionaries to navigation and shared controls. Changing it does not translate or mutate researcher-entered projects, prompts, metadata, transcripts, or annotations.
 
 ```text
@@ -49,6 +51,18 @@ If a researcher later discovers that an imported recording was matched to the wr
 At database initialization, document-storage recordings are reconciled against SQLite. Referenced non-empty files are counted as verified; missing references are reported in Settings; zero-byte and unreferenced files are moved into app-private recovery storage rather than treated as successful recordings or silently deleted.
 
 Background recording, automatic WhatsApp/chat access, automatic uploads, remote authentication, and AI transcription are out of scope for 0.1.
+
+## Local web review boundary
+
+```text
+research dataset ZIP selected by researcher
+        ↓
+browser ZIP extraction + manifest/schema/hash verification
+        ↓
+in-memory recording index, audio object URLs, and transcript view
+```
+
+There are no analytics, external scripts, accounts, network writes, or server-side storage in this workflow. The next web slice will store annotation drafts locally and produce a new verified derivative archive; it must never overwrite the source archive or claim a save before local persistence is verified.
 
 ## Export boundary
 

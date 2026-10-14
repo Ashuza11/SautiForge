@@ -26,9 +26,10 @@ The first vertical slice includes:
 - Settings and safety status for microphone permission, free space, versions, offline behavior, backup limits, and the latest storage check.
 - Consent-filtered research ZIP exports with JSON/JSONL/CSV metadata, original audio, SHA-256 manifest, and post-compression verification.
 - A visibly separate sensitive administrative backup and hash/schema/database/audio-verified restore with rollback on failure.
-- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 119 automated tests including translation completeness and critical-workflow localization, language persistence, brand-palette consistency, participant progress, clear example-selection and correction validation, real in-memory SQLite migration/relationship checks, scenario example sets, privacy-minimized batch sharing and queue progression, imported-audio hashing, prompt provenance and duplicate prevention, metadata and annotation selectors, transcription context persistence, repeat playback, and accepted-audio readability guards.
+- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 123 automated tests including translation completeness and critical-workflow localization, language persistence, brand-palette consistency, participant progress, clear example-selection and correction validation, real in-memory SQLite migration/relationship checks, scenario example sets, privacy-minimized batch sharing and queue progression, imported-audio hashing, prompt provenance and duplicate prevention, metadata and annotation selectors, transcription context persistence, repeat playback, accepted-audio readability guards, and browser ZIP validation.
 - Android APK build profile in `eas.json`.
 - A verified GitHub Actions release build that produces a standalone pilot APK and SHA-256 sidecar.
+- A responsive local web review workspace that opens research dataset ZIPs directly in the browser, verifies every declared file size and SHA-256 hash, rejects administrative backups and undeclared members, and supports recording search, context inspection, transcript review, and playback without uploading data. Editing and enriched re-export are the next web slices.
 
 The first standalone APK was produced successfully from commit `142375373dd4ac119abb5b6627bf9d46a0cdc916` by [GitHub Actions run 35874820535](https://github.com/Ashuza11/SautiForge/actions/runs/35874820535). Installation, recording, ZIP export, and restore have not yet been exercised on the target physical phone. The application is therefore **not yet field-ready**.
 
@@ -52,6 +53,14 @@ npm run android
 ```
 
 The app uses only on-device SQLite. No account or backend is required.
+
+To run the local web dataset reviewer:
+
+```bash
+npm run web:dev
+```
+
+Open the local URL, choose a SautiForge **research dataset** ZIP, and keep the source archive unchanged as the authoritative backup. The browser workspace processes the ZIP in memory and does not accept sensitive administrative backups. Build and preview the static site with `npm run web:build` and `npm run web:preview`.
 
 To validate a research ZIP after transfer to a computer, extract it and run:
 
@@ -96,4 +105,4 @@ See [build verification](docs/BUILD_VERIFICATION.md) for the exact source commit
 - Consent and future contact information must remain outside default research dataset exports.
 - App-private storage is not a complete backup or encryption strategy. Field deployment requires device encryption, access controls, tested backup/restore, and a consent-withdrawal procedure.
 
-See [Architecture](docs/ARCHITECTURE.md), [schema](docs/SCHEMA.md), [development plan](docs/DEVELOPMENT_PLAN.md), [test coverage](docs/TESTING.md), [field-test checklist](docs/FIELD_TEST_CHECKLIST.md), and [export format](docs/EXPORT_FORMAT.md).
+See [Architecture](docs/ARCHITECTURE.md), [web annotation workflow](docs/WEB_ANNOTATION.md), [schema](docs/SCHEMA.md), [development plan](docs/DEVELOPMENT_PLAN.md), [test coverage](docs/TESTING.md), [field-test checklist](docs/FIELD_TEST_CHECKLIST.md), and [export format](docs/EXPORT_FORMAT.md).
