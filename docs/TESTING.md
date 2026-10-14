@@ -14,6 +14,8 @@ Current automated suite: 38 files, 128 tests.
 
 The `Android pilot APK` GitHub Actions workflow repeats type-checking/tests, runs Expo prebuild, builds `:app:assembleRelease` with Java 17, and publishes the APK plus SHA-256. A green workflow proves compilation and artifact creation, but not installation, microphone behavior, or offline device persistence.
 
+The `Web annotation workspace` workflow runs TypeScript and web tests, builds `web-dist/`, uploads only that static directory, and deploys it through the protected `github-pages` environment. Pages must first be enabled with **GitHub Actions** as its source. A green deployment does not replace browser tests with a real pilot ZIP.
+
 Release assembly first passed in [run 35874820535](https://github.com/Ashuza11/SautiForge/actions/runs/35874820535) for commit `142375373dd4ac119abb5b6627bf9d46a0cdc916`. The evidence and its limits are recorded in `BUILD_VERIFICATION.md`.
 
 | Feature | Automated coverage | Native/field coverage still required |

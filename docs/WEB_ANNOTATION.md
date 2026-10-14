@@ -25,3 +25,7 @@ Private administrative backups are deliberately rejected. The selected archive r
 - Closing or refreshing the page discards the open ZIP/audio workspace; saved drafts remain in that browser profile and reappear after reopening the exact source archive.
 
 Create a production build with `npm run web:build`. The generated `web-dist/` directory is intentionally ignored by Git.
+
+## Static hosting
+
+The `Web annotation workspace` workflow builds and deploys `web-dist/` to GitHub Pages. Enable **GitHub Actions** as the Pages source once in repository settings, then use `https://ashuza11.github.io/SautiForge/`. The hosted files contain application code only. Dataset ZIPs, decoded audio, local drafts, and annotated exports are processed by browser APIs and are not workflow artifacts or network uploads.

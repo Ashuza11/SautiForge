@@ -62,6 +62,16 @@ npm run web:dev
 
 Open the local URL, choose a SautiForge **research dataset** ZIP, and keep the source archive unchanged as the authoritative backup. The browser workspace processes the ZIP in memory and does not accept sensitive administrative backups. Build and preview the static site with `npm run web:build` and `npm run web:preview`.
 
+### GitHub Pages web workspace
+
+The `Web annotation workspace` GitHub Actions workflow verifies the web tests, builds the static workspace, and deploys only the application files to GitHub Pages. It never receives a research ZIP or browser draft. A repository administrator must enable **Settings → Pages → Source: GitHub Actions** once; after a successful deployment the project URL is:
+
+```text
+https://ashuza11.github.io/SautiForge/
+```
+
+Opening the site requires internet access, but selected datasets, audio, drafts, and generated ZIPs remain inside the browser and are not sent to GitHub. Use a secured browser profile and do not treat browser storage as an encrypted backup.
+
 To validate a research ZIP after transfer to a computer, extract it and run:
 
 ```bash

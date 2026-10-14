@@ -23,7 +23,7 @@
 2. **Implemented:** edit verbatim and normalized text, notes, language tags, scenario/example context, structured business labels, researcher code, and workflow status with tested, source-bound local draft persistence.
 3. **Implemented:** export a new verified research archive containing original audio, human revision provenance, updated workflow states, portable metadata, and an archive checksum while keeping the imported archive unchanged.
 4. Add a tested Label Studio task adapter and documented optional audio conversion workflow for tools that do not accept an original container.
-5. Publish the static build only after privacy, browser compatibility, large-pilot behavior, and recovery have been exercised. No dataset will be hosted with the application.
+5. **Workflow implemented, enablement pending:** publish only the tested static application through GitHub Pages. No dataset is hosted with it. Browser compatibility, full-pilot memory behavior, download recovery, and a real annotated export remain manual acceptance gates before relying on the hosted workspace.
 
 ## Required before field-ready status
 
