@@ -28,6 +28,12 @@ Before files are written, every project, scenario, participant, session, recordi
 
 Research exports evaluate the participant’s latest consent revision at export time. They include only eligible, non-archived recordings and the participants/sessions they reference. They exclude consent records, consent notes, participant research notes, session researcher notes, provider filenames, database files, and recordings withdrawn from the selected sharing category. Scenario example sets, prompt snapshots, original container/codec metadata, capture source, transport, prompt exposure, exact elicitation example, import time, source MIME type, content hash, and pseudonymous submission code remain attached to recordings. Transcription revisions include their editable `scenario_context` and `elicitation_prompt_context`. M4A/AAC is never described as WAV.
 
+### Web annotated derivative
+
+The static web workspace accepts only an already consent-filtered research dataset. Its annotated export uses the same `1.3.0` structure and sharing category. It appends human transcription and `business.transaction` annotation revisions for saved drafts, updates recording workflow statuses, copies every original audio member byte-for-byte, rebuilds `participants.csv`, JSON/JSONL, counts, sizes, and SHA-256 hashes, and reopens the completed ZIP through the shared validator before starting the browser download. The original imported ZIP is never modified. The interface reports the completed ZIP's SHA-256 so it can be recorded for transfer verification.
+
+The web workspace does not re-evaluate private consent records because they are deliberately absent from a research export. Therefore, create the source ZIP in the Android app using the intended sharing category and do not use the web workflow to broaden that category.
+
 ## Restricted administrative backup
 
 ```text

@@ -12,15 +12,16 @@ The web workspace makes computer-based review faster while preserving SautiForge
 4. Search by recording ID, pseudonymous speaker code, scenario, language, or annotation status; play audio and inspect frozen prompt context and the latest transcript.
 5. Edit verbatim and normalized text, language tags, notes, scenario/example context, researcher code, workflow status, and structured business labels. Source values are prefilled but remain editable.
 6. Save a local draft. SautiForge validates it, writes it under the source manifest hash and recording ID, and reads it back before showing a success message.
+7. Download an annotated ZIP. SautiForge creates human revision records, retains the original audio bytes, rebuilds portable metadata and all member hashes, reopens and validates the generated archive, and reports its archive SHA-256 before reporting success.
 
 Private administrative backups are deliberately rejected. The selected archive remains in browser memory and is not modified. Keep the original ZIP and its checksum as the authoritative recovery copy.
 
 ## Current limitations
 
-- Local drafts remain in that browser profile and are not yet part of an export. Enriched dataset export is not yet implemented.
+- Only explicitly saved local drafts are included in the annotated export. Unsaved edits are not exported.
 - Browser storage is not an encrypted research backup. Use a secured computer profile and clear drafts before another person uses the profile.
 - Browser playback depends on native codec support. Original Opus files remain unchanged even if a particular browser requires a separate research derivative for another tool.
 - ZIP extraction currently occurs in memory and must be exercised with the full pilot archive before field use.
-- Closing or refreshing the page discards the open in-memory workspace.
+- Closing or refreshing the page discards the open ZIP/audio workspace; saved drafts remain in that browser profile and reappear after reopening the exact source archive.
 
 Create a production build with `npm run web:build`. The generated `web-dist/` directory is intentionally ignored by Git.

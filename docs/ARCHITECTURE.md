@@ -62,7 +62,7 @@ browser ZIP extraction + manifest/schema/hash verification
 in-memory recording index, audio object URLs, and transcript view
 ```
 
-There are no analytics, external scripts, accounts, network writes, or server-side storage in this workflow. Annotation drafts are validated with Zod, keyed by the source manifest hash and recording UUID, written to browser storage, and immediately read back before the UI reports success. A failed, blocked, or silently ignored write is reported as an error. The next web slice will produce a new verified derivative archive; it must never overwrite the source archive.
+There are no analytics, external scripts, accounts, network writes, or server-side storage in this workflow. Annotation drafts are validated with Zod, keyed by the source manifest hash and recording UUID, written to browser storage, and immediately read back before the UI reports success. A failed, blocked, or silently ignored write is reported as an error. Export creates human transcription and business-annotation revisions, copies original audio bytes, rebuilds the manifest and hashes, then reopens the completed ZIP through the same validator before passing it to browser downloads. It never overwrites the source archive.
 
 ## Export boundary
 

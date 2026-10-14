@@ -70,6 +70,12 @@ export class LocalDraftRepository {
       throw new Error('Browser storage is unavailable. The local draft could not be removed or verified.');
     }
   }
+
+  listForDataset(dataset: LoadedResearchDataset): WebAnnotationDraft[] {
+    return dataset.records.recordings
+      .map((recording) => this.load(dataset.manifestSha256, recording.id))
+      .filter((draft): draft is WebAnnotationDraft => draft !== null);
+  }
 }
 
 export function initialDraft(dataset: LoadedResearchDataset, recording: ResearchRecording, now = new Date()): WebAnnotationDraft {

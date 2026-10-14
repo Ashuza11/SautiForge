@@ -2,6 +2,7 @@ import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } 
 
 import { currencyOptions, paymentMethodOptions, preserveAnnotationValue, transactionIntentOptions } from '../../src/features/annotations/domain/business-annotation-options';
 import type { BusinessAnnotationPayload } from '../../src/features/annotations/domain/annotation';
+import { createAnnotatedResearchArchive } from './domain/annotated-export';
 import { initialDraft, LocalDraftRepository, type WebAnnotationDraft } from './domain/draft';
 import { audioMimeType, loadResearchDataset, matchesRecordingQuery, type LoadedResearchDataset, type ResearchRecording } from './domain/dataset';
 
@@ -71,6 +72,15 @@ function DatasetWorkspace({ dataset, selectedId, setSelectedId, query, setQuery 
 }) {
   const participants = useMemo(() => new Map(dataset.records.participants.map((item) => [item.id, item])), [dataset]);
   const scenarios = useMemo(() => new Map(dataset.records.scenarios.map((item) => [item.id, item])), [dataset]);
+  const draftRepository = useMemo(() => new LocalDraftRepository(window.localStorage), []);
+  const [draftVersion, setDraftVersion] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const localDrafts = useMemo(() => {
+    try { return draftRepository.listForDataset(dataset); }
+    catch { return []; }
+  }, [dataset, draftRepository, draftVersion]);
   const filtered = useMemo(() => {
     return dataset.records.recordings.filter((recording) => {
       const speaker = participants.get(recording.participant_id)?.speaker_code ?? '';
@@ -81,6 +91,28 @@ function DatasetWorkspace({ dataset, selectedId, setSelectedId, query, setQuery 
   const selected = filtered.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
   const transcribed = new Set(dataset.records.transcriptions.filter((item) => Boolean(item.verbatim_text)).map((item) => item.recording_id)).size;
 
+  const exportAnnotated = async () => {
+    setExporting(true);
+    setExportMessage(null);
+    setExportError(null);
+    try {
+      const drafts = draftRepository.listForDataset(dataset);
+      const output = await createAnnotatedResearchArchive(dataset, drafts);
+      const copy = Uint8Array.from(output.bytes);
+      const url = URL.createObjectURL(new Blob([copy.buffer], { type: 'application/zip' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = output.fileName;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+      setExportMessage(`Verified ${output.fileName} and sent it to browser downloads with ${output.appliedDrafts} local draft${output.appliedDrafts === 1 ? '' : 's'}. Archive SHA-256: ${output.archiveSha256}`);
+    } catch (cause) {
+      setExportError(cause instanceof Error ? cause.message : 'The annotated dataset could not be exported.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <main className="workspace">
       <section className="dataset-heading">
@@ -89,12 +121,18 @@ function DatasetWorkspace({ dataset, selectedId, setSelectedId, query, setQuery 
           <h2>{dataset.records.project.title}</h2>
           <p>{dataset.fileName} · {dataset.manifest.sharingCategory?.replaceAll('_', ' ')}</p>
         </div>
-        <div className="stats" aria-label="Dataset summary">
-          <Stat value={dataset.records.recordings.length} label="Recordings" />
-          <Stat value={dataset.records.participants.length} label="Participants" />
-          <Stat value={transcribed} label="Transcribed" />
+        <div className="summary-actions">
+          <div className="stats" aria-label="Dataset summary">
+            <Stat value={dataset.records.recordings.length} label="Recordings" />
+            <Stat value={dataset.records.participants.length} label="Participants" />
+            <Stat value={transcribed} label="In source ZIP" />
+            <Stat value={localDrafts.length} label="Local drafts" />
+          </div>
+          <button disabled={exporting} onClick={() => void exportAnnotated()}>{exporting ? 'Building and verifying…' : 'Download annotated ZIP'}</button>
         </div>
       </section>
+      {exportError ? <div className="error workspace-message" role="alert">{exportError}</div> : null}
+      {exportMessage ? <div className="save-message workspace-message" role="status">{exportMessage}</div> : null}
 
       <section className="work-grid">
         <aside className="recording-panel">
@@ -116,14 +154,14 @@ function DatasetWorkspace({ dataset, selectedId, setSelectedId, query, setQuery 
           </div>
         </aside>
         <section className="detail-panel">
-          {selected ? <RecordingDetail key={selected.id} dataset={dataset} recording={selected} /> : <p className="empty">Select a recording.</p>}
+          {selected ? <RecordingDetail key={selected.id} dataset={dataset} recording={selected} onDraftChange={() => setDraftVersion((value) => value + 1)} /> : <p className="empty">Select a recording.</p>}
         </section>
       </section>
     </main>
   );
 }
 
-function RecordingDetail({ dataset, recording }: { dataset: LoadedResearchDataset; recording: ResearchRecording }) {
+function RecordingDetail({ dataset, recording, onDraftChange }: { dataset: LoadedResearchDataset; recording: ResearchRecording; onDraftChange: () => void }) {
   const scenario = dataset.records.scenarios.find((item) => item.id === recording.scenario_id);
   const participant = dataset.records.participants.find((item) => item.id === recording.participant_id);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -167,6 +205,7 @@ function RecordingDetail({ dataset, recording }: { dataset: LoadedResearchDatase
       setDraft(saved);
       setDraftMessage(`Saved in this browser at ${new Date(saved.updatedAt).toLocaleString()}.`);
       setDraftError(null);
+      onDraftChange();
     } catch (cause) {
       setDraftMessage(null);
       setDraftError(cause instanceof Error ? cause.message : 'The draft could not be saved.');
@@ -180,6 +219,7 @@ function RecordingDetail({ dataset, recording }: { dataset: LoadedResearchDatase
       setDraft(initialDraft(dataset, recording));
       setDraftMessage('Local draft removed. The values shown now come from the source ZIP.');
       setDraftError(null);
+      onDraftChange();
     } catch (cause) {
       setDraftError(cause instanceof Error ? cause.message : 'The local draft could not be removed.');
     }

@@ -46,6 +46,7 @@ button.secondary { color: var(--green); background: var(--green-soft); }
 .dataset-heading h2 { margin: 8px 0 6px; font-size: clamp(26px, 4vw, 38px); }
 .dataset-heading p { margin: 0; color: var(--muted); }
 .verified { display: inline-flex; padding: 6px 10px; border-radius: 999px; color: var(--green-dark); background: var(--green-soft); font-size: 12px; font-weight: 800; text-transform: uppercase; }
+.summary-actions { display: grid; justify-items: end; gap: 12px; }
 .stats { display: flex; gap: 10px; align-self: end; }
 .stat { min-width: 100px; padding: 13px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .stat strong, .stat span { display: block; }
@@ -91,12 +92,14 @@ input[type="search"] { width: 100%; min-height: 44px; padding: 10px 12px; border
 .field textarea { resize: vertical; line-height: 1.5; }
 .annotation-editor h4 { margin: 28px 0 0; font-size: 16px; }
 .save-message { margin-top: 18px; padding: 12px; border-radius: 10px; color: var(--green-dark); background: var(--green-soft); font-weight: 650; }
+.workspace-message { margin: -10px 0 22px; overflow-wrap: anywhere; }
 .editor-actions { display: flex; gap: 10px; margin-top: 20px; }
 .empty { padding: 30px 10px; color: var(--muted); text-align: center; }
 
 @media (max-width: 850px) {
   .dataset-heading { display: block; }
-  .stats { margin-top: 18px; overflow-x: auto; }
+  .summary-actions { justify-items: stretch; margin-top: 18px; }
+  .stats { overflow-x: auto; }
   .work-grid { display: block; }
   .recording-panel { border-right: 0; border-bottom: 1px solid var(--line); }
   .recording-list { max-height: 330px; }
@@ -109,7 +112,7 @@ input[type="search"] { width: 100%; min-height: 44px; padding: 10px 12px; border
   .brand-mark { width: 42px; height: 42px; }
   .header-action { min-height: 40px !important; padding: 8px 10px !important; font-size: 12px; }
   .workspace { padding: 16px; }
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); }
   .stat { min-width: 0; }
   .context-card, .metadata-grid, .form-grid, .form-grid-three { grid-template-columns: 1fr; }
   .recording-item { grid-template-columns: 1fr; }

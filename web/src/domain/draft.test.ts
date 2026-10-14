@@ -12,6 +12,7 @@ describe('local web annotation drafts', () => {
     const draft = makeDraft();
     expect(repository.save(draft)).toEqual(draft);
     expect(repository.load(manifestHash, recordingId)).toEqual(draft);
+    expect(repository.listForDataset({ manifestSha256: manifestHash, records: { recordings: [{ id: recordingId }] } } as never)).toEqual([draft]);
     repository.clear(manifestHash, recordingId);
     expect(repository.load(manifestHash, recordingId)).toBeNull();
   });
