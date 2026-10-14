@@ -3,6 +3,7 @@ import { strToU8, zipSync } from 'fflate';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { audioMimeType, latestTranscription, loadResearchDataset, matchesRecordingQuery } from './dataset';
+import { initialDraft } from './draft';
 
 beforeAll(() => {
   if (!globalThis.crypto?.subtle) Object.defineProperty(globalThis, 'crypto', { value: webcrypto });
@@ -28,6 +29,13 @@ describe('browser research dataset import', () => {
     expect(matchesRecordingQuery(recording, 'SPK-001', 'Recording a sale', 'inventory')).toBe(false);
     expect(latestTranscription(dataset, recording.id)).toBeNull();
     expect(audioMimeType(recording.audio_path)).toBe('audio/ogg');
+    expect(initialDraft(dataset, recording, new Date(time))).toMatchObject({
+      scenarioContext: 'Recording a sale',
+      elicitationPromptContext: 'Example',
+      languageTags: ['Kingwana'],
+      annotationStatus: 'needs_transcription',
+      updatedAt: time,
+    });
   });
 
   it('rejects an administrative backup before exposing its contents', async () => {

@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
-import { audioMimeType, latestTranscription, loadResearchDataset, matchesRecordingQuery, type LoadedResearchDataset, type ResearchRecording } from './domain/dataset';
+import { currencyOptions, paymentMethodOptions, preserveAnnotationValue, transactionIntentOptions } from '../../src/features/annotations/domain/business-annotation-options';
+import type { BusinessAnnotationPayload } from '../../src/features/annotations/domain/annotation';
+import { initialDraft, LocalDraftRepository, type WebAnnotationDraft } from './domain/draft';
+import { audioMimeType, loadResearchDataset, matchesRecordingQuery, type LoadedResearchDataset, type ResearchRecording } from './domain/dataset';
 
 export function App() {
   const picker = useRef<HTMLInputElement>(null);
@@ -123,8 +126,12 @@ function DatasetWorkspace({ dataset, selectedId, setSelectedId, query, setQuery 
 function RecordingDetail({ dataset, recording }: { dataset: LoadedResearchDataset; recording: ResearchRecording }) {
   const scenario = dataset.records.scenarios.find((item) => item.id === recording.scenario_id);
   const participant = dataset.records.participants.find((item) => item.id === recording.participant_id);
-  const transcript = latestTranscription(dataset, recording.id);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const repository = useMemo(() => new LocalDraftRepository(window.localStorage), []);
+  const baseDraft = useMemo(() => initialDraft(dataset, recording), [dataset, recording]);
+  const [draft, setDraft] = useState<WebAnnotationDraft>(baseDraft);
+  const [draftMessage, setDraftMessage] = useState<string | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
 
   useEffect(() => {
     const bytes = dataset.entries.get(recording.audio_path);
@@ -134,6 +141,49 @@ function RecordingDetail({ dataset, recording }: { dataset: LoadedResearchDatase
     setAudioUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [dataset, recording]);
+
+  useEffect(() => {
+    try {
+      setDraft(repository.load(dataset.manifestSha256, recording.id) ?? baseDraft);
+    } catch (cause) {
+      setDraftError(cause instanceof Error ? cause.message : 'The local draft could not be opened.');
+    }
+  }, [baseDraft, dataset.manifestSha256, recording.id, repository]);
+
+  const updateDraft = (changes: Partial<WebAnnotationDraft>) => {
+    setDraft((current) => ({ ...current, ...changes }));
+    setDraftMessage(null);
+    setDraftError(null);
+  };
+
+  const updateBusiness = (field: keyof BusinessAnnotationPayload, value: string) => {
+    updateDraft({ businessLabels: { ...draft.businessLabels, [field]: value.trim() || null } });
+  };
+
+  const saveDraft = (event: FormEvent) => {
+    event.preventDefault();
+    try {
+      const saved = repository.save({ ...draft, updatedAt: new Date().toISOString() });
+      setDraft(saved);
+      setDraftMessage(`Saved in this browser at ${new Date(saved.updatedAt).toLocaleString()}.`);
+      setDraftError(null);
+    } catch (cause) {
+      setDraftMessage(null);
+      setDraftError(cause instanceof Error ? cause.message : 'The draft could not be saved.');
+    }
+  };
+
+  const clearDraft = () => {
+    if (!window.confirm('Remove the locally saved draft for this recording? The source ZIP will not be changed.')) return;
+    try {
+      repository.clear(dataset.manifestSha256, recording.id);
+      setDraft(initialDraft(dataset, recording));
+      setDraftMessage('Local draft removed. The values shown now come from the source ZIP.');
+      setDraftError(null);
+    } catch (cause) {
+      setDraftError(cause instanceof Error ? cause.message : 'The local draft could not be removed.');
+    }
+  };
 
   return (
     <article>
@@ -152,14 +202,69 @@ function RecordingDetail({ dataset, recording }: { dataset: LoadedResearchDatase
         <Metadata label="Duration" value={formatDuration(recording.duration_ms)} />
         <Metadata label="Format" value={`${recording.container.toUpperCase()} · ${recording.codec ?? 'codec unavailable'}`} />
       </dl>
-      <section className="transcript-card">
-        <p className="eyebrow">Latest transcription</p>
-        <h3>Verbatim</h3>
-        <p>{transcript?.verbatim_text ?? 'Not transcribed yet.'}</p>
-        {transcript?.normalized_text ? <><h3>Normalized</h3><p>{transcript.normalized_text}</p></> : null}
-      </section>
+      <form className="annotation-editor" onSubmit={saveDraft}>
+        <div className="editor-heading">
+          <div><p className="eyebrow">Human annotation draft</p><h3>Transcription and labels</h3></div>
+          <span className="local-badge">This browser only</span>
+        </div>
+        <p className="editor-note">Drafts are verified after writing to this browser. They are not yet inside the source ZIP; keep that archive unchanged.</p>
+        <Field label="Verbatim transcription" hint="Write exactly what was spoken, including Kingwana and French code-switching.">
+          <textarea rows={5} value={draft.verbatimText} onChange={(event) => updateDraft({ verbatimText: event.target.value })} />
+        </Field>
+        <div className="form-grid">
+          <Field label="Normalized text" hint="Optional; do not replace the verbatim text.">
+            <textarea rows={3} value={draft.normalizedText} onChange={(event) => updateDraft({ normalizedText: event.target.value })} />
+          </Field>
+          <Field label="Annotation notes">
+            <textarea rows={3} value={draft.notes} onChange={(event) => updateDraft({ notes: event.target.value })} />
+          </Field>
+          <Field label="Scenario context">
+            <input value={draft.scenarioContext} onChange={(event) => updateDraft({ scenarioContext: event.target.value })} />
+          </Field>
+          <Field label="Example context">
+            <textarea rows={2} value={draft.elicitationPromptContext} onChange={(event) => updateDraft({ elicitationPromptContext: event.target.value })} />
+          </Field>
+          <Field label="Language tags" hint="Comma-separated, for example Kingwana, French.">
+            <input value={draft.languageTags.join(', ')} onChange={(event) => updateDraft({ languageTags: event.target.value.split(',').map((value) => value.trim()).filter(Boolean) })} />
+          </Field>
+          <Field label="Researcher code">
+            <input value={draft.createdBy} onChange={(event) => updateDraft({ createdBy: event.target.value })} />
+          </Field>
+          <Field label="Workflow status">
+            <select value={draft.annotationStatus} onChange={(event) => updateDraft({ annotationStatus: event.target.value as WebAnnotationDraft['annotationStatus'] })}>
+              {['recorded', 'needs_transcription', 'transcribed', 'needs_review', 'validated', 'rejected'].map((value) => <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>)}
+            </select>
+          </Field>
+        </div>
+        <h4>Structured business labels</h4>
+        <div className="form-grid form-grid-three">
+          <Field label="Transaction intent"><OptionSelect value={draft.businessLabels.transactionIntent} options={preserveAnnotationValue(transactionIntentOptions, draft.businessLabels.transactionIntent)} onChange={(value) => updateBusiness('transactionIntent', value)} /></Field>
+          <Field label="Product or service"><input value={draft.businessLabels.productOrService ?? ''} onChange={(event) => updateBusiness('productOrService', event.target.value)} /></Field>
+          <Field label="Quantity"><input value={draft.businessLabels.quantity ?? ''} onChange={(event) => updateBusiness('quantity', event.target.value)} /></Field>
+          <Field label="Amount"><input value={draft.businessLabels.amount ?? ''} onChange={(event) => updateBusiness('amount', event.target.value)} /></Field>
+          <Field label="Currency"><OptionSelect value={draft.businessLabels.currency} options={preserveAnnotationValue(currencyOptions, draft.businessLabels.currency)} onChange={(value) => updateBusiness('currency', value)} /></Field>
+          <Field label="Amount paid"><input value={draft.businessLabels.amountPaid ?? ''} onChange={(event) => updateBusiness('amountPaid', event.target.value)} /></Field>
+          <Field label="Outstanding debt"><input value={draft.businessLabels.outstandingDebt ?? ''} onChange={(event) => updateBusiness('outstandingDebt', event.target.value)} /></Field>
+          <Field label="Payment method"><OptionSelect value={draft.businessLabels.paymentMethod} options={preserveAnnotationValue(paymentMethodOptions, draft.businessLabels.paymentMethod)} onChange={(value) => updateBusiness('paymentMethod', value)} /></Field>
+          <Field label="Transaction reference"><input value={draft.businessLabels.transactionReference ?? ''} onChange={(event) => updateBusiness('transactionReference', event.target.value)} /></Field>
+        </div>
+        {draftError ? <div className="error" role="alert">{draftError}</div> : null}
+        {draftMessage ? <div className="save-message" role="status">{draftMessage}</div> : null}
+        <div className="editor-actions">
+          <button type="submit">Save local draft</button>
+          <button className="secondary" type="button" onClick={clearDraft}>Clear local draft</button>
+        </div>
+      </form>
     </article>
   );
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  return <label className="field"><span>{label}</span>{children}{hint ? <small>{hint}</small> : null}</label>;
+}
+
+function OptionSelect({ value, options, onChange }: { value: string | null; options: { label: string; value: string }[]; onChange: (value: string) => void }) {
+  return <select value={value ?? ''} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
 }
 
 function Stat({ value, label }: { value: number; label: string }) {
