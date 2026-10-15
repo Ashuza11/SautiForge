@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
-import { currencyOptions, paymentMethodOptions, preserveAnnotationValue, transactionIntentOptions } from '../../src/features/annotations/domain/business-annotation-options';
+import { currencyOptions, paymentMethodOptions, preserveAnnotationValue, productOrServiceOptions, transactionIntentOptions } from '../../src/features/annotations/domain/business-annotation-options';
 import type { BusinessAnnotationPayload } from '../../src/features/annotations/domain/annotation';
 import { effectiveAnnotationStatus, firstIncompleteRecording, participantAnnotationProgress, recordingHasVerbatim } from './domain/annotation-workflow';
 import { createAnnotatedResearchArchive } from './domain/annotated-export';
@@ -388,7 +388,9 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
         <h4>Structured business labels</h4>
         <div className="form-grid form-grid-three">
           <Field label="Transaction intent"><OptionSelect value={draft.businessLabels.transactionIntent} options={preserveAnnotationValue(transactionIntentOptions, draft.businessLabels.transactionIntent)} onChange={(value) => updateBusiness('transactionIntent', value)} /></Field>
-          <Field label="Product or service" hint="Use one consistent canonical label across the dataset (recommended: English, for example airtime). Keep the speaker’s word, such as unités, in the verbatim transcript."><input value={draft.businessLabels.productOrService ?? ''} onChange={(event) => updateBusiness('productOrService', event.target.value)} /></Field>
+          <Field label="Product or service" hint="Choose a canonical suggestion or type a new English snake_case value when none matches. Keep the speaker’s original word in the verbatim transcript.">
+            <SuggestionInput id="product-or-service-options" value={draft.businessLabels.productOrService ?? ''} options={productOrServiceOptions} onChange={(value) => updateBusiness('productOrService', value)} />
+          </Field>
           <Field label="Quantity"><input value={draft.businessLabels.quantity ?? ''} onChange={(event) => updateBusiness('quantity', event.target.value)} /></Field>
           <Field label="Amount"><input value={draft.businessLabels.amount ?? ''} onChange={(event) => updateBusiness('amount', event.target.value)} /></Field>
           <Field label="Currency"><OptionSelect value={draft.businessLabels.currency} options={preserveAnnotationValue(currencyOptions, draft.businessLabels.currency)} onChange={(value) => updateBusiness('currency', value)} /></Field>
@@ -415,6 +417,10 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 function OptionSelect({ value, options, onChange }: { value: string | null; options: { label: string; value: string }[]; onChange: (value: string) => void }) {
   return <select value={value ?? ''} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>;
+}
+
+function SuggestionInput({ id, value, options, onChange }: { id: string; value: string; options: { label: string; value: string }[]; onChange: (value: string) => void }) {
+  return <><input list={id} value={value} placeholder="Select or type a value" onChange={(event) => onChange(event.target.value)} /><datalist id={id}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</datalist></>;
 }
 
 function Stat({ value, label }: { value: number; label: string }) {

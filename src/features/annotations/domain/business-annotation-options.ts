@@ -37,6 +37,23 @@ export const paymentMethodOptions: AnnotationSelectOption[] = [
   { label: 'Other', value: 'other' },
 ];
 
+export const productOrServiceOptions: AnnotationSelectOption[] = [
+  { label: 'Airtime / unités', value: 'airtime' },
+  { label: 'Mobile data / forfait internet', value: 'mobile_data' },
+  { label: 'Mobile phone', value: 'mobile_phone' },
+  { label: 'Phone charger / chargeur', value: 'phone_charger' },
+  { label: 'SIM card / carte SIM', value: 'sim_card' },
+  { label: 'Phone battery / batterie', value: 'phone_battery' },
+  { label: 'Phone screen / écran', value: 'phone_screen' },
+  { label: 'Phone case / coque', value: 'phone_case' },
+  { label: 'Wireless earbuds / AirPods', value: 'wireless_earbuds' },
+  { label: 'Memory card', value: 'memory_card' },
+  { label: 'Phone repair', value: 'phone_repair' },
+  { label: 'Unknown', value: 'unknown' },
+  { label: 'Ambiguous', value: 'ambiguous' },
+  { label: 'Unavailable', value: 'unavailable' },
+];
+
 export function preserveAnnotationValue(options: AnnotationSelectOption[], value: string | null): AnnotationSelectOption[] {
   return value && !options.some((option) => option.value === value)
     ? [...options, { label: value, value }]
