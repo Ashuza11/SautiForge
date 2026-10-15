@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import { currencyOptions, paymentMethodOptions, preserveAnnotationValue, productOrServiceOptions, transactionIntentOptions } from '../../src/features/annotations/domain/business-annotation-options';
 import type { BusinessAnnotationPayload } from '../../src/features/annotations/domain/annotation';
+import { codeSwitchingOptions } from '../../src/features/recordings/domain/recording-metadata-options';
 import { effectiveAnnotationStatus, firstIncompleteRecording, participantAnnotationProgress, recordingHasVerbatim } from './domain/annotation-workflow';
 import { createAnnotatedResearchArchive } from './domain/annotated-export';
 import { initialDraft, LocalDraftRepository, prepareDraftForSave, type WebAnnotationDraft } from './domain/draft';
@@ -284,7 +285,8 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
 
   useEffect(() => {
     try {
-      setDraft(repository.load(dataset.manifestSha256, recording.id) ?? baseDraft);
+      const saved = repository.load(dataset.manifestSha256, recording.id);
+      setDraft(saved ? { ...saved, codeSwitchingStatus: saved.codeSwitchingStatus ?? baseDraft.codeSwitchingStatus } : baseDraft);
     } catch (cause) {
       setDraftError(cause instanceof Error ? cause.message : 'The local draft could not be opened.');
     }
@@ -375,6 +377,9 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
           </Field>
           <Field label="Language tags" hint="Comma-separated, for example Kingwana, French.">
             <input value={draft.languageTags.join(', ')} onChange={(event) => updateDraft({ languageTags: event.target.value.split(',').map((value) => value.trim()).filter(Boolean) })} />
+          </Field>
+          <Field label="Code switching" hint="Choose Present when the recording uses more than one language, such as Kingwana and French. Choose None when only one language is used.">
+            <OptionSelect value={draft.codeSwitchingStatus ?? 'unknown'} options={codeSwitchingOptions.map((option) => ({ ...option }))} onChange={(value) => updateDraft({ codeSwitchingStatus: value as WebAnnotationDraft['codeSwitchingStatus'] })} />
           </Field>
           <Field label="Researcher code">
             <input value={draft.createdBy} onChange={(event) => updateDraft({ createdBy: event.target.value })} />

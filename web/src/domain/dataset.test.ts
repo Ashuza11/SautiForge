@@ -27,6 +27,7 @@ describe('browser research dataset import', () => {
       scenarioContext: 'Recording a sale',
       elicitationPromptContext: 'Example',
       languageTags: ['Kingwana'],
+      codeSwitchingStatus: 'present',
       annotationStatus: 'needs_transcription',
       updatedAt: fixtureTime,
     });

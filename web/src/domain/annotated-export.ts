@@ -66,7 +66,12 @@ export async function createAnnotatedResearchArchive(
         supersedes_id: previousAnnotation?.id ?? null, created_at: draft.updatedAt, created_by: nullable(draft.createdBy),
       });
     }
-    return { ...recording, annotation_status: draft.annotationStatus, updated_at: draft.updatedAt };
+    return {
+      ...recording,
+      annotation_status: draft.annotationStatus,
+      code_switching_status: draft.codeSwitchingStatus ?? recording.code_switching_status,
+      updated_at: draft.updatedAt,
+    };
   });
 
   const records = researchExportRecordsSchema.parse({ ...dataset.records, recordings, transcriptions, annotations });

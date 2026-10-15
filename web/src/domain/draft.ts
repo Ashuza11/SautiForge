@@ -5,6 +5,7 @@ import type { LoadedResearchDataset, ResearchRecording } from './dataset';
 import { latestTranscription } from './dataset';
 
 const annotationStatusSchema = z.enum(['recorded', 'needs_transcription', 'transcribed', 'needs_review', 'validated', 'rejected']);
+const codeSwitchingStatusSchema = z.enum(['none', 'present', 'ambiguous', 'unknown']);
 
 export const webAnnotationDraftSchema = z.object({
   schemaVersion: z.literal(1),
@@ -15,6 +16,7 @@ export const webAnnotationDraftSchema = z.object({
   scenarioContext: z.string().max(500),
   elicitationPromptContext: z.string().max(1_000),
   languageTags: z.array(z.string().trim().min(1)),
+  codeSwitchingStatus: codeSwitchingStatusSchema.optional(),
   notes: z.string(),
   createdBy: z.string(),
   annotationStatus: annotationStatusSchema,
@@ -94,6 +96,9 @@ export function initialDraft(dataset: LoadedResearchDataset, recording: Research
     scenarioContext: transcription?.scenario_context ?? scenario?.title ?? '',
     elicitationPromptContext: transcription?.elicitation_prompt_context ?? recording.elicitation_prompt_text ?? '',
     languageTags: parseStringList(transcription?.language_tags_json ?? recording.spoken_languages_json),
+    codeSwitchingStatus: codeSwitchingStatusSchema.safeParse(recording.code_switching_status).success
+      ? codeSwitchingStatusSchema.parse(recording.code_switching_status)
+      : 'unknown',
     notes: transcription?.notes ?? '',
     createdBy: transcription?.created_by ?? '',
     annotationStatus: recording.annotation_status,

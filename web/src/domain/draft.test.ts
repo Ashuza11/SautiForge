@@ -24,6 +24,12 @@ describe('local web annotation drafts', () => {
     storage.replaceOnlyValue(JSON.stringify({ ...makeDraft(), recordingId: 'not-a-uuid' }));
     expect(() => repository.load(manifestHash, recordingId)).toThrow(/invalid annotation draft/);
     expect(() => webAnnotationDraftSchema.parse({ ...makeDraft(), annotationStatus: 'complete' })).toThrow();
+    expect(() => webAnnotationDraftSchema.parse({ ...makeDraft(), codeSwitchingStatus: 'yes' })).toThrow();
+  });
+
+  it('loads older drafts without inventing a code-switching correction', () => {
+    const { codeSwitchingStatus: _removed, ...olderDraft } = makeDraft();
+    expect(webAnnotationDraftSchema.parse(olderDraft).codeSwitchingStatus).toBeUndefined();
   });
 
   it('does not report success when browser storage cannot persist a write', () => {

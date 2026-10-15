@@ -21,6 +21,7 @@ describe('annotated research export', () => {
       languageTags: ['Kingwana', 'French'],
       createdBy: 'ANNOTATOR-01',
       annotationStatus: 'transcribed' as const,
+      codeSwitchingStatus: 'none' as const,
       businessLabels: { ...initialDraft(source, recording).businessLabels, transactionIntent: 'record_sale', quantity: '2', amount: '5000', currency: 'CDF' },
     };
     const ids = [
@@ -37,6 +38,7 @@ describe('annotated research export', () => {
     expect(output.appliedDrafts).toBe(1);
     expect(output.archiveSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(verified.records.recordings[0].annotation_status).toBe('transcribed');
+    expect(verified.records.recordings[0].code_switching_status).toBe('none');
     expect(verified.records.transcriptions).toMatchObject([{ source: 'human', revision_number: 1, verbatim_text: draft.verbatimText, created_by: 'ANNOTATOR-01' }]);
     expect(JSON.parse(verified.records.annotations[0].payload_json)).toMatchObject({ transactionIntent: 'record_sale', amount: '5000', currency: 'CDF' });
     expect(verified.records.annotations[0]).toMatchObject({ source: 'human', revision_number: 1, annotation_type: 'business.transaction' });
@@ -65,5 +67,18 @@ describe('annotated research export', () => {
     await expect(createAnnotatedResearchArchive(source, [])).rejects.toThrow(/at least one/);
     const draft = initialDraft(source, source.records.recordings[0]);
     await expect(createAnnotatedResearchArchive(source, [{ ...draft, sourceManifestSha256: 'b'.repeat(64) }])).rejects.toThrow(/different source/);
+  });
+
+  it('preserves source code switching when applying a draft saved before that review field existed', async () => {
+    const source = await loadResearchDataset(archiveInput('pilot.zip', await makeResearchArchive()));
+    const draft = initialDraft(source, source.records.recordings[0], new Date('2026-10-15T10:00:00.000Z'));
+    const { codeSwitchingStatus: _removed, ...legacyDraft } = draft;
+    const ids = ['61f523b2-2db8-4f59-82e9-e70b182656f1', '71f523b2-2db8-4f59-82e9-e70b182656f1'];
+    const output = await createAnnotatedResearchArchive(source, [{ ...legacyDraft, verbatimText: 'Transcription.' }], {
+      now: new Date('2026-10-15T11:00:00.000Z'),
+      newId: () => ids.shift() ?? crypto.randomUUID(),
+    });
+    const verified = await loadResearchDataset(archiveInput(output.fileName, output.bytes));
+    expect(verified.records.recordings[0].code_switching_status).toBe('present');
   });
 });
