@@ -8,6 +8,10 @@ export type ParticipantAnnotationProgress = {
   complete: boolean;
 };
 
+export function effectiveAnnotationStatus(recording: ResearchRecording, draft?: WebAnnotationDraft): ResearchRecording['annotation_status'] {
+  return draft?.annotationStatus ?? recording.annotation_status;
+}
+
 export function participantAnnotationProgress(dataset: LoadedResearchDataset, drafts: WebAnnotationDraft[]): ParticipantAnnotationProgress[] {
   const draftsByRecording = new Map(drafts.map((draft) => [draft.recordingId, draft]));
   return dataset.records.participants.map((participant) => {

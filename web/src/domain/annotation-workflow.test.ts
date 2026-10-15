@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { firstIncompleteRecording, participantAnnotationProgress } from './annotation-workflow';
+import { effectiveAnnotationStatus, firstIncompleteRecording, participantAnnotationProgress } from './annotation-workflow';
 
 describe('participant annotation workflow', () => {
   it('marks a speaker complete only when every recording has a verbatim transcript', () => {
@@ -33,5 +33,12 @@ describe('participant annotation workflow', () => {
     } as never;
     expect(firstIncompleteRecording(dataset, 'speaker-one', [])?.id).toBe('two');
     expect(participantAnnotationProgress(dataset, [{ recordingId: 'one', verbatimText: '' }] as never)[0].transcribedCount).toBe(0);
+  });
+
+  it('shows a saved draft status instead of the stale source ZIP status', () => {
+    const recording = { annotation_status: 'needs_transcription' } as never;
+    expect(effectiveAnnotationStatus(recording)).toBe('needs_transcription');
+    expect(effectiveAnnotationStatus(recording, { annotationStatus: 'transcribed' } as never)).toBe('transcribed');
+    expect(effectiveAnnotationStatus(recording, { annotationStatus: 'needs_review' } as never)).toBe('needs_review');
   });
 });

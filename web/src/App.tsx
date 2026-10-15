@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import { currencyOptions, paymentMethodOptions, preserveAnnotationValue, transactionIntentOptions } from '../../src/features/annotations/domain/business-annotation-options';
 import type { BusinessAnnotationPayload } from '../../src/features/annotations/domain/annotation';
-import { firstIncompleteRecording, participantAnnotationProgress, recordingHasVerbatim } from './domain/annotation-workflow';
+import { effectiveAnnotationStatus, firstIncompleteRecording, participantAnnotationProgress, recordingHasVerbatim } from './domain/annotation-workflow';
 import { createAnnotatedResearchArchive } from './domain/annotated-export';
 import { initialDraft, LocalDraftRepository, prepareDraftForSave, type WebAnnotationDraft } from './domain/draft';
 import { audioMimeType, loadResearchDataset, matchesRecordingQuery, type LoadedResearchDataset, type ResearchRecording } from './domain/dataset';
@@ -134,6 +134,7 @@ function DatasetWorkspace({ dataset, selectedId, setSelectedId, query, setQuery 
     try { return draftRepository.listForDataset(dataset); }
     catch { return []; }
   }, [dataset, draftRepository, draftVersion]);
+  const draftsByRecording = useMemo(() => new Map(localDrafts.map((draft) => [draft.recordingId, draft])), [localDrafts]);
   const progress = useMemo(() => participantAnnotationProgress(dataset, localDrafts), [dataset, localDrafts]);
   const progressByParticipant = useMemo(() => new Map(progress.map((item) => [item.participantId, item])), [progress]);
   const filtered = useMemo(() => {
@@ -141,9 +142,10 @@ function DatasetWorkspace({ dataset, selectedId, setSelectedId, query, setQuery 
       if (recording.participant_id !== selectedParticipantId) return false;
       const speaker = participants.get(recording.participant_id)?.speaker_code ?? '';
       const scenario = scenarios.get(recording.scenario_id)?.title ?? '';
-      return matchesRecordingQuery(recording, speaker, scenario, query);
+      const annotationStatus = effectiveAnnotationStatus(recording, draftsByRecording.get(recording.id));
+      return matchesRecordingQuery({ ...recording, annotation_status: annotationStatus }, speaker, scenario, query);
     });
-  }, [dataset, participants, query, scenarios, selectedParticipantId]);
+  }, [dataset, draftsByRecording, participants, query, scenarios, selectedParticipantId]);
   const selected = filtered.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
   const transcribed = progress.reduce((total, item) => total + item.transcribedCount, 0);
 
@@ -242,10 +244,11 @@ function DatasetWorkspace({ dataset, selectedId, setSelectedId, query, setQuery 
             {filtered.map((recording) => {
               const speaker = participants.get(recording.participant_id)?.speaker_code ?? 'Unknown speaker';
               const scenario = scenarios.get(recording.scenario_id)?.title ?? 'Unknown scenario';
+              const annotationStatus = effectiveAnnotationStatus(recording, draftsByRecording.get(recording.id));
               return (
                 <button key={recording.id} className={`recording-item ${selected?.id === recording.id ? 'selected' : ''}`} onClick={() => setSelectedId(recording.id)}>
                   <span><strong>{recording.display_id}</strong><small>{speaker}</small></span>
-                  <span><small>{scenario}</small><Status value={recording.annotation_status} /></span>
+                  <span><small>{scenario}</small><Status value={annotationStatus} /></span>
                 </button>
               );
             })}
@@ -335,7 +338,7 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
     <article>
       <div className="detail-title">
         <div><p className="eyebrow">{participant?.speaker_code}</p><h2>{recording.display_id}</h2></div>
-        <Status value={recording.annotation_status} />
+        <Status value={draft.annotationStatus} />
       </div>
       <div className="context-card">
         <div><span>Scenario</span><strong>{scenario?.title ?? 'Unknown'}</strong></div>
