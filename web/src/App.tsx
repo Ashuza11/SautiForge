@@ -5,7 +5,7 @@ import type { BusinessAnnotationPayload } from '../../src/features/annotations/d
 import { codeSwitchingOptions } from '../../src/features/recordings/domain/recording-metadata-options';
 import { effectiveAnnotationStatus, firstIncompleteRecording, participantAnnotationProgress, recordingHasVerbatim } from './domain/annotation-workflow';
 import { createAnnotatedResearchArchive } from './domain/annotated-export';
-import { initialDraft, LocalDraftRepository, prepareDraftForSave, type WebAnnotationDraft } from './domain/draft';
+import { initialDraft, LocalDraftRepository, prepareDraftForSave, scenarioTransactionIntent, type WebAnnotationDraft } from './domain/draft';
 import { audioMimeType, loadResearchDataset, matchesRecordingQuery, type LoadedResearchDataset, type ResearchRecording } from './domain/dataset';
 import { IndexedDbWorkspaceArchiveStorage, WorkspaceArchiveRepository } from './domain/workspace-archive';
 
@@ -270,6 +270,7 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const repository = useMemo(() => new LocalDraftRepository(window.localStorage), []);
   const baseDraft = useMemo(() => initialDraft(dataset, recording), [dataset, recording]);
+  const expectedTransactionIntent = scenarioTransactionIntent(scenario?.expected_intent);
   const [draft, setDraft] = useState<WebAnnotationDraft>(baseDraft);
   const [draftMessage, setDraftMessage] = useState<string | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
@@ -286,11 +287,18 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
   useEffect(() => {
     try {
       const saved = repository.load(dataset.manifestSha256, recording.id);
-      setDraft(saved ? { ...saved, codeSwitchingStatus: saved.codeSwitchingStatus ?? baseDraft.codeSwitchingStatus } : baseDraft);
+      setDraft(saved ? {
+        ...saved,
+        codeSwitchingStatus: saved.codeSwitchingStatus ?? baseDraft.codeSwitchingStatus,
+        businessLabels: {
+          ...saved.businessLabels,
+          transactionIntent: saved.businessLabels.transactionIntent ?? expectedTransactionIntent,
+        },
+      } : baseDraft);
     } catch (cause) {
       setDraftError(cause instanceof Error ? cause.message : 'The local draft could not be opened.');
     }
-  }, [baseDraft, dataset.manifestSha256, recording.id, repository]);
+  }, [baseDraft, dataset.manifestSha256, expectedTransactionIntent, recording.id, repository]);
 
   const updateDraft = (changes: Partial<WebAnnotationDraft>) => {
     setDraft((current) => ({ ...current, ...changes }));
@@ -392,7 +400,10 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
         </div>
         <h4>Structured business labels</h4>
         <div className="form-grid form-grid-three">
-          <Field label="Transaction intent"><OptionSelect value={draft.businessLabels.transactionIntent} options={preserveAnnotationValue(transactionIntentOptions, draft.businessLabels.transactionIntent)} onChange={(value) => updateBusiness('transactionIntent', value)} /></Field>
+          <Field label="Transaction intent" hint={expectedTransactionIntent ? `Suggested by this scenario: ${expectedTransactionIntent}. You can correct it when the recording differs.` : 'No compatible scenario intent is available; select the correct value.'}>
+            <OptionSelect value={draft.businessLabels.transactionIntent} options={preserveAnnotationValue(transactionIntentOptions, draft.businessLabels.transactionIntent)} onChange={(value) => updateBusiness('transactionIntent', value)} />
+            {expectedTransactionIntent ? <button className="inline-field-action" type="button" onClick={() => updateBusiness('transactionIntent', expectedTransactionIntent)}>Use scenario intent</button> : null}
+          </Field>
           <Field label="Product or service" hint="Choose a canonical suggestion or type a new English snake_case value when none matches. Keep the speaker’s original word in the verbatim transcript.">
             <SuggestionInput id="product-or-service-options" value={draft.businessLabels.productOrService ?? ''} options={productOrServiceOptions} onChange={(value) => updateBusiness('productOrService', value)} />
           </Field>

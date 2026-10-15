@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { LocalDraftRepository, emptyBusinessLabels, prepareDraftForSave, webAnnotationDraftSchema, type DraftStorage } from './draft';
+import { LocalDraftRepository, emptyBusinessLabels, prepareDraftForSave, scenarioTransactionIntent, webAnnotationDraftSchema, withScenarioTransactionIntent, type DraftStorage } from './draft';
 
 const manifestHash = 'a'.repeat(64);
 const recordingId = 'de0a9676-92cc-4b18-997a-3fafce18b700';
@@ -46,6 +46,13 @@ describe('local web annotation drafts', () => {
     });
     expect(prepareDraftForSave({ ...makeDraft(), annotationStatus: 'needs_review' }).annotationStatus).toBe('needs_review');
     expect(prepareDraftForSave({ ...makeDraft(), verbatimText: '', annotationStatus: 'needs_transcription' }).annotationStatus).toBe('needs_transcription');
+  });
+
+  it('prefills supported scenario intent without replacing a human label', () => {
+    const empty = emptyBusinessLabels();
+    expect(withScenarioTransactionIntent(empty, 'record_sale').transactionIntent).toBe('record_sale');
+    expect(withScenarioTransactionIntent({ ...empty, transactionIntent: 'other' }, 'record_sale').transactionIntent).toBe('other');
+    expect(scenarioTransactionIntent('custom_research_intent')).toBeNull();
   });
 });
 

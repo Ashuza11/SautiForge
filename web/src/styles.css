@@ -102,6 +102,7 @@ input[type="search"] { width: 100%; min-height: 44px; padding: 10px 12px; border
 .field small { color: var(--muted); font-weight: 450; line-height: 1.4; }
 .field input, .field select, .field textarea { width: 100%; min-height: 43px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--surface); font-weight: 450; }
 .field textarea { resize: vertical; line-height: 1.5; }
+.field .inline-field-action { justify-self: start; min-height: 34px; padding: 7px 10px; color: var(--green); background: var(--green-soft); font-size: 12px; }
 .annotation-editor h4 { margin: 28px 0 0; font-size: 16px; }
 .save-message { margin-top: 18px; padding: 12px; border-radius: 10px; color: var(--green-dark); background: var(--green-soft); font-weight: 650; }
 .workspace-message { margin: -10px 0 22px; overflow-wrap: anywhere; }

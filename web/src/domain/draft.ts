@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { businessAnnotationPayloadSchema, type BusinessAnnotationPayload } from '../../../src/features/annotations/domain/annotation';
+import { transactionIntentOptions } from '../../../src/features/annotations/domain/business-annotation-options';
 import type { LoadedResearchDataset, ResearchRecording } from './dataset';
 import { latestTranscription } from './dataset';
 
@@ -87,6 +88,10 @@ export function initialDraft(dataset: LoadedResearchDataset, recording: Research
     .sort((left, right) => right.revision_number - left.revision_number)[0];
   const parsedBusiness = annotation ? businessAnnotationPayloadSchema.safeParse(parseJson(annotation.payload_json)) : null;
   const scenario = dataset.records.scenarios.find((item) => item.id === recording.scenario_id);
+  const businessLabels = withScenarioTransactionIntent(
+    parsedBusiness?.success ? parsedBusiness.data : emptyBusinessLabels(),
+    scenario?.expected_intent,
+  );
   return webAnnotationDraftSchema.parse({
     schemaVersion: 1,
     sourceManifestSha256: dataset.manifestSha256,
@@ -102,7 +107,7 @@ export function initialDraft(dataset: LoadedResearchDataset, recording: Research
     notes: transcription?.notes ?? '',
     createdBy: transcription?.created_by ?? '',
     annotationStatus: recording.annotation_status,
-    businessLabels: parsedBusiness?.success ? parsedBusiness.data : emptyBusinessLabels(),
+    businessLabels,
     updatedAt: now.toISOString(),
   });
 }
@@ -119,6 +124,17 @@ export function emptyBusinessLabels(): BusinessAnnotationPayload {
     paymentMethod: null,
     transactionReference: null,
   };
+}
+
+export function scenarioTransactionIntent(expectedIntent: string | null | undefined): string | null {
+  if (!expectedIntent) return null;
+  return transactionIntentOptions.some((option) => option.value === expectedIntent && option.value !== '') ? expectedIntent : null;
+}
+
+export function withScenarioTransactionIntent(labels: BusinessAnnotationPayload, expectedIntent: string | null | undefined): BusinessAnnotationPayload {
+  if (labels.transactionIntent !== null) return labels;
+  const suggested = scenarioTransactionIntent(expectedIntent);
+  return suggested ? { ...labels, transactionIntent: suggested } : labels;
 }
 
 export function prepareDraftForSave(draft: WebAnnotationDraft, now = new Date()): WebAnnotationDraft {

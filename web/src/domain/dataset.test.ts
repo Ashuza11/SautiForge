@@ -29,6 +29,7 @@ describe('browser research dataset import', () => {
       languageTags: ['Kingwana'],
       codeSwitchingStatus: 'present',
       annotationStatus: 'needs_transcription',
+      businessLabels: expect.objectContaining({ transactionIntent: 'record_sale' }),
       updatedAt: fixtureTime,
     });
   });
