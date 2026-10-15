@@ -1,10 +1,12 @@
-import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import { currencyOptions, paymentMethodOptions, preserveAnnotationValue, transactionIntentOptions } from '../../src/features/annotations/domain/business-annotation-options';
 import type { BusinessAnnotationPayload } from '../../src/features/annotations/domain/annotation';
+import { firstIncompleteRecording, participantAnnotationProgress, recordingHasVerbatim } from './domain/annotation-workflow';
 import { createAnnotatedResearchArchive } from './domain/annotated-export';
-import { initialDraft, LocalDraftRepository, type WebAnnotationDraft } from './domain/draft';
+import { initialDraft, LocalDraftRepository, prepareDraftForSave, type WebAnnotationDraft } from './domain/draft';
 import { audioMimeType, loadResearchDataset, matchesRecordingQuery, type LoadedResearchDataset, type ResearchRecording } from './domain/dataset';
+import { IndexedDbWorkspaceArchiveStorage, WorkspaceArchiveRepository } from './domain/workspace-archive';
 
 export function App() {
   const picker = useRef<HTMLInputElement>(null);
@@ -13,15 +15,49 @@ export function App() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const archiveRepository = useMemo(() => new WorkspaceArchiveRepository(new IndexedDbWorkspaceArchiveStorage()), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    archiveRepository.load()
+      .then(async (saved) => {
+        if (!saved || cancelled) return;
+        const loaded = await loadResearchDataset({
+          name: saved.fileName,
+          size: saved.bytes.byteLength,
+          arrayBuffer: async () => saved.bytes.slice(0),
+        });
+        if (cancelled) return;
+        setDataset(loaded);
+        setSelectedId(loaded.records.recordings[0]?.id ?? null);
+        setNotice(`Restored the verified local workspace saved on ${new Date(saved.savedAt).toLocaleString()}.`);
+      })
+      .catch((cause) => {
+        if (!cancelled) setError(cause instanceof Error ? cause.message : 'The saved workspace could not be opened.');
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [archiveRepository]);
 
   const open = async (file?: File) => {
     if (!file) return;
     setLoading(true);
     setError(null);
+    setNotice(null);
     try {
-      const loaded = await loadResearchDataset(file);
+      const bytes = await file.arrayBuffer();
+      const loaded = await loadResearchDataset({ name: file.name, size: bytes.byteLength, arrayBuffer: async () => bytes.slice(0) });
       setDataset(loaded);
       setSelectedId(loaded.records.recordings[0]?.id ?? null);
+      setQuery('');
+      try {
+        const saved = await archiveRepository.save({ fileName: file.name, bytes, savedAt: new Date().toISOString() });
+        setNotice(`Verified and retained this ZIP in the current browser on ${new Date(saved.savedAt).toLocaleString()}.`);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'The ZIP could not be retained by this browser.');
+      }
     } catch (cause) {
       setDataset(null);
       setSelectedId(null);
@@ -29,6 +65,20 @@ export function App() {
     } finally {
       setLoading(false);
       if (picker.current) picker.current.value = '';
+    }
+  };
+
+  const forgetWorkspace = async () => {
+    if (!window.confirm('Remove the retained research ZIP and close this workspace? Saved annotation drafts remain in this browser.')) return;
+    try {
+      await archiveRepository.clear();
+      setDataset(null);
+      setSelectedId(null);
+      setQuery('');
+      setNotice(null);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The saved workspace could not be removed.');
     }
   };
 
@@ -40,7 +90,7 @@ export function App() {
           <p className="eyebrow">SautiForge</p>
           <h1>Dataset annotation</h1>
         </div>
-        {dataset ? <button className="secondary header-action" onClick={() => picker.current?.click()}>Open another ZIP</button> : null}
+        {dataset ? <div className="header-actions"><button className="secondary" onClick={() => picker.current?.click()}>Open another ZIP</button><button className="quiet" onClick={() => void forgetWorkspace()}>Close &amp; forget ZIP</button></div> : null}
       </header>
 
       <input ref={picker} hidden type="file" accept=".zip,application/zip" onChange={(event) => void open(event.target.files?.[0])} />
@@ -51,13 +101,13 @@ export function App() {
             <p className="eyebrow">Local browser workflow</p>
             <h2>Open a verified SautiForge research dataset</h2>
             <p>The archive is validated and read on this device. It is not uploaded.</p>
-            <button disabled={loading} onClick={() => picker.current?.click()}>{loading ? 'Validating dataset…' : 'Choose research ZIP'}</button>
+            <button disabled={loading} onClick={() => picker.current?.click()}>{loading ? 'Checking saved workspace…' : 'Choose research ZIP'}</button>
             {error ? <div className="error" role="alert">{error}</div> : null}
           </section>
           <div className="privacy-note"><span aria-hidden="true">✓</span> Private administrative backups are rejected.</div>
         </main>
       ) : (
-        <DatasetWorkspace dataset={dataset} selectedId={selectedId} setSelectedId={setSelectedId} query={query} setQuery={setQuery} />
+        <><div className="global-messages">{notice ? <div className="save-message" role="status">{notice}</div> : null}{error ? <div className="error" role="alert">{error}</div> : null}</div><DatasetWorkspace key={dataset.manifestSha256} dataset={dataset} selectedId={selectedId} setSelectedId={setSelectedId} query={query} setQuery={setQuery} /></>
       )}
     </div>
   );
@@ -73,6 +123,9 @@ function DatasetWorkspace({ dataset, selectedId, setSelectedId, query, setQuery 
   const participants = useMemo(() => new Map(dataset.records.participants.map((item) => [item.id, item])), [dataset]);
   const scenarios = useMemo(() => new Map(dataset.records.scenarios.map((item) => [item.id, item])), [dataset]);
   const draftRepository = useMemo(() => new LocalDraftRepository(window.localStorage), []);
+  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(
+    dataset.records.recordings.find((item) => item.id === selectedId)?.participant_id ?? dataset.records.participants[0]?.id ?? null,
+  );
   const [draftVersion, setDraftVersion] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
@@ -81,15 +134,51 @@ function DatasetWorkspace({ dataset, selectedId, setSelectedId, query, setQuery 
     try { return draftRepository.listForDataset(dataset); }
     catch { return []; }
   }, [dataset, draftRepository, draftVersion]);
+  const progress = useMemo(() => participantAnnotationProgress(dataset, localDrafts), [dataset, localDrafts]);
+  const progressByParticipant = useMemo(() => new Map(progress.map((item) => [item.participantId, item])), [progress]);
   const filtered = useMemo(() => {
     return dataset.records.recordings.filter((recording) => {
+      if (recording.participant_id !== selectedParticipantId) return false;
       const speaker = participants.get(recording.participant_id)?.speaker_code ?? '';
       const scenario = scenarios.get(recording.scenario_id)?.title ?? '';
       return matchesRecordingQuery(recording, speaker, scenario, query);
     });
-  }, [dataset, participants, query, scenarios]);
+  }, [dataset, participants, query, scenarios, selectedParticipantId]);
   const selected = filtered.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
-  const transcribed = new Set(dataset.records.transcriptions.filter((item) => Boolean(item.verbatim_text)).map((item) => item.recording_id)).size;
+  const transcribed = progress.reduce((total, item) => total + item.transcribedCount, 0);
+
+  const selectParticipant = (participantId: string) => {
+    setSelectedParticipantId(participantId);
+    const next = firstIncompleteRecording(dataset, participantId, localDrafts);
+    if (next) setSelectedId(next.id);
+    setQuery('');
+  };
+
+  const continueAfterSave = (recording: ResearchRecording) => {
+    const drafts = draftRepository.listForDataset(dataset);
+    setDraftVersion((value) => value + 1);
+    const sameSpeaker = dataset.records.recordings.filter((item) => item.participant_id === recording.participant_id);
+    const currentIndex = sameSpeaker.findIndex((item) => item.id === recording.id);
+    const orderedRecordings = [...sameSpeaker.slice(currentIndex + 1), ...sameSpeaker.slice(0, currentIndex)];
+    const nextSameSpeaker = orderedRecordings.find((item) => !recordingHasVerbatim(dataset, item, drafts));
+    if (nextSameSpeaker) {
+      setSelectedId(nextSameSpeaker.id);
+      return true;
+    }
+
+    const participantIndex = dataset.records.participants.findIndex((item) => item.id === recording.participant_id);
+    const orderedParticipants = [...dataset.records.participants.slice(participantIndex + 1), ...dataset.records.participants.slice(0, participantIndex)];
+    const updatedProgress = participantAnnotationProgress(dataset, drafts);
+    const nextParticipant = orderedParticipants.find((item) => {
+      const state = updatedProgress.find((entry) => entry.participantId === item.id);
+      return state && state.recordingCount > 0 && !state.complete;
+    });
+    if (!nextParticipant) return false;
+    setSelectedParticipantId(nextParticipant.id);
+    const nextRecording = firstIncompleteRecording(dataset, nextParticipant.id, drafts);
+    if (nextRecording) setSelectedId(nextRecording.id);
+    return Boolean(nextRecording);
+  };
 
   const exportAnnotated = async () => {
     setExporting(true);
@@ -125,7 +214,7 @@ function DatasetWorkspace({ dataset, selectedId, setSelectedId, query, setQuery 
           <div className="stats" aria-label="Dataset summary">
             <Stat value={dataset.records.recordings.length} label="Recordings" />
             <Stat value={dataset.records.participants.length} label="Participants" />
-            <Stat value={transcribed} label="In source ZIP" />
+            <Stat value={transcribed} label="Transcribed" />
             <Stat value={localDrafts.length} label="Local drafts" />
           </div>
           <button disabled={exporting} onClick={() => void exportAnnotated()}>{exporting ? 'Building and verifying…' : 'Download annotated ZIP'}</button>
@@ -136,9 +225,19 @@ function DatasetWorkspace({ dataset, selectedId, setSelectedId, query, setQuery 
 
       <section className="work-grid">
         <aside className="recording-panel">
-          <label className="search-label" htmlFor="recording-search">Search recordings</label>
+          <p className="panel-heading">Speakers</p>
+          <div className="participant-list">
+            {dataset.records.participants.map((participant) => {
+              const state = progressByParticipant.get(participant.id);
+              return <button key={participant.id} className={`participant-item ${participant.id === selectedParticipantId ? 'selected' : ''} ${state?.complete ? 'complete' : ''}`} onClick={() => selectParticipant(participant.id)}>
+                <span><strong>{participant.speaker_code}</strong><small>{state?.transcribedCount ?? 0}/{state?.recordingCount ?? 0} transcribed</small></span>
+                <span>{state?.complete ? 'Done' : 'In progress'}</span>
+              </button>;
+            })}
+          </div>
+          <label className="search-label" htmlFor="recording-search">Search this speaker’s recordings</label>
           <input id="recording-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ID, speaker, scenario or status" />
-          <p className="result-count">{filtered.length} result{filtered.length === 1 ? '' : 's'}</p>
+          <p className="result-count">{filtered.length} recording{filtered.length === 1 ? '' : 's'} for this speaker</p>
           <div className="recording-list">
             {filtered.map((recording) => {
               const speaker = participants.get(recording.participant_id)?.speaker_code ?? 'Unknown speaker';
@@ -154,14 +253,14 @@ function DatasetWorkspace({ dataset, selectedId, setSelectedId, query, setQuery 
           </div>
         </aside>
         <section className="detail-panel">
-          {selected ? <RecordingDetail key={selected.id} dataset={dataset} recording={selected} onDraftChange={() => setDraftVersion((value) => value + 1)} /> : <p className="empty">Select a recording.</p>}
+          {selected ? <RecordingDetail key={selected.id} dataset={dataset} recording={selected} onDraftChange={() => setDraftVersion((value) => value + 1)} onSaveAndContinue={continueAfterSave} /> : <p className="empty">Select a recording.</p>}
         </section>
       </section>
     </main>
   );
 }
 
-function RecordingDetail({ dataset, recording, onDraftChange }: { dataset: LoadedResearchDataset; recording: ResearchRecording; onDraftChange: () => void }) {
+function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue }: { dataset: LoadedResearchDataset; recording: ResearchRecording; onDraftChange: () => void; onSaveAndContinue: (recording: ResearchRecording) => boolean }) {
   const scenario = dataset.records.scenarios.find((item) => item.id === recording.scenario_id);
   const participant = dataset.records.participants.find((item) => item.id === recording.participant_id);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -198,14 +297,21 @@ function RecordingDetail({ dataset, recording, onDraftChange }: { dataset: Loade
     updateDraft({ businessLabels: { ...draft.businessLabels, [field]: value.trim() || null } });
   };
 
-  const saveDraft = (event: FormEvent) => {
-    event.preventDefault();
+  const saveDraft = (shouldContinue: boolean) => {
+    if (shouldContinue && !draft.verbatimText.trim()) {
+      setDraftMessage(null);
+      setDraftError('Add the verbatim transcription before continuing. Use “Save draft and stay” for incomplete work.');
+      return;
+    }
     try {
-      const saved = repository.save({ ...draft, updatedAt: new Date().toISOString() });
+      const saved = repository.save(prepareDraftForSave(draft));
       setDraft(saved);
-      setDraftMessage(`Saved in this browser at ${new Date(saved.updatedAt).toLocaleString()}.`);
+      setDraftMessage(shouldContinue ? null : `Draft saved and verified in this browser at ${new Date(saved.updatedAt).toLocaleString()}. You can continue editing this recording.`);
       setDraftError(null);
-      onDraftChange();
+      if (shouldContinue) {
+        const moved = onSaveAndContinue(recording);
+        if (!moved) setDraftMessage('Draft saved and verified. Every speaker with recordings now has a verbatim transcription.');
+      } else onDraftChange();
     } catch (cause) {
       setDraftMessage(null);
       setDraftError(cause instanceof Error ? cause.message : 'The draft could not be saved.');
@@ -242,7 +348,7 @@ function RecordingDetail({ dataset, recording, onDraftChange }: { dataset: Loade
         <Metadata label="Duration" value={formatDuration(recording.duration_ms)} />
         <Metadata label="Format" value={`${recording.container.toUpperCase()} · ${recording.codec ?? 'codec unavailable'}`} />
       </dl>
-      <form className="annotation-editor" onSubmit={saveDraft}>
+      <form className="annotation-editor" onSubmit={(event) => { event.preventDefault(); saveDraft(true); }}>
         <div className="editor-heading">
           <div><p className="eyebrow">Human annotation draft</p><h3>Transcription and labels</h3></div>
           <span className="local-badge">This browser only</span>
@@ -279,7 +385,7 @@ function RecordingDetail({ dataset, recording, onDraftChange }: { dataset: Loade
         <h4>Structured business labels</h4>
         <div className="form-grid form-grid-three">
           <Field label="Transaction intent"><OptionSelect value={draft.businessLabels.transactionIntent} options={preserveAnnotationValue(transactionIntentOptions, draft.businessLabels.transactionIntent)} onChange={(value) => updateBusiness('transactionIntent', value)} /></Field>
-          <Field label="Product or service"><input value={draft.businessLabels.productOrService ?? ''} onChange={(event) => updateBusiness('productOrService', event.target.value)} /></Field>
+          <Field label="Product or service" hint="Use one consistent canonical label across the dataset (recommended: English, for example airtime). Keep the speaker’s word, such as unités, in the verbatim transcript."><input value={draft.businessLabels.productOrService ?? ''} onChange={(event) => updateBusiness('productOrService', event.target.value)} /></Field>
           <Field label="Quantity"><input value={draft.businessLabels.quantity ?? ''} onChange={(event) => updateBusiness('quantity', event.target.value)} /></Field>
           <Field label="Amount"><input value={draft.businessLabels.amount ?? ''} onChange={(event) => updateBusiness('amount', event.target.value)} /></Field>
           <Field label="Currency"><OptionSelect value={draft.businessLabels.currency} options={preserveAnnotationValue(currencyOptions, draft.businessLabels.currency)} onChange={(value) => updateBusiness('currency', value)} /></Field>
@@ -291,7 +397,8 @@ function RecordingDetail({ dataset, recording, onDraftChange }: { dataset: Loade
         {draftError ? <div className="error" role="alert">{draftError}</div> : null}
         {draftMessage ? <div className="save-message" role="status">{draftMessage}</div> : null}
         <div className="editor-actions">
-          <button type="submit">Save local draft</button>
+          <button type="submit">Save &amp; continue</button>
+          <button className="secondary" type="button" onClick={() => saveDraft(false)}>Save draft and stay</button>
           <button className="secondary" type="button" onClick={clearDraft}>Clear local draft</button>
         </div>
       </form>

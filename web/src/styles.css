@@ -25,13 +25,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .topbar h1, .topbar p { margin: 0; }
 .topbar h1 { font-size: 20px; }
 .brand-mark { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; color: white; background: var(--green); font-size: 25px; font-weight: 900; }
-.header-action { margin-left: auto; }
+.header-actions { display: flex; gap: 8px; margin-left: auto; }
 .eyebrow { margin: 0 0 5px; color: var(--green); font-size: 12px; font-weight: 850; letter-spacing: .09em; text-transform: uppercase; }
 
 button:not(.recording-item) { min-height: 46px; border: 0; border-radius: 10px; padding: 11px 18px; color: white; background: var(--green); font-weight: 750; }
 button:not(.recording-item):hover { background: var(--green-dark); }
 button:disabled { cursor: wait; opacity: .65; }
 button.secondary { color: var(--green); background: var(--green-soft); }
+button.quiet { color: var(--muted); background: transparent; border: 1px solid var(--line); }
 
 .welcome { width: min(720px, calc(100% - 32px)); margin: clamp(40px, 10vh, 110px) auto; }
 .hero-card { padding: clamp(28px, 6vw, 58px); background: var(--surface); border: 1px solid var(--line); border-radius: 24px; box-shadow: 0 18px 50px rgba(24, 68, 46, .08); }
@@ -42,6 +43,8 @@ button.secondary { color: var(--green); background: var(--green-soft); }
 .error { margin-top: 18px; padding: 14px; border-radius: 10px; color: var(--danger); background: #fbeaea; font-weight: 650; }
 
 .workspace { width: min(1500px, 100%); margin: 0 auto; padding: clamp(20px, 3vw, 40px); }
+.global-messages { width: min(1500px, calc(100% - 32px)); margin: 0 auto; }
+.global-messages .save-message, .global-messages .error { margin-bottom: 0; }
 .dataset-heading { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
 .dataset-heading h2 { margin: 8px 0 6px; font-size: clamp(26px, 4vw, 38px); }
 .dataset-heading p { margin: 0; color: var(--muted); }
@@ -55,6 +58,15 @@ button.secondary { color: var(--green); background: var(--green-soft); }
 
 .work-grid { display: grid; grid-template-columns: minmax(310px, 390px) minmax(0, 1fr); min-height: 650px; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
 .recording-panel { padding: 18px; border-right: 1px solid var(--line); background: #f8faf8; }
+.panel-heading { margin: 0 0 8px; color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.participant-list { display: grid; gap: 7px; max-height: 230px; margin-bottom: 20px; overflow: auto; }
+.participant-item { display: flex; justify-content: space-between; gap: 10px; width: 100%; min-height: 54px !important; padding: 10px 12px !important; border: 1px solid var(--line) !important; color: var(--ink) !important; background: var(--surface) !important; text-align: left; }
+.participant-item.selected { border-color: var(--green) !important; box-shadow: inset 4px 0 var(--green); }
+.participant-item.complete { border-color: #7fb99c !important; background: var(--green-soft) !important; }
+.participant-item span { align-self: center; }
+.participant-item span:last-child { color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.participant-item strong, .participant-item small { display: block; }
+.participant-item small { margin-top: 3px; color: var(--muted); font-weight: 500; }
 .search-label { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 750; }
 input[type="search"] { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--surface); }
 .result-count { margin: 12px 2px 8px; color: var(--muted); font-size: 12px; }
@@ -110,7 +122,8 @@ input[type="search"] { width: 100%; min-height: 44px; padding: 10px 12px; border
   .topbar { padding: 12px 16px; }
   .topbar h1 { font-size: 17px; }
   .brand-mark { width: 42px; height: 42px; }
-  .header-action { min-height: 40px !important; padding: 8px 10px !important; font-size: 12px; }
+  .header-actions { align-items: stretch; flex-direction: column; }
+  .header-actions button { min-height: 36px !important; padding: 6px 9px !important; font-size: 11px; }
   .workspace { padding: 16px; }
   .stats { display: grid; grid-template-columns: repeat(2, 1fr); }
   .stat { min-width: 0; }

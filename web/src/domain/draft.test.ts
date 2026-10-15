@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { LocalDraftRepository, emptyBusinessLabels, webAnnotationDraftSchema, type DraftStorage } from './draft';
+import { LocalDraftRepository, emptyBusinessLabels, prepareDraftForSave, webAnnotationDraftSchema, type DraftStorage } from './draft';
 
 const manifestHash = 'a'.repeat(64);
 const recordingId = 'de0a9676-92cc-4b18-997a-3fafce18b700';
@@ -31,6 +31,15 @@ describe('local web annotation drafts', () => {
     expect(() => repository.save(makeDraft())).toThrow(/could not be written/);
     const silentRepository = new LocalDraftRepository(new SilentStorage());
     expect(() => silentRepository.save(makeDraft())).toThrow(/not readable after saving/);
+  });
+
+  it('marks a completed verbatim draft transcribed without overriding later review states', () => {
+    expect(prepareDraftForSave({ ...makeDraft(), annotationStatus: 'needs_transcription' }, new Date('2026-10-15T11:00:00.000Z'))).toMatchObject({
+      annotationStatus: 'transcribed',
+      updatedAt: '2026-10-15T11:00:00.000Z',
+    });
+    expect(prepareDraftForSave({ ...makeDraft(), annotationStatus: 'needs_review' }).annotationStatus).toBe('needs_review');
+    expect(prepareDraftForSave({ ...makeDraft(), verbatimText: '', annotationStatus: 'needs_transcription' }).annotationStatus).toBe('needs_transcription');
   });
 });
 

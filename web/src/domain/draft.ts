@@ -116,6 +116,13 @@ export function emptyBusinessLabels(): BusinessAnnotationPayload {
   };
 }
 
+export function prepareDraftForSave(draft: WebAnnotationDraft, now = new Date()): WebAnnotationDraft {
+  const annotationStatus = draft.verbatimText.trim() && ['recorded', 'needs_transcription'].includes(draft.annotationStatus)
+    ? 'transcribed'
+    : draft.annotationStatus;
+  return webAnnotationDraftSchema.parse({ ...draft, annotationStatus, updatedAt: now.toISOString() });
+}
+
 function draftKey(manifestSha256: string, recordingId: string): string {
   return `sautiforge.web.draft.v1.${manifestSha256}.${recordingId}`;
 }
