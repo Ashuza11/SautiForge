@@ -26,6 +26,7 @@ describe('browser research dataset import', () => {
     expect(initialDraft(dataset, recording, new Date(fixtureTime))).toMatchObject({
       scenarioContext: 'Recording a sale',
       elicitationPromptContext: 'Example',
+      verbatimText: 'Example',
       languageTags: ['Kingwana'],
       codeSwitchingStatus: 'present',
       annotationStatus: 'needs_transcription',

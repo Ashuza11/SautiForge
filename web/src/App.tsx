@@ -5,7 +5,7 @@ import type { BusinessAnnotationPayload } from '../../src/features/annotations/d
 import { codeSwitchingOptions } from '../../src/features/recordings/domain/recording-metadata-options';
 import { effectiveAnnotationStatus, firstIncompleteRecording, participantAnnotationProgress, recordingHasVerbatim } from './domain/annotation-workflow';
 import { createAnnotatedResearchArchive } from './domain/annotated-export';
-import { initialDraft, LocalDraftRepository, prepareDraftForSave, scenarioTransactionIntent, type WebAnnotationDraft } from './domain/draft';
+import { initialDraft, LocalDraftRepository, prefillVerbatim, prepareDraftForSave, scenarioTransactionIntent, type WebAnnotationDraft } from './domain/draft';
 import { audioMimeType, loadResearchDataset, matchesRecordingQuery, type LoadedResearchDataset, type ResearchRecording } from './domain/dataset';
 import { IndexedDbWorkspaceArchiveStorage, WorkspaceArchiveRepository } from './domain/workspace-archive';
 
@@ -289,6 +289,7 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
       const saved = repository.load(dataset.manifestSha256, recording.id);
       setDraft(saved ? {
         ...saved,
+        verbatimText: prefillVerbatim(saved.verbatimText, recording.elicitation_prompt_text),
         codeSwitchingStatus: saved.codeSwitchingStatus ?? baseDraft.codeSwitchingStatus,
         businessLabels: {
           ...saved.businessLabels,
@@ -367,7 +368,7 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
           <span className="local-badge">This browser only</span>
         </div>
         <p className="editor-note">Drafts are verified after writing to this browser. They are not yet inside the source ZIP; keep that archive unchanged.</p>
-        <Field label="Verbatim transcription" hint="Write exactly what was spoken, including Kingwana and French code-switching.">
+        <Field label="Verbatim transcription" hint="The example is prefilled only as a starting point. Edit it so it contains exactly what the speaker said, including Kingwana and French code-switching.">
           <textarea rows={5} value={draft.verbatimText} onChange={(event) => updateDraft({ verbatimText: event.target.value })} />
         </Field>
         <div className="form-grid">

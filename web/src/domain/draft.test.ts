@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { LocalDraftRepository, emptyBusinessLabels, prepareDraftForSave, scenarioTransactionIntent, webAnnotationDraftSchema, withScenarioTransactionIntent, type DraftStorage } from './draft';
+import { LocalDraftRepository, emptyBusinessLabels, prefillVerbatim, prepareDraftForSave, scenarioTransactionIntent, webAnnotationDraftSchema, withScenarioTransactionIntent, type DraftStorage } from './draft';
 
 const manifestHash = 'a'.repeat(64);
 const recordingId = 'de0a9676-92cc-4b18-997a-3fafce18b700';
@@ -53,6 +53,13 @@ describe('local web annotation drafts', () => {
     expect(withScenarioTransactionIntent(empty, 'record_sale').transactionIntent).toBe('record_sale');
     expect(withScenarioTransactionIntent({ ...empty, transactionIntent: 'other' }, 'record_sale').transactionIntent).toBe('other');
     expect(scenarioTransactionIntent('custom_research_intent')).toBeNull();
+  });
+
+  it('prefills empty verbatim text from the example without replacing a transcript', () => {
+    expect(prefillVerbatim('', 'Example phrase')).toBe('Example phrase');
+    expect(prefillVerbatim(null, 'Example phrase')).toBe('Example phrase');
+    expect(prefillVerbatim('Actual spoken words', 'Example phrase')).toBe('Actual spoken words');
+    expect(prefillVerbatim('', null)).toBe('');
   });
 });
 

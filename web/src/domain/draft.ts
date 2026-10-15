@@ -96,7 +96,7 @@ export function initialDraft(dataset: LoadedResearchDataset, recording: Research
     schemaVersion: 1,
     sourceManifestSha256: dataset.manifestSha256,
     recordingId: recording.id,
-    verbatimText: transcription?.verbatim_text ?? '',
+    verbatimText: prefillVerbatim(transcription?.verbatim_text, recording.elicitation_prompt_text),
     normalizedText: transcription?.normalized_text ?? '',
     scenarioContext: transcription?.scenario_context ?? scenario?.title ?? '',
     elicitationPromptContext: transcription?.elicitation_prompt_context ?? recording.elicitation_prompt_text ?? '',
@@ -124,6 +124,11 @@ export function emptyBusinessLabels(): BusinessAnnotationPayload {
     paymentMethod: null,
     transactionReference: null,
   };
+}
+
+export function prefillVerbatim(existingVerbatim: string | null | undefined, exampleText: string | null | undefined): string {
+  if (existingVerbatim?.trim()) return existingVerbatim;
+  return exampleText ?? '';
 }
 
 export function scenarioTransactionIntent(expectedIntent: string | null | undefined): string | null {
