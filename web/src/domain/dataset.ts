@@ -117,6 +117,10 @@ export function matchesRecordingQuery(recording: ResearchRecording, speakerCode:
     .some((value) => String(value).toLowerCase().includes(needle));
 }
 
+export function recordingIsInSearchScope(recording: ResearchRecording, selectedParticipantId: string | null, query: string): boolean {
+  return query.trim().length > 0 || recording.participant_id === selectedParticipantId;
+}
+
 function requireEntry(entries: ReadonlyMap<string, Uint8Array>, path: string): Uint8Array {
   const entry = entries.get(path);
   if (!entry) throw new Error(`ZIP member is missing: ${path}`);

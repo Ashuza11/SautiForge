@@ -2,7 +2,7 @@ import { webcrypto } from 'node:crypto';
 import { strToU8 } from 'fflate';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { audioMimeType, latestTranscription, loadResearchDataset, matchesRecordingQuery } from './dataset';
+import { audioMimeType, latestTranscription, loadResearchDataset, matchesRecordingQuery, recordingIsInSearchScope } from './dataset';
 import { initialDraft } from './draft';
 import { archiveInput, fixtureRecordingId, fixtureTime, makeResearchArchive } from '../test/research-archive-fixture';
 
@@ -20,7 +20,10 @@ describe('browser research dataset import', () => {
     expect(dataset.manifestSha256).toMatch(/^[a-f0-9]{64}$/);
     const recording = dataset.records.recordings[0];
     expect(matchesRecordingQuery(recording, 'SPK-001', 'Recording a sale', 'spk-001')).toBe(true);
+    expect(matchesRecordingQuery(recording, 'SPK-001', 'Recording a sale', 'SF-20261015-DE0A9676')).toBe(true);
     expect(matchesRecordingQuery(recording, 'SPK-001', 'Recording a sale', 'inventory')).toBe(false);
+    expect(recordingIsInSearchScope(recording, 'another-speaker', '')).toBe(false);
+    expect(recordingIsInSearchScope(recording, 'another-speaker', 'SF-20261015-DE0A9676')).toBe(true);
     expect(latestTranscription(dataset, recording.id)).toBeNull();
     expect(audioMimeType(recording.audio_path)).toBe('audio/ogg');
     expect(initialDraft(dataset, recording, new Date(fixtureTime))).toMatchObject({

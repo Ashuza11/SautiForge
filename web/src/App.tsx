@@ -6,7 +6,7 @@ import { codeSwitchingOptions } from '../../src/features/recordings/domain/recor
 import { effectiveAnnotationStatus, firstIncompleteRecording, participantAnnotationProgress, recordingHasVerbatim } from './domain/annotation-workflow';
 import { createAnnotatedResearchArchive } from './domain/annotated-export';
 import { initialDraft, LocalDraftRepository, prefillVerbatim, prepareDraftForSave, scenarioTransactionIntent, type WebAnnotationDraft } from './domain/draft';
-import { audioMimeType, loadResearchDataset, matchesRecordingQuery, type LoadedResearchDataset, type ResearchRecording } from './domain/dataset';
+import { audioMimeType, loadResearchDataset, matchesRecordingQuery, recordingIsInSearchScope, type LoadedResearchDataset, type ResearchRecording } from './domain/dataset';
 import { IndexedDbWorkspaceArchiveStorage, WorkspaceArchiveRepository } from './domain/workspace-archive';
 
 export function App() {
@@ -138,22 +138,29 @@ function DatasetWorkspace({ dataset, selectedId, setSelectedId, query, setQuery 
   const draftsByRecording = useMemo(() => new Map(localDrafts.map((draft) => [draft.recordingId, draft])), [localDrafts]);
   const progress = useMemo(() => participantAnnotationProgress(dataset, localDrafts), [dataset, localDrafts]);
   const progressByParticipant = useMemo(() => new Map(progress.map((item) => [item.participantId, item])), [progress]);
+  const globalSearchActive = query.trim().length > 0;
   const filtered = useMemo(() => {
     return dataset.records.recordings.filter((recording) => {
-      if (recording.participant_id !== selectedParticipantId) return false;
+      if (!recordingIsInSearchScope(recording, selectedParticipantId, query)) return false;
       const speaker = participants.get(recording.participant_id)?.speaker_code ?? '';
       const scenario = scenarios.get(recording.scenario_id)?.title ?? '';
       const annotationStatus = effectiveAnnotationStatus(recording, draftsByRecording.get(recording.id));
       return matchesRecordingQuery({ ...recording, annotation_status: annotationStatus }, speaker, scenario, query);
     });
   }, [dataset, draftsByRecording, participants, query, scenarios, selectedParticipantId]);
-  const selected = filtered.find((item) => item.id === selectedId) ?? filtered[0] ?? null;
+  const selected = filtered.find((item) => item.id === selectedId) ?? (globalSearchActive ? null : filtered[0]) ?? null;
   const transcribed = progress.reduce((total, item) => total + item.transcribedCount, 0);
 
   const selectParticipant = (participantId: string) => {
     setSelectedParticipantId(participantId);
     const next = firstIncompleteRecording(dataset, participantId, localDrafts);
     if (next) setSelectedId(next.id);
+    setQuery('');
+  };
+
+  const openRecording = (recording: ResearchRecording) => {
+    setSelectedParticipantId(recording.participant_id);
+    setSelectedId(recording.id);
     setQuery('');
   };
 
@@ -238,22 +245,22 @@ function DatasetWorkspace({ dataset, selectedId, setSelectedId, query, setQuery 
               </button>;
             })}
           </div>
-          <label className="search-label" htmlFor="recording-search">Search this speaker’s recordings</label>
-          <input id="recording-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ID, speaker, scenario or status" />
-          <p className="result-count">{filtered.length} recording{filtered.length === 1 ? '' : 's'} for this speaker</p>
+          <label className="search-label" htmlFor="recording-search">Search all recordings</label>
+          <input id="recording-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Recording ID, speaker, scenario or status" />
+          <p className="result-count">{globalSearchActive ? `${filtered.length} global result${filtered.length === 1 ? '' : 's'} · select one to open it` : `${filtered.length} recording${filtered.length === 1 ? '' : 's'} for this speaker`}</p>
           <div className="recording-list">
             {filtered.map((recording) => {
               const speaker = participants.get(recording.participant_id)?.speaker_code ?? 'Unknown speaker';
               const scenario = scenarios.get(recording.scenario_id)?.title ?? 'Unknown scenario';
               const annotationStatus = effectiveAnnotationStatus(recording, draftsByRecording.get(recording.id));
               return (
-                <button key={recording.id} className={`recording-item ${selected?.id === recording.id ? 'selected' : ''}`} onClick={() => setSelectedId(recording.id)}>
+                <button key={recording.id} className={`recording-item ${selected?.id === recording.id ? 'selected' : ''}`} onClick={() => openRecording(recording)}>
                   <span><strong>{recording.display_id}</strong><small>{speaker}</small></span>
                   <span><small>{scenario}</small><Status value={annotationStatus} /></span>
                 </button>
               );
             })}
-            {!filtered.length ? <p className="empty">No recordings match this search.</p> : null}
+            {!filtered.length ? <p className="empty">No recording in the open ZIP matches this search.</p> : null}
           </div>
         </aside>
         <section className="detail-panel">
@@ -365,7 +372,6 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
       <form className="annotation-editor" onSubmit={(event) => { event.preventDefault(); saveDraft(true); }}>
         <div className="editor-heading">
           <div><p className="eyebrow">Human annotation draft</p><h3>Transcription and labels</h3></div>
-          <span className="local-badge">This browser only</span>
         </div>
         <p className="editor-note">Drafts are verified after writing to this browser. They are not yet inside the source ZIP; keep that archive unchanged.</p>
         <Field label="Verbatim transcription" hint="The example is prefilled only as a starting point. Edit it so it contains exactly what the speaker said, including Kingwana and French code-switching.">
