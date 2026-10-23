@@ -45,6 +45,19 @@ button.quiet { color: var(--muted); background: transparent; border: 1px solid v
 .workspace { width: min(1500px, 100%); margin: 0 auto; padding: clamp(20px, 3vw, 40px); }
 .global-messages { width: min(1500px, calc(100% - 32px)); margin: 0 auto; }
 .global-messages .save-message, .global-messages .error { margin-bottom: 0; }
+.welcome-actions, .compact-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.project-admin { width: min(1500px, calc(100% - 32px)); margin: 24px auto 48px; }
+.project-admin-grid { display: grid; grid-template-columns: minmax(280px, 0.75fr) minmax(0, 1.25fr); gap: 20px; align-items: start; }
+.project-list-card { padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.project-list-card h3 { margin-top: 0; }
+.web-project-card { padding: 14px 0; border-top: 1px solid var(--line); }
+.web-project-card:first-of-type { border-top: 0; }
+.web-project-card strong, .web-project-card small { display: block; }
+.web-project-card small, .web-project-card p { margin-top: 4px; color: var(--muted); }
+.web-project-card p { font-size: 13px; }
+.compact-actions button { min-height: 38px; padding: 7px 10px; font-size: 13px; }
+.project-form { background: var(--surface); }
+.field-error { color: var(--danger) !important; }
 .dataset-heading { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
 .dataset-heading h2 { margin: 8px 0 6px; font-size: clamp(26px, 4vw, 38px); }
 .dataset-heading p { margin: 0; color: var(--muted); }
@@ -109,6 +122,7 @@ input[type="search"] { width: 100%; min-height: 44px; padding: 10px 12px; border
 .empty { padding: 30px 10px; color: var(--muted); text-align: center; }
 
 @media (max-width: 850px) {
+  .project-admin-grid { grid-template-columns: 1fr; }
   .dataset-heading { display: block; }
   .summary-actions { justify-items: stretch; margin-top: 18px; }
   .stats { overflow-x: auto; }

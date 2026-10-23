@@ -22,6 +22,8 @@ SQLite database + app document storage (verified audio)
 
 Feature code is grouped under `src/features/<feature>`. Shared database setup lives under `src/core/database`, explicit domain utilities under `src/domain`, and reusable presentation primitives under `src/ui`.
 
+Projects explicitly select an annotation profile. `business_transaction` retains the Kingwana transcription and structured-label workflow. `verbatim_transcription` supports general speech projects such as Mashi and keeps business fields out of their web annotation and derivative export path. The ISO 639-3 language code is stored and exported separately from the editable language name and variety.
+
 ## Data integrity rules
 
 - UUIDs are internal identifiers; recordings also receive separate human-readable IDs.

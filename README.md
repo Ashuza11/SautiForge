@@ -11,9 +11,10 @@ The first vertical slice includes:
 - Expo SDK 57, React Native, TypeScript, and Expo Router application structure.
 - A consistent high-contrast green brand palette shared by the icon, launch screen, primary controls, selections, and progress indicators.
 - A verified, device-persisted interface language selector for English, French, and Kiswahili; collection forms, dropdowns, validation, alerts, navigation, review, export, and settings update offline without changing research-entered content.
-- A versioned `expo-sqlite` database with foreign keys and WAL journaling.
+- A versioned `expo-sqlite` database with foreign keys and WAL journaling; schema 8 adds ISO 639-3 and per-project annotation profiles.
 - All MVP entity tables, stable UUID keys, timestamps, constraints, and indexes.
 - First-run Kingwana pilot project and five editable scenario records.
+- An editable Mashi Community Speech Pilot (`Shi` / `Mashi`, ISO 639-3 `shr`) with a general verbatim-transcription profile that does not require Kingwana business labels.
 - Working offline project creation, editing, selection, and soft archival.
 - Working scenario creation, editing, versioning, structured reference data, and soft archival.
 - Pseudonymous participant registration/editing with automatically generated speaker IDs, selection lists for common demographic values, free-text fallbacks, and gold/green collection and transcription completion indicators derived from retained recordings.
@@ -26,10 +27,11 @@ The first vertical slice includes:
 - Settings and safety status for microphone permission, free space, versions, offline behavior, backup limits, and the latest storage check.
 - Consent-filtered research ZIP exports with JSON/JSONL/CSV metadata, original audio, SHA-256 manifest, and post-compression verification.
 - A visibly separate sensitive administrative backup and hash/schema/database/audio-verified restore with rollback on failure.
-- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 128 automated tests including translation completeness and critical-workflow localization, language persistence, brand-palette consistency, participant progress, clear example-selection and correction validation, real in-memory SQLite migration/relationship checks, scenario example sets, privacy-minimized batch sharing and queue progression, imported-audio hashing, prompt provenance and duplicate prevention, metadata and annotation selectors, transcription context persistence, repeat playback, accepted-audio readability guards, browser ZIP validation, verified local web drafts, and derivative dataset generation.
+- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 147 automated tests including translation completeness and critical-workflow localization, language persistence, brand-palette consistency, participant progress, clear example-selection and correction validation, real in-memory SQLite migration/relationship checks, scenario example sets, privacy-minimized batch sharing and queue progression, imported-audio hashing, prompt provenance and duplicate prevention, metadata and annotation selectors, project-aware Mashi transcription, verified web project persistence, repeat playback, accepted-audio readability guards, browser ZIP validation, verified local web drafts, and derivative dataset generation.
 - Android APK build profile in `eas.json`.
 - A verified GitHub Actions release build that produces a standalone pilot APK and SHA-256 sidecar.
 - A responsive local web annotation workspace that opens research dataset ZIPs directly in the browser, verifies every declared file size and SHA-256 hash, rejects administrative backups and undeclared members, and supports recording search, playback, prefilled transcription/business-label editing, read-after-write-verified browser drafts, and a verified annotated research ZIP containing original audio and human revision provenance without uploading data.
+- A reusable web project-administration screen that creates, edits and archives any language project through the shared Android domain contract, verifies local persistence, and downloads a portable JSON configuration. It is intentionally repository-backed so a Neon adapter can replace local storage without rewriting the form.
 
 The first standalone APK was produced successfully from commit `142375373dd4ac119abb5b6627bf9d46a0cdc916` by [GitHub Actions run 35874820535](https://github.com/Ashuza11/SautiForge/actions/runs/35874820535). Installation, recording, ZIP export, and restore have not yet been exercised on the target physical phone. The application is therefore **not yet field-ready**.
 
@@ -116,3 +118,5 @@ See [build verification](docs/BUILD_VERIFICATION.md) for the exact source commit
 - App-private storage is not a complete backup or encryption strategy. Field deployment requires device encryption, access controls, tested backup/restore, and a consent-withdrawal procedure.
 
 See [Architecture](docs/ARCHITECTURE.md), [web annotation workflow](docs/WEB_ANNOTATION.md), [schema](docs/SCHEMA.md), [development plan](docs/DEVELOPMENT_PLAN.md), [test coverage](docs/TESTING.md), [field-test checklist](docs/FIELD_TEST_CHECKLIST.md), and [export format](docs/EXPORT_FORMAT.md).
+
+The verified V2 audit, reuse matrix, target architecture, first implemented Mashi slice, and remaining community-workflow limitations are documented in [Community speech data collection V2](docs/COMMUNITY_V2_ARCHITECTURE.md).

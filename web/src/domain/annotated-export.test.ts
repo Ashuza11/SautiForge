@@ -81,4 +81,26 @@ describe('annotated research export', () => {
     const verified = await loadResearchDataset(archiveInput(output.fileName, output.bytes));
     expect(verified.records.recordings[0].code_switching_status).toBe('present');
   });
+
+  it('exports a Mashi transcription without inventing Kingwana business labels', async () => {
+    const source = await loadResearchDataset(archiveInput('mashi.zip', await makeResearchArchive(
+      { schemaVersion: '1.4.0', databaseVersion: 8 },
+      { project: { title: 'Mashi Community Speech Pilot', target_language: 'Shi', language_code: 'shr', language_variety: 'Mashi', research_domain: 'General speech transcription', annotation_profile: 'verbatim_transcription' } },
+    )));
+    const draft = {
+      ...initialDraft(source, source.records.recordings[0], new Date('2026-10-22T10:00:00.000Z')),
+      verbatimText: 'Mashi transcription entered by a human.',
+      notes: 'Regional form noted by the annotator.',
+      businessLabels: { ...initialDraft(source, source.records.recordings[0]).businessLabels, transactionIntent: 'record_sale' as const },
+    };
+    const ids = ['81f523b2-2db8-4f59-82e9-e70b182656f1', '91f523b2-2db8-4f59-82e9-e70b182656f1'];
+    const output = await createAnnotatedResearchArchive(source, [draft], {
+      now: new Date('2026-10-22T11:00:00.000Z'),
+      newId: () => ids.shift() ?? crypto.randomUUID(),
+    });
+    const verified = await loadResearchDataset(archiveInput(output.fileName, output.bytes));
+    expect(verified.records.project).toMatchObject({ language_code: 'shr', annotation_profile: 'verbatim_transcription' });
+    expect(verified.records.transcriptions[0]).toMatchObject({ verbatim_text: draft.verbatimText, notes: draft.notes, source: 'human' });
+    expect(verified.records.annotations).toEqual([]);
+  });
 });

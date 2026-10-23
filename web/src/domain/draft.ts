@@ -88,15 +88,15 @@ export function initialDraft(dataset: LoadedResearchDataset, recording: Research
     .sort((left, right) => right.revision_number - left.revision_number)[0];
   const parsedBusiness = annotation ? businessAnnotationPayloadSchema.safeParse(parseJson(annotation.payload_json)) : null;
   const scenario = dataset.records.scenarios.find((item) => item.id === recording.scenario_id);
-  const businessLabels = withScenarioTransactionIntent(
-    parsedBusiness?.success ? parsedBusiness.data : emptyBusinessLabels(),
-    scenario?.expected_intent,
-  );
+  const businessProfile = usesBusinessAnnotations(dataset);
+  const businessLabels = businessProfile
+    ? withScenarioTransactionIntent(parsedBusiness?.success ? parsedBusiness.data : emptyBusinessLabels(), scenario?.expected_intent)
+    : emptyBusinessLabels();
   return webAnnotationDraftSchema.parse({
     schemaVersion: 1,
     sourceManifestSha256: dataset.manifestSha256,
     recordingId: recording.id,
-    verbatimText: prefillVerbatim(transcription?.verbatim_text, recording.elicitation_prompt_text),
+    verbatimText: prefillVerbatimForProject(dataset, transcription?.verbatim_text, recording.elicitation_prompt_text),
     normalizedText: transcription?.normalized_text ?? '',
     scenarioContext: transcription?.scenario_context ?? scenario?.title ?? '',
     elicitationPromptContext: transcription?.elicitation_prompt_context ?? recording.elicitation_prompt_text ?? '',
@@ -110,6 +110,19 @@ export function initialDraft(dataset: LoadedResearchDataset, recording: Research
     businessLabels,
     updatedAt: now.toISOString(),
   });
+}
+
+export function usesBusinessAnnotations(dataset: Pick<LoadedResearchDataset, 'records'>): boolean {
+  return dataset.records.project.annotation_profile === 'business_transaction';
+}
+
+export function prefillVerbatimForProject(
+  dataset: Pick<LoadedResearchDataset, 'records'>,
+  existingVerbatim: string | null | undefined,
+  exampleText: string | null | undefined,
+): string {
+  if (existingVerbatim?.trim()) return existingVerbatim;
+  return usesBusinessAnnotations(dataset) ? (exampleText ?? '') : '';
 }
 
 export function emptyBusinessLabels(): BusinessAnnotationPayload {

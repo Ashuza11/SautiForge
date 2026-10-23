@@ -9,17 +9,19 @@ type ProjectRow = {
   title: string;
   description: string;
   target_language: string;
+  language_code: string;
   language_variety: string;
   research_domain: string;
   collection_location: string;
   protocol_version: string;
+  annotation_profile: Project['annotationProfile'];
   status: Project['status'];
   created_at: string;
   updated_at: string;
 };
 
-const selectColumns = `id, title, description, target_language, language_variety,
-  research_domain, collection_location, protocol_version, status, created_at, updated_at`;
+const selectColumns = `id, title, description, target_language, language_code, language_variety,
+  research_domain, collection_location, protocol_version, annotation_profile, status, created_at, updated_at`;
 
 function fromRow(row: ProjectRow): Project {
   return projectSchema.parse({
@@ -27,10 +29,12 @@ function fromRow(row: ProjectRow): Project {
     title: row.title,
     description: row.description,
     targetLanguage: row.target_language,
+    languageCode: row.language_code,
     languageVariety: row.language_variety,
     researchDomain: row.research_domain,
     collectionLocation: row.collection_location,
     protocolVersion: row.protocol_version,
+    annotationProfile: row.annotation_profile,
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -74,16 +78,19 @@ export class SQLiteProjectRepository implements ProjectRepository {
     });
     await this.db.runAsync(
       `INSERT INTO projects
-        (id, title, description, target_language, language_variety, research_domain, collection_location, protocol_version, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, title, description, target_language, language_code, language_variety, research_domain, collection_location,
+         protocol_version, annotation_profile, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       project.id,
       project.title,
       project.description,
       project.targetLanguage,
+      project.languageCode,
       project.languageVariety,
       project.researchDomain,
       project.collectionLocation,
       project.protocolVersion,
+      project.annotationProfile,
       project.status,
       project.createdAt,
       project.updatedAt,
@@ -95,15 +102,17 @@ export class SQLiteProjectRepository implements ProjectRepository {
     const draft = projectDraftSchema.parse(input);
     const updatedAt = nowIso();
     const result = await this.db.runAsync(
-      `UPDATE projects SET title = ?, description = ?, target_language = ?, language_variety = ?,
-       research_domain = ?, collection_location = ?, protocol_version = ?, status = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE projects SET title = ?, description = ?, target_language = ?, language_code = ?, language_variety = ?,
+       research_domain = ?, collection_location = ?, protocol_version = ?, annotation_profile = ?, status = ?, updated_at = ? WHERE id = ?`,
       draft.title,
       draft.description,
       draft.targetLanguage,
+      draft.languageCode,
       draft.languageVariety,
       draft.researchDomain,
       draft.collectionLocation,
       draft.protocolVersion,
+      draft.annotationProfile,
       draft.status,
       updatedAt,
       id,

@@ -1,4 +1,4 @@
-# Export and backup format 1.3.0
+# Export and backup format 1.4.0
 
 SautiForge creates ZIP archives offline. Each archive is staged, hashed, compressed, extracted into a second temporary directory, and checked byte-for-byte before the app reports success. Temporary archives remain in cache until Android saves or shares them; local source recordings are never deleted.
 
@@ -28,9 +28,11 @@ Before files are written, every project, scenario, participant, session, recordi
 
 Research exports evaluate the participant’s latest consent revision at export time. They include only eligible, non-archived recordings and the participants/sessions they reference. They exclude consent records, consent notes, participant research notes, session researcher notes, provider filenames, database files, and recordings withdrawn from the selected sharing category. Scenario example sets, prompt snapshots, original container/codec metadata, capture source, transport, prompt exposure, exact elicitation example, import time, source MIME type, content hash, and pseudonymous submission code remain attached to recordings. Transcription revisions include their editable `scenario_context` and `elicitation_prompt_context`. M4A/AAC is never described as WAV.
 
+Project metadata now includes `language_code` and `annotation_profile`. Older 1.0–1.3 research archives remain readable and default to `und` plus the original `business_transaction` behavior when those fields are absent.
+
 ### Web annotated derivative
 
-The static web workspace accepts only an already consent-filtered research dataset. Its annotated export uses the same `1.3.0` structure and sharing category. It appends human transcription and `business.transaction` annotation revisions for saved drafts, updates recording workflow statuses, copies every original audio member byte-for-byte, rebuilds `participants.csv`, JSON/JSONL, counts, sizes, and SHA-256 hashes, and reopens the completed ZIP through the shared validator before starting the browser download. The original imported ZIP is never modified. The interface reports the completed ZIP's SHA-256 so it can be recorded for transfer verification.
+The static web workspace accepts only an already consent-filtered research dataset. Its annotated export uses the `1.4.0` structure and source sharing category. It appends human transcription revisions for saved drafts. It appends `business.transaction` revisions only when the project selects that profile; a verbatim-transcription project such as Mashi neither displays nor creates those labels. It updates recording workflow statuses, copies every original audio member byte-for-byte, rebuilds `participants.csv`, JSON/JSONL, counts, sizes, and SHA-256 hashes, and reopens the completed ZIP through the shared validator before starting the browser download. The original imported ZIP is never modified. The interface reports the completed ZIP's SHA-256 so it can be recorded for transfer verification.
 
 The web workspace does not re-evaluate private consent records because they are deliberately absent from a research export. Therefore, create the source ZIP in the Android app using the intended sharing category and do not use the web workflow to broaden that category.
 
@@ -50,10 +52,10 @@ Restore accepts administrative backups only. Before extraction it verifies suffi
 
 ## Compatibility
 
-- Export schema written by this release: `1.3.0` (the validator also accepts `1.0.0`, `1.1.0`, and `1.2.0`)
-- SQLite schema: `7`
+- Export schema written by this release: `1.4.0` (the validator also accepts `1.0.0`, `1.1.0`, `1.2.0`, and `1.3.0`)
+- SQLite schema: `8`
 - Audio conversion: not performed
-- Restore policy: backup database versions `3` through `7` are accepted and migrated when needed; older/incomplete and newer versions are rejected
+- Restore policy: backup database versions `3` through `8` are accepted and migrated when needed; older/incomplete and newer versions are rejected
 - ZIP creation requires an APK/development build; the native ZIP module is unavailable in Expo Go.
 
 ## Validate after transfer

@@ -5,9 +5,10 @@ import type { BusinessAnnotationPayload } from '../../src/features/annotations/d
 import { codeSwitchingOptions } from '../../src/features/recordings/domain/recording-metadata-options';
 import { effectiveAnnotationStatus, firstIncompleteRecording, participantAnnotationProgress, recordingHasVerbatim } from './domain/annotation-workflow';
 import { createAnnotatedResearchArchive } from './domain/annotated-export';
-import { initialDraft, LocalDraftRepository, prefillVerbatim, prepareDraftForSave, scenarioTransactionIntent, type WebAnnotationDraft } from './domain/draft';
+import { initialDraft, LocalDraftRepository, prefillVerbatimForProject, prepareDraftForSave, scenarioTransactionIntent, usesBusinessAnnotations, type WebAnnotationDraft } from './domain/draft';
 import { audioMimeType, loadResearchDataset, matchesRecordingQuery, recordingIsInSearchScope, type LoadedResearchDataset, type ResearchRecording } from './domain/dataset';
 import { IndexedDbWorkspaceArchiveStorage, WorkspaceArchiveRepository } from './domain/workspace-archive';
+import { ProjectAdmin } from './ProjectAdmin';
 
 export function App() {
   const picker = useRef<HTMLInputElement>(null);
@@ -17,6 +18,7 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showProjects, setShowProjects] = useState(false);
   const archiveRepository = useMemo(() => new WorkspaceArchiveRepository(new IndexedDbWorkspaceArchiveStorage()), []);
 
   useEffect(() => {
@@ -91,18 +93,21 @@ export function App() {
           <p className="eyebrow">SautiForge</p>
           <h1>Dataset annotation</h1>
         </div>
-        {dataset ? <div className="header-actions"><button className="secondary" onClick={() => picker.current?.click()}>Open another ZIP</button><button className="quiet" onClick={() => void forgetWorkspace()}>Close &amp; forget ZIP</button></div> : null}
+        <div className="header-actions">
+          <button className="secondary" onClick={() => setShowProjects((value) => !value)}>{showProjects ? 'Annotation' : 'Projects'}</button>
+          {!showProjects && dataset ? <><button className="secondary" onClick={() => picker.current?.click()}>Open another ZIP</button><button className="quiet" onClick={() => void forgetWorkspace()}>Close &amp; forget ZIP</button></> : null}
+        </div>
       </header>
 
       <input ref={picker} hidden type="file" accept=".zip,application/zip" onChange={(event) => void open(event.target.files?.[0])} />
 
-      {!dataset ? (
+      {showProjects ? <ProjectAdmin onClose={() => setShowProjects(false)} /> : !dataset ? (
         <main className="welcome">
           <section className="hero-card">
             <p className="eyebrow">Local browser workflow</p>
             <h2>Open a verified SautiForge research dataset</h2>
             <p>The archive is validated and read on this device. It is not uploaded.</p>
-            <button disabled={loading} onClick={() => picker.current?.click()}>{loading ? 'Checking saved workspace…' : 'Choose research ZIP'}</button>
+            <div className="welcome-actions"><button disabled={loading} onClick={() => picker.current?.click()}>{loading ? 'Checking saved workspace…' : 'Choose research ZIP'}</button><button className="secondary" onClick={() => setShowProjects(true)}>Create project</button></div>
             {error ? <div className="error" role="alert">{error}</div> : null}
           </section>
           <div className="privacy-note"><span aria-hidden="true">✓</span> Private administrative backups are rejected.</div>
@@ -277,6 +282,7 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const repository = useMemo(() => new LocalDraftRepository(window.localStorage), []);
   const baseDraft = useMemo(() => initialDraft(dataset, recording), [dataset, recording]);
+  const businessProfile = usesBusinessAnnotations(dataset);
   const expectedTransactionIntent = scenarioTransactionIntent(scenario?.expected_intent);
   const [draft, setDraft] = useState<WebAnnotationDraft>(baseDraft);
   const [draftMessage, setDraftMessage] = useState<string | null>(null);
@@ -296,7 +302,7 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
       const saved = repository.load(dataset.manifestSha256, recording.id);
       setDraft(saved ? {
         ...saved,
-        verbatimText: prefillVerbatim(saved.verbatimText, recording.elicitation_prompt_text),
+        verbatimText: prefillVerbatimForProject(dataset, saved.verbatimText, recording.elicitation_prompt_text),
         codeSwitchingStatus: saved.codeSwitchingStatus ?? baseDraft.codeSwitchingStatus,
         businessLabels: {
           ...saved.businessLabels,
@@ -306,7 +312,7 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
     } catch (cause) {
       setDraftError(cause instanceof Error ? cause.message : 'The local draft could not be opened.');
     }
-  }, [baseDraft, dataset.manifestSha256, expectedTransactionIntent, recording.id, repository]);
+  }, [baseDraft, dataset, expectedTransactionIntent, recording.elicitation_prompt_text, recording.id, repository]);
 
   const updateDraft = (changes: Partial<WebAnnotationDraft>) => {
     setDraft((current) => ({ ...current, ...changes }));
@@ -371,17 +377,17 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
       </dl>
       <form className="annotation-editor" onSubmit={(event) => { event.preventDefault(); saveDraft(true); }}>
         <div className="editor-heading">
-          <div><p className="eyebrow">Human annotation draft</p><h3>Transcription and labels</h3></div>
+          <div><p className="eyebrow">Human annotation draft</p><h3>{businessProfile ? 'Transcription and labels' : 'Verbatim transcription'}</h3></div>
         </div>
         <p className="editor-note">Drafts are verified after writing to this browser. They are not yet inside the source ZIP; keep that archive unchanged.</p>
-        <Field label="Verbatim transcription" hint="The example is prefilled only as a starting point. Edit it so it contains exactly what the speaker said, including Kingwana and French code-switching.">
+        <Field label="Verbatim transcription" hint={businessProfile ? 'The example is prefilled only as a starting point. Edit it so it contains exactly what the speaker said, including code-switching.' : 'Type exactly what the speaker said. Source descriptions and prompts are context only and are never inserted as a transcript.'}>
           <textarea rows={5} value={draft.verbatimText} onChange={(event) => updateDraft({ verbatimText: event.target.value })} />
         </Field>
         <div className="form-grid">
           <Field label="Normalized text" hint="Optional; do not replace the verbatim text.">
             <textarea rows={3} value={draft.normalizedText} onChange={(event) => updateDraft({ normalizedText: event.target.value })} />
           </Field>
-          <Field label="Annotation notes">
+          <Field label={businessProfile ? 'Annotation notes' : 'Language-variant notes'} hint={businessProfile ? undefined : 'Optional: record regional, orthographic, dialect, or uncertain-expression information.'}>
             <textarea rows={3} value={draft.notes} onChange={(event) => updateDraft({ notes: event.target.value })} />
           </Field>
           <Field label="Scenario context">
@@ -390,10 +396,10 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
           <Field label="Example context">
             <textarea rows={2} value={draft.elicitationPromptContext} onChange={(event) => updateDraft({ elicitationPromptContext: event.target.value })} />
           </Field>
-          <Field label="Language tags" hint="Comma-separated, for example Kingwana, French.">
+          <Field label="Language tags" hint={businessProfile ? 'Comma-separated, for example Kingwana, French.' : `Comma-separated, for example ${dataset.records.project.language_variety}, French.`}>
             <input value={draft.languageTags.join(', ')} onChange={(event) => updateDraft({ languageTags: event.target.value.split(',').map((value) => value.trim()).filter(Boolean) })} />
           </Field>
-          <Field label="Code switching" hint="Choose Present when the recording uses more than one language, such as Kingwana and French. Choose None when only one language is used.">
+          <Field label="Code switching" hint={businessProfile ? 'Choose Present when the recording uses more than one language, such as Kingwana and French. Choose None when only one language is used.' : 'Choose Present when the recording uses more than one language. Choose None when only one language is used.'}>
             <OptionSelect value={draft.codeSwitchingStatus ?? 'unknown'} options={codeSwitchingOptions.map((option) => ({ ...option }))} onChange={(value) => updateDraft({ codeSwitchingStatus: value as WebAnnotationDraft['codeSwitchingStatus'] })} />
           </Field>
           <Field label="Researcher code">
@@ -405,7 +411,7 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
             </select>
           </Field>
         </div>
-        <h4>Structured business labels</h4>
+        {businessProfile ? <><h4>Structured business labels</h4>
         <div className="form-grid form-grid-three">
           <Field label="Transaction intent" hint={expectedTransactionIntent ? `Suggested by this scenario: ${expectedTransactionIntent}. You can correct it when the recording differs.` : 'No compatible scenario intent is available; select the correct value.'}>
             <OptionSelect value={draft.businessLabels.transactionIntent} options={preserveAnnotationValue(transactionIntentOptions, draft.businessLabels.transactionIntent)} onChange={(value) => updateBusiness('transactionIntent', value)} />
@@ -421,7 +427,7 @@ function RecordingDetail({ dataset, recording, onDraftChange, onSaveAndContinue 
           <Field label="Outstanding debt"><input value={draft.businessLabels.outstandingDebt ?? ''} onChange={(event) => updateBusiness('outstandingDebt', event.target.value)} /></Field>
           <Field label="Payment method"><OptionSelect value={draft.businessLabels.paymentMethod} options={preserveAnnotationValue(paymentMethodOptions, draft.businessLabels.paymentMethod)} onChange={(value) => updateBusiness('paymentMethod', value)} /></Field>
           <Field label="Transaction reference"><input value={draft.businessLabels.transactionReference ?? ''} onChange={(event) => updateBusiness('transactionReference', event.target.value)} /></Field>
-        </div>
+        </div></> : null}
         {draftError ? <div className="error" role="alert">{draftError}</div> : null}
         {draftMessage ? <div className="save-message" role="status">{draftMessage}</div> : null}
         <div className="editor-actions">

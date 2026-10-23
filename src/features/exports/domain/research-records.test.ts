@@ -29,10 +29,20 @@ const recording = {
 
 describe('research export record contracts', () => {
   it('accepts a complete, privacy-minimized record set', () => {
-    expect(researchExportRecordsSchema.parse({
+    const parsed = researchExportRecordsSchema.parse({
       project: { id: projectId, title: 'Pilot', description: '', target_language: 'Swahili', language_variety: 'Kingwana', research_domain: 'Business', collection_location: 'Bukavu', protocol_version: '1.0', status: 'active', created_at: time, updated_at: time },
       scenarios: [], participants: [participant], sessions: [], recordings: [recording], transcriptions: [], annotations: [],
-    }).recordings[0].audio_path).toBe(`audio/${recordingId}.m4a`);
+    });
+    expect(parsed.recordings[0].audio_path).toBe(`audio/${recordingId}.m4a`);
+    expect(parsed.project).toMatchObject({ language_code: 'und', annotation_profile: 'business_transaction' });
+  });
+
+  it('preserves reusable language and annotation configuration', () => {
+    const parsed = researchExportRecordsSchema.parse({
+      project: { id: projectId, title: 'Mashi pilot', description: '', target_language: 'Shi', language_code: 'shr', language_variety: 'Mashi', research_domain: 'General speech', collection_location: 'South Kivu', protocol_version: '0.2', annotation_profile: 'verbatim_transcription', status: 'active', created_at: time, updated_at: time },
+      scenarios: [], participants: [participant], sessions: [], recordings: [recording], transcriptions: [], annotations: [],
+    });
+    expect(parsed.project).toMatchObject({ language_code: 'shr', annotation_profile: 'verbatim_transcription' });
   });
 
   it('rejects administrative participant fields from research exports', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { LocalDraftRepository, emptyBusinessLabels, prefillVerbatim, prepareDraftForSave, scenarioTransactionIntent, webAnnotationDraftSchema, withScenarioTransactionIntent, type DraftStorage } from './draft';
+import { LocalDraftRepository, emptyBusinessLabels, prefillVerbatim, prefillVerbatimForProject, prepareDraftForSave, scenarioTransactionIntent, usesBusinessAnnotations, webAnnotationDraftSchema, withScenarioTransactionIntent, type DraftStorage } from './draft';
 
 const manifestHash = 'a'.repeat(64);
 const recordingId = 'de0a9676-92cc-4b18-997a-3fafce18b700';
@@ -60,6 +60,15 @@ describe('local web annotation drafts', () => {
     expect(prefillVerbatim(null, 'Example phrase')).toBe('Example phrase');
     expect(prefillVerbatim('Actual spoken words', 'Example phrase')).toBe('Actual spoken words');
     expect(prefillVerbatim('', null)).toBe('');
+  });
+
+  it('does not turn source context into a transcript for general transcription projects', () => {
+    const general = { records: { project: { annotation_profile: 'verbatim_transcription' } } } as never;
+    const business = { records: { project: { annotation_profile: 'business_transaction' } } } as never;
+    expect(usesBusinessAnnotations(general)).toBe(false);
+    expect(prefillVerbatimForProject(general, '', 'Source description')).toBe('');
+    expect(prefillVerbatimForProject(general, 'Actual Mashi speech', 'Source description')).toBe('Actual Mashi speech');
+    expect(prefillVerbatimForProject(business, '', 'Elicitation example')).toBe('Elicitation example');
   });
 });
 

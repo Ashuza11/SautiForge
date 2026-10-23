@@ -10,8 +10,10 @@ const nullableJsonText = jsonText.nullable();
 
 export const researchProjectSchema = z.object({
   id, title: z.string().min(1), description: z.string(), target_language: z.string().min(1),
+  language_code: z.string().regex(/^[a-z]{3}$/).default('und'),
   language_variety: z.string().min(1), research_domain: z.string().min(1), collection_location: z.string().min(1),
-  protocol_version: z.string().min(1), status: z.enum(['active', 'archived']), created_at: timestamp, updated_at: timestamp,
+  protocol_version: z.string().min(1), annotation_profile: z.enum(['business_transaction', 'verbatim_transcription']).default('business_transaction'),
+  status: z.enum(['active', 'archived']), created_at: timestamp, updated_at: timestamp,
 }).strict();
 
 export const researchScenarioSchema = z.object({

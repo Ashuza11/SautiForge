@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DATABASE_NAME = 'sautiforge.db';
-export const DATABASE_VERSION = 7;
+export const DATABASE_VERSION = 8;
 export const DATABASE_OPEN_PRAGMAS = 'PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;';
 export const DATABASE_CREATE_PRAGMAS = 'PRAGMA journal_mode = WAL;';
 
@@ -225,6 +225,33 @@ ALTER TABLE transcriptions ADD COLUMN scenario_context TEXT;
 ALTER TABLE transcriptions ADD COLUMN elicitation_prompt_context TEXT;
 `;
 
+export const MIGRATION_8_SQL = `
+ALTER TABLE projects ADD COLUMN language_code TEXT NOT NULL DEFAULT 'und'
+  CHECK (length(language_code) = 3 AND language_code = lower(language_code));
+ALTER TABLE projects ADD COLUMN annotation_profile TEXT NOT NULL DEFAULT 'business_transaction'
+  CHECK (annotation_profile IN ('business_transaction', 'verbatim_transcription'));
+UPDATE projects SET language_code = 'swh' WHERE id = '6a7d8df7-d495-4f69-9934-dc48ce5ee8d1';
+
+INSERT OR IGNORE INTO projects
+  (id, title, description, target_language, language_variety, research_domain, collection_location,
+   protocol_version, status, created_at, updated_at, language_code, annotation_profile)
+VALUES
+  ('8246c28f-9576-4e0b-88fd-cb8689a71133', 'Mashi Community Speech Pilot',
+   'Editable pilot project for permission-cleared Mashi speech transcription and linguistic review.',
+   'Shi', 'Mashi', 'General speech transcription', 'South Kivu, Democratic Republic of Congo',
+   '0.2', 'active', '2026-10-22T00:00:00.000Z', '2026-10-22T00:00:00.000Z', 'shr', 'verbatim_transcription');
+
+INSERT OR IGNORE INTO scenarios
+  (id, project_id, title, description, collection_instructions, expected_intent, collection_method,
+   version, reference_data_json, status, created_at, updated_at, remote_examples_json)
+VALUES
+  ('461f70c1-37bf-4a14-ae97-ef119f4e34d5', '8246c28f-9576-4e0b-88fd-cb8689a71133',
+   'Authorized speech sample', 'Import or record a permission-cleared Mashi speech sample.',
+   'Confirm the speaker or rights holder permits the intended research and annotation uses before collection.',
+   'verbatim_transcription', 'authorized_import', '1.0', NULL, 'active',
+   '2026-10-22T00:00:00.000Z', '2026-10-22T00:00:00.000Z', '[]');
+`;
+
 const KINGWANA_PROJECT_ID = '6a7d8df7-d495-4f69-9934-dc48ce5ee8d1';
 const SEEDED_AT = '2026-01-01T00:00:00.000Z';
 
@@ -342,6 +369,14 @@ export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
       await transaction.execAsync('PRAGMA user_version = 7');
     });
     currentVersion = 7;
+  }
+
+  if (currentVersion === 7) {
+    await db.withExclusiveTransactionAsync(async (transaction) => {
+      await transaction.execAsync(MIGRATION_8_SQL);
+      await transaction.execAsync('PRAGMA user_version = 8');
+    });
+    currentVersion = 8;
   }
 
   await db.execAsync(DATABASE_OPEN_PRAGMAS);

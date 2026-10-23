@@ -10,7 +10,7 @@ npx expo-doctor
 npx expo export --platform android
 ```
 
-Current automated suite: 38 files, 128 tests.
+Current automated suite: 41 files, 147 tests.
 
 The `Android pilot APK` GitHub Actions workflow repeats type-checking/tests, runs Expo prebuild, builds `:app:assembleRelease` with Java 17, and publishes the APK plus SHA-256. A green workflow proves compilation and artifact creation, but not installation, microphone behavior, or offline device persistence.
 
@@ -20,7 +20,7 @@ Release assembly first passed in [run 35874820535](https://github.com/Ashuza11/S
 
 | Feature | Automated coverage | Native/field coverage still required |
 | --- | --- | --- |
-| Projects | Required fields and reusable project validation | Screen CRUD and restart persistence |
+| Projects | Required fields, ISO 639-3 code, annotation profile, reusable project validation, migration 8 configuration, Mashi seed, and verified web create/edit/archive/template persistence | Android screen CRUD/restart persistence and browser interaction testing |
 | Scenarios | Versioned reusable prompt/reference validation plus bounded, unique, line-separated remote example sets | Screen CRUD, batch-example editing, and historical prompt snapshot inspection |
 | Participants | Pseudonymous required fields, generated speaker IDs, demographic bounds, common selector values, custom values, and collection/transcription progress derived from active scenarios and retained recordings | Screen CRUD, selector interaction, uniqueness error UX, and visual progress verification |
 | Consent | Recording gate, expiry, withdrawal, and each sharing category | Microphone gate and export exclusion on device |
@@ -34,6 +34,6 @@ Release assembly first passed in [run 35874820535](https://github.com/Ashuza11/S
 | Restore | Migration chain execution, foreign keys, uniqueness, exact member set, unsafe/encrypted/duplicate entry rejection, and conservative storage preflight | Native ZIP picker, rollback injection, low-storage simulation, clean-device restore comparison |
 | Settings | Strict local settings and storage-recovery report schemas, complete English/French/Kiswahili dictionaries, critical-workflow localization, and write-read verification of the interface language | Permission presentation, language switching across screens, and restart persistence |
 | File recovery | Verified/missing/empty/orphan classification | Startup quarantine with real interrupted files and process death |
-| Web annotation | Real ZIP fixtures covering complete import, SHA-256/size tampering, unsafe references, undeclared private members, administrative-backup rejection, count mismatch, search matching, audio MIME mapping, prefilled context, draft validation, save/reload/removal, write failure, silently ignored persistence, derivative revision provenance, original-audio preservation, rebuilt hashes, and generated-ZIP revalidation | Browser playback, draft recovery, and downloads across target desktop/mobile browsers; memory behavior with a full pilot archive; offline static-host use; independent validation of a real annotated export |
+| Web annotation | Real ZIP fixtures covering complete import, SHA-256/size tampering, unsafe references, undeclared private members, administrative-backup rejection, count mismatch, search matching, audio MIME mapping, profile-aware transcript prefill, Mashi business-label isolation, draft validation, save/reload/removal, write failure, silently ignored persistence, derivative revision provenance, original-audio preservation, rebuilt hashes, and generated-ZIP revalidation | Browser playback, draft recovery, and downloads across target desktop/mobile browsers; memory behavior with a full pilot archive; offline static-host use; independent validation of a real annotated export |
 
-The migration tests execute all seven migration SQL scripts against an in-memory SQLite database and check table creation, foreign-key enforcement, speaker-code uniqueness, imported-audio provenance, scenario examples, elicitation linkage, prompt-correction history, and transcription context. Native modules cannot be proven by Node unit tests: all microphone, multi-file document-provider, sharing, ZIP-native, reboot, and interruption cases remain explicit gates in `FIELD_TEST_CHECKLIST.md`.
+The migration tests execute all eight migration SQL scripts against an in-memory SQLite database and check table creation, foreign-key enforcement, speaker-code uniqueness, imported-audio provenance, scenario examples, elicitation linkage, prompt-correction history, transcription context, project annotation configuration, and the Mashi seed. Native modules cannot be proven by Node unit tests: all microphone, multi-file document-provider, sharing, ZIP-native, reboot, and interruption cases remain explicit gates in `FIELD_TEST_CHECKLIST.md`.

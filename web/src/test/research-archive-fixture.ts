@@ -9,14 +9,19 @@ export const fixtureScenarioId = '17f523b2-2db8-4f59-82e9-e70b182656f1';
 export const fixtureRecordingId = 'de0a9676-92cc-4b18-997a-3fafce18b700';
 
 type ManifestOverrides = Record<string, unknown>;
-type ArchiveOverrides = { audioBytes?: Uint8Array; recordingAudioPath?: string; extra?: Record<string, Uint8Array> };
+type ArchiveOverrides = {
+  audioBytes?: Uint8Array;
+  recordingAudioPath?: string;
+  project?: Record<string, unknown>;
+  extra?: Record<string, Uint8Array>;
+};
 
 export async function makeResearchArchive(manifestOverrides: ManifestOverrides = {}, archiveOverrides: ArchiveOverrides = {}): Promise<Uint8Array> {
   const canonicalAudioPath = `audio/${fixtureRecordingId}.opus`;
   const audioPath = archiveOverrides.recordingAudioPath ?? canonicalAudioPath;
   const expectedAudio = strToU8('valid opus fixture');
   const entries: Record<string, Uint8Array> = {
-    'metadata/project.json': strToU8(JSON.stringify({ id: fixtureProjectId, title: 'Pilot', description: '', target_language: 'Swahili', language_variety: 'Kingwana', research_domain: 'Business', collection_location: 'Bukavu', protocol_version: '1.0', status: 'active', created_at: fixtureTime, updated_at: fixtureTime })),
+    'metadata/project.json': strToU8(JSON.stringify({ id: fixtureProjectId, title: 'Pilot', description: '', target_language: 'Swahili', language_variety: 'Kingwana', research_domain: 'Business', collection_location: 'Bukavu', protocol_version: '1.0', status: 'active', created_at: fixtureTime, updated_at: fixtureTime, ...archiveOverrides.project })),
     'metadata/scenarios.jsonl': line({ id: fixtureScenarioId, project_id: fixtureProjectId, title: 'Recording a sale', description: '', collection_instructions: 'Use fiction.', expected_intent: 'record_sale', collection_method: 'elicited_prompt', version: '1.0', remote_examples_json: '[]', reference_data_json: null, status: 'active', created_at: fixtureTime, updated_at: fixtureTime }),
     'metadata/participants.jsonl': line({ id: fixtureParticipantId, project_id: fixtureProjectId, speaker_code: 'SPK-001', primary_language: 'Kingwana', language_variety: 'Bukavu', other_languages_json: '["French"]', age_bracket: null, gender_self_described: null, business_category: null, years_business_experience: null, status: 'active', created_at: fixtureTime, updated_at: fixtureTime }),
     'metadata/sessions.jsonl': line({ id: fixtureSessionId, project_id: fixtureProjectId, participant_id: fixtureParticipantId, started_at: fixtureTime, ended_at: null, device_metadata_json: '{}', collection_environment: 'Indoor shop', city: 'Bukavu', status: 'completed', created_at: fixtureTime, updated_at: fixtureTime }),

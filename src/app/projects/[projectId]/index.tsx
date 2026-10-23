@@ -102,6 +102,8 @@ export default function ProjectDetailScreen() {
         <Text style={uiStyles.body}>{project.description || strings.noDescription}</Text>
         <View style={uiStyles.divider} />
         <Text style={uiStyles.muted}>{strings.domain}: {project.researchDomain}</Text>
+        <Text style={uiStyles.muted}>{strings.languageCode}: {project.languageCode}</Text>
+        <Text style={uiStyles.muted}>{strings.annotationProfile}: {project.annotationProfile === 'business_transaction' ? strings.businessTransactionProfile : strings.verbatimTranscriptionProfile}</Text>
         <Text style={uiStyles.muted}>{strings.location}: {project.collectionLocation}</Text>
         <Text style={uiStyles.muted}>{strings.protocol}: {project.protocolVersion}</Text>
         {project.status === 'active' && activeProjectId !== project.id ? <Button label={strings.selectProject} variant="secondary" onPress={() => void selectForCollection()} /> : null}

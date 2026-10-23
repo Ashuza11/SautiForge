@@ -4,7 +4,7 @@ import { businessAnnotationPayloadSchema } from '../../../src/features/annotatio
 import { EXPORT_SCHEMA_VERSION, exportManifestSchema, validateManifestReferences, type ExportManifest } from '../../../src/features/exports/domain/manifest';
 import { researchExportRecordsSchema, type ResearchExportRecords } from '../../../src/features/exports/domain/research-records';
 import { loadResearchDataset, type LoadedResearchDataset } from './dataset';
-import { webAnnotationDraftSchema, type WebAnnotationDraft } from './draft';
+import { usesBusinessAnnotations, webAnnotationDraftSchema, type WebAnnotationDraft } from './draft';
 
 type ExportOptions = {
   now?: Date;
@@ -56,15 +56,17 @@ export async function createAnnotatedResearchArchive(
       });
     }
 
-    const previousAnnotation = latestRevision(annotations.filter((item) => item.recording_id === recording.id && item.annotation_type === 'business.transaction'));
-    const labels = businessAnnotationPayloadSchema.parse(draft.businessLabels);
-    const hasBusinessLabels = Object.values(labels).some((value) => value !== null);
-    if ((hasBusinessLabels || previousAnnotation) && !sameBusinessAnnotation(previousAnnotation, labels)) {
-      annotations.push({
-        id: idFactory(), recording_id: recording.id, annotation_type: 'business.transaction', schema_version: '1.0',
-        payload_json: JSON.stringify(labels), source: 'human', revision_number: (previousAnnotation?.revision_number ?? 0) + 1,
-        supersedes_id: previousAnnotation?.id ?? null, created_at: draft.updatedAt, created_by: nullable(draft.createdBy),
-      });
+    if (usesBusinessAnnotations(dataset)) {
+      const previousAnnotation = latestRevision(annotations.filter((item) => item.recording_id === recording.id && item.annotation_type === 'business.transaction'));
+      const labels = businessAnnotationPayloadSchema.parse(draft.businessLabels);
+      const hasBusinessLabels = Object.values(labels).some((value) => value !== null);
+      if ((hasBusinessLabels || previousAnnotation) && !sameBusinessAnnotation(previousAnnotation, labels)) {
+        annotations.push({
+          id: idFactory(), recording_id: recording.id, annotation_type: 'business.transaction', schema_version: '1.0',
+          payload_json: JSON.stringify(labels), source: 'human', revision_number: (previousAnnotation?.revision_number ?? 0) + 1,
+          supersedes_id: previousAnnotation?.id ?? null, created_at: draft.updatedAt, created_by: nullable(draft.createdBy),
+        });
+      }
     }
     return {
       ...recording,

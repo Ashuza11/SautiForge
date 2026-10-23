@@ -1,16 +1,19 @@
 import { z } from 'zod';
 
 export const projectStatusSchema = z.enum(['active', 'archived']);
+export const annotationProfileSchema = z.enum(['business_transaction', 'verbatim_transcription']);
 
 export const projectSchema = z.object({
   id: z.string().uuid(),
   title: z.string().trim().min(1, 'Title is required').max(160),
   description: z.string().trim().max(2000),
   targetLanguage: z.string().trim().min(1, 'Target language is required').max(120),
+  languageCode: z.string().trim().toLowerCase().regex(/^[a-z]{3}$/, 'Use a three-letter ISO 639-3 language code.'),
   languageVariety: z.string().trim().min(1, 'Language variety is required').max(120),
   researchDomain: z.string().trim().min(1, 'Research domain is required').max(160),
   collectionLocation: z.string().trim().min(1, 'Collection location is required').max(160),
   protocolVersion: z.string().trim().min(1, 'Protocol version is required').max(40),
+  annotationProfile: annotationProfileSchema,
   createdAt: z.string().datetime({ offset: true }),
   updatedAt: z.string().datetime({ offset: true }),
   status: projectStatusSchema,

@@ -104,8 +104,8 @@ export class ExportService {
 
   async createResearchDataset(projectId: string, category: SharingCategory): Promise<ExportResult> {
     const project = await this.db.getFirstAsync<Record<string, unknown> & { id: string; title: string }>(
-      `SELECT id, title, description, target_language, language_variety, research_domain, collection_location,
-       protocol_version, status, created_at, updated_at FROM projects WHERE id = ?`, projectId,
+      `SELECT id, title, description, target_language, language_code, language_variety, research_domain, collection_location,
+       protocol_version, annotation_profile, status, created_at, updated_at FROM projects WHERE id = ?`, projectId,
     );
     if (!project) throw new Error('Project not found.');
     const allRecordings = await this.db.getAllAsync<RecordingExportRow>(

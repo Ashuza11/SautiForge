@@ -3,17 +3,19 @@ import { View } from 'react-native';
 import type { ZodIssue } from 'zod';
 
 import { projectDraftSchema, type ProjectDraft } from '../domain/project';
-import { Button, ErrorNotice, Field, uiStyles } from '@/ui/components';
+import { Button, ErrorNotice, Field, SelectField, uiStyles } from '@/ui/components';
 import { useI18n } from '@/i18n';
 
 const blankProject: ProjectDraft = {
   title: '',
   description: '',
   targetLanguage: '',
+  languageCode: 'und',
   languageVariety: '',
   researchDomain: '',
   collectionLocation: '',
   protocolVersion: '0.1',
+  annotationProfile: 'verbatim_transcription',
   status: 'active',
 };
 
@@ -55,10 +57,21 @@ export function ProjectForm({ initial = blankProject, onSave }: Props) {
       <Field label={strings.projectTitle} value={draft.title} onChangeText={set('title')} error={errors.title} autoCapitalize="sentences" />
       <Field label={strings.description} value={draft.description} onChangeText={set('description')} error={errors.description} multiline />
       <Field label={strings.targetLanguage} value={draft.targetLanguage} onChangeText={set('targetLanguage')} error={errors.targetLanguage} />
+      <Field label={strings.languageCode} value={draft.languageCode} onChangeText={set('languageCode')} error={errors.languageCode} autoCapitalize="none" maxLength={3} placeholder="shr" />
       <Field label={strings.languageVariety} value={draft.languageVariety} onChangeText={set('languageVariety')} error={errors.languageVariety} />
       <Field label={strings.researchDomain} value={draft.researchDomain} onChangeText={set('researchDomain')} error={errors.researchDomain} />
       <Field label={strings.collectionLocation} value={draft.collectionLocation} onChangeText={set('collectionLocation')} error={errors.collectionLocation} />
       <Field label={strings.protocolVersion} value={draft.protocolVersion} onChangeText={set('protocolVersion')} error={errors.protocolVersion} autoCapitalize="none" />
+      <SelectField
+        label={strings.annotationProfile}
+        value={draft.annotationProfile}
+        options={[
+          { label: strings.verbatimTranscriptionProfile, value: 'verbatim_transcription' },
+          { label: strings.businessTransactionProfile, value: 'business_transaction' },
+        ]}
+        onValueChange={(value) => setDraft((current) => ({ ...current, annotationProfile: value as ProjectDraft['annotationProfile'] }))}
+        error={errors.annotationProfile}
+      />
       <Button label={strings.saveProject} onPress={submit} loading={saving} />
     </View>
   );

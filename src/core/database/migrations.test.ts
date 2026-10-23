@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 
-import { DATABASE_CREATE_PRAGMAS, DATABASE_OPEN_PRAGMAS, DATABASE_VERSION, MIGRATION_1_SQL, MIGRATION_2_SQL, MIGRATION_3_SQL, MIGRATION_4_SQL, MIGRATION_5_SQL, MIGRATION_6_SQL, MIGRATION_7_SQL } from './migrations';
+import { DATABASE_CREATE_PRAGMAS, DATABASE_OPEN_PRAGMAS, DATABASE_VERSION, MIGRATION_1_SQL, MIGRATION_2_SQL, MIGRATION_3_SQL, MIGRATION_4_SQL, MIGRATION_5_SQL, MIGRATION_6_SQL, MIGRATION_7_SQL, MIGRATION_8_SQL } from './migrations';
 
 const requiredTables = [
   'projects',
@@ -17,7 +17,7 @@ const requiredTables = [
 
 describe('database migration 1', () => {
   it('has an explicit schema version', () => {
-    expect(DATABASE_VERSION).toBe(7);
+    expect(DATABASE_VERSION).toBe(8);
   });
 
   it.each(requiredTables)('creates the %s table', (table) => {
@@ -63,6 +63,13 @@ describe('database migration 1', () => {
     expect(MIGRATION_7_SQL).toContain('elicitation_prompt_context');
   });
 
+  it('adds reusable project annotation configuration and the Mashi pilot in migration 8', () => {
+    expect(MIGRATION_8_SQL).toContain('language_code');
+    expect(MIGRATION_8_SQL).toContain('annotation_profile');
+    expect(MIGRATION_8_SQL).toContain("'Mashi Community Speech Pilot'");
+    expect(MIGRATION_8_SQL).toContain("'shr', 'verbatim_transcription'");
+  });
+
   it('executes the complete migration chain in SQLite', () => {
     const db = new DatabaseSync(':memory:');
     try {
@@ -74,11 +81,16 @@ describe('database migration 1', () => {
       db.exec(MIGRATION_5_SQL);
       db.exec(MIGRATION_6_SQL);
       db.exec(MIGRATION_7_SQL);
+      db.exec(MIGRATION_8_SQL);
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => String(row.name));
       expect(tables).toEqual(expect.arrayContaining([...requiredTables, 'recording_prompt_corrections']));
       expect(db.prepare('PRAGMA foreign_keys').get()).toMatchObject({ foreign_keys: 1 });
       const transcriptionColumns = db.prepare('PRAGMA table_info(transcriptions)').all().map((row) => String(row.name));
       expect(transcriptionColumns).toEqual(expect.arrayContaining(['scenario_context', 'elicitation_prompt_context']));
+      const projectColumns = db.prepare('PRAGMA table_info(projects)').all().map((row) => String(row.name));
+      expect(projectColumns).toEqual(expect.arrayContaining(['language_code', 'annotation_profile']));
+      expect(db.prepare('SELECT language_code, annotation_profile FROM projects WHERE title = ?').get('Mashi Community Speech Pilot'))
+        .toMatchObject({ language_code: 'shr', annotation_profile: 'verbatim_transcription' });
     } finally { db.close(); }
   });
 
@@ -93,6 +105,7 @@ describe('database migration 1', () => {
       db.exec(MIGRATION_5_SQL);
       db.exec(MIGRATION_6_SQL);
       db.exec(MIGRATION_7_SQL);
+      db.exec(MIGRATION_8_SQL);
       const timestamp = '2026-09-23T08:00:00.000Z';
       db.prepare(`INSERT INTO projects (id, title, description, target_language, language_variety, research_domain,
         collection_location, protocol_version, status, created_at, updated_at) VALUES (?, ?, '', ?, ?, ?, ?, ?, 'active', ?, ?)`)
