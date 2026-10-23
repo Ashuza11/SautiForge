@@ -27,11 +27,12 @@ The first vertical slice includes:
 - Settings and safety status for microphone permission, free space, versions, offline behavior, backup limits, and the latest storage check.
 - Consent-filtered research ZIP exports with JSON/JSONL/CSV metadata, original audio, SHA-256 manifest, and post-compression verification.
 - A visibly separate sensitive administrative backup and hash/schema/database/audio-verified restore with rollback on failure.
-- Strict Zod validation for persisted and exported records, a portable post-transfer dataset validator, and 147 automated tests including translation completeness and critical-workflow localization, language persistence, brand-palette consistency, participant progress, clear example-selection and correction validation, real in-memory SQLite migration/relationship checks, scenario example sets, privacy-minimized batch sharing and queue progression, imported-audio hashing, prompt provenance and duplicate prevention, metadata and annotation selectors, project-aware Mashi transcription, verified web project persistence, repeat playback, accepted-audio readability guards, browser ZIP validation, verified local web drafts, and derivative dataset generation.
+- Strict Zod validation for persisted, API, and exported records; a portable post-transfer dataset validator; and 172 automated tests including localization, database relationships, consent, recording recovery, import provenance, project-aware annotation, verified browser persistence/exports, server authorization, Neon mapping, migration rules, and private-object-storage controls.
 - Android APK build profile in `eas.json`.
 - A verified GitHub Actions release build that produces a standalone pilot APK and SHA-256 sidecar.
 - A responsive local web annotation workspace that opens research dataset ZIPs directly in the browser, verifies every declared file size and SHA-256 hash, rejects administrative backups and undeclared members, and supports recording search, playback, prefilled transcription/business-label editing, read-after-write-verified browser drafts, and a verified annotated research ZIP containing original audio and human revision provenance without uploading data.
 - A reusable web project-administration screen that creates, edits and archives any language project through the shared Android domain contract, verifies local persistence, and downloads a portable JSON configuration. It is intentionally repository-backed so a Neon adapter can replace local storage without rewriting the form.
+- A separate, tested community-service foundation with a Hono API, Neon/PostgreSQL project migration and repository, exact-origin administrator boundary, private S3-compatible storage adapter, and non-leaking readiness checks. It is not yet connected to the static web page and contains no public upload or volunteer task endpoint.
 
 The first standalone APK was produced successfully from commit `142375373dd4ac119abb5b6627bf9d46a0cdc916` by [GitHub Actions run 35874820535](https://github.com/Ashuza11/SautiForge/actions/runs/35874820535). Installation, recording, ZIP export, and restore have not yet been exercised on the target physical phone. The application is therefore **not yet field-ready**.
 
@@ -54,7 +55,7 @@ To run on a USB-connected Android device during development:
 npm run android
 ```
 
-The app uses only on-device SQLite. No account or backend is required.
+The Android app uses only on-device SQLite. No account or backend is required for its field collection, review, export, or restore workflows.
 
 To run the local web dataset reviewer:
 
@@ -117,6 +118,6 @@ See [build verification](docs/BUILD_VERIFICATION.md) for the exact source commit
 - Consent and future contact information must remain outside default research dataset exports.
 - App-private storage is not a complete backup or encryption strategy. Field deployment requires device encryption, access controls, tested backup/restore, and a consent-withdrawal procedure.
 
-See [Architecture](docs/ARCHITECTURE.md), [web annotation workflow](docs/WEB_ANNOTATION.md), [schema](docs/SCHEMA.md), [development plan](docs/DEVELOPMENT_PLAN.md), [test coverage](docs/TESTING.md), [field-test checklist](docs/FIELD_TEST_CHECKLIST.md), and [export format](docs/EXPORT_FORMAT.md).
+See [Architecture](docs/ARCHITECTURE.md), [web annotation workflow](docs/WEB_ANNOTATION.md), [community service foundation](docs/SERVER_FOUNDATION.md), [schema](docs/SCHEMA.md), [development plan](docs/DEVELOPMENT_PLAN.md), [test coverage](docs/TESTING.md), [field-test checklist](docs/FIELD_TEST_CHECKLIST.md), and [export format](docs/EXPORT_FORMAT.md).
 
 The verified V2 audit, reuse matrix, target architecture, first implemented Mashi slice, and remaining community-workflow limitations are documented in [Community speech data collection V2](docs/COMMUNITY_V2_ARCHITECTURE.md).

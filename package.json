@@ -3,6 +3,10 @@
   "main": "expo-router/entry",
   "version": "0.1.0",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1156.0",
+    "@aws-sdk/s3-request-presigner": "^3.1156.0",
+    "@hono/node-server": "^2.1.5",
+    "@neondatabase/serverless": "^1.2.0",
     "@noble/hashes": "^2.4.0",
     "expo": "~57.0.25",
     "expo-asset": "~57.0.18",
@@ -18,6 +22,7 @@
     "expo-splash-screen": "~57.0.9",
     "expo-sqlite": "~57.0.3",
     "fflate": "^0.8.3",
+    "hono": "^4.13.13",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -25,11 +30,13 @@
     "react-native-screens": "~4.26.0",
     "react-native-web": "~0.21.0",
     "react-native-zip-archive": "^9.5.1",
-    "zod": "^4.1.11"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "@types/react": "~19.2.2",
     "@types/react-dom": "19.2.3",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "vite": "^7.3.7",
     "vitest": "^3.2.4"
@@ -40,12 +47,19 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "npm run typecheck:app && npm run typecheck:server",
+    "typecheck:app": "tsc --noEmit",
+    "typecheck:server": "tsc --noEmit -p server/tsconfig.json",
     "test": "vitest run",
     "web:dev": "vite --config web/vite.config.ts",
     "web:build": "vite build --config web/vite.config.ts",
     "web:preview": "vite preview --config web/vite.config.ts",
-    "validate:export": "node scripts/validate-export.mjs"
+    "validate:export": "node scripts/validate-export.mjs",
+    "server:dev": "tsx watch server/src/index.ts",
+    "server:start": "tsx server/src/index.ts",
+    "server:migrate": "tsx server/scripts/migrate.ts",
+    "server:start:local": "node --env-file=server/.env --import tsx server/src/index.ts",
+    "server:migrate:local": "node --env-file=server/.env --import tsx server/scripts/migrate.ts"
   },
   "private": true
 }

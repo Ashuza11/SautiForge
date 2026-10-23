@@ -20,11 +20,11 @@ Facts in this section were verified from the repository and automated tests. Rec
 | Browser persistence | ZIP in IndexedDB; per-recording drafts in local storage, both source-manifest-bound | Reuse for researcher mode and failed-edit recovery | It is neither encrypted backup nor safe multi-user remote storage |
 | Export | Consent-filtered JSON/JSONL/CSV, original audio, stable IDs, sizes and SHA-256; strict Zod validation and ZIP revalidation | Extend compatibly | Schema 1.4 adds project language code and annotation profile |
 | Backup/restore | Separate sensitive SQLite/audio archive with preflight, hash, integrity, foreign-key, and rollback checks | Preserve for Android administration | It must not be accepted by the public/community web workflow |
-| Backend and accounts | None | Do not pretend local browser storage is collaborative infrastructure | Community tasks require a small authenticated service and protected object storage in a later slice |
+| Backend and accounts | A separate Hono service now provides protected project CRUD, a Neon repository/migration, private S3-compatible storage boundary, and readiness checks; it is not connected to the public web client | Reuse this server boundary for source rights and later task sessions | Scoped admin/contributor sessions, source/task records, and a deployed service are still required |
 | Deployment | Standalone APK GitHub Action and static GitHub Pages workflow | Continue both | A community service will need a separate deployment and threat review |
 | Automated tests | Type/domain/migration/repository/export/web tests using Vitest and Node SQLite | Extend with each slice | Native microphone, document-provider, browser/device, and field tests remain manual acceptance gates |
 
-## Implemented first V2 slice
+## Implemented V2 slices
 
 This slice keeps the existing ZIP bridge and makes it project-aware:
 
@@ -50,6 +50,14 @@ permission-cleared short Mashi audio
 
 It is not yet the remote two-annotator community workflow.
 
+The second slice adds the server foundation without changing that working bridge:
+
+- A real Node/Hono API owns validation, IDs, timestamps, project persistence, and infrastructure readiness.
+- A Neon/PostgreSQL migration represents reusable projects without embedding a particular language.
+- A private S3-compatible adapter can create short-lived, checksummed, encrypted upload/download URLs, but no public media route exists before source rights are modeled.
+- Secrets remain server-only. GitHub Pages and the Expo bundle do not receive the database URL, object-storage credentials, or administrator token.
+- Protected project endpoints use a temporary administrator bearer token. The browser remains local-only until scoped administrator sessions are added.
+
 ## Recommended target architecture (not yet implemented)
 
 ```text
@@ -70,8 +78,8 @@ The service must distinguish speaker, annotator, reviewer, and rights holder. Ra
 ## Smallest safe implementation plan
 
 1. **Completed:** project-aware Mashi transcription profile through Android configuration, reusable web project creation, ZIP interchange, web editing, and verified derivative export.
-2. **Next:** introduce the small API, Neon project repository, private S3 adapter, and server-side permission boundary without changing the Android offline workflow.
-3. Add web-admin source catalogue records with explicit rights-by-use states. Candidate URLs remain unapproved metadata; only an authorized file can proceed.
+2. **Completed in Batch 2:** introduce the small API, Neon project repository/migration, private S3-compatible adapter, and server-side permission boundary without changing the Android offline workflow.
+3. **Next:** add web-admin source catalogue records with explicit rights-by-use states. Candidate URLs remain unapproved metadata; only an authorized file can proceed.
 4. Add authorized master upload and manual 8–30 second segmentation with exact offsets and clip hashes. FFmpeg runs on the administration computer or service, not on the Android recorder.
 5. Add scoped invites, pseudonymous contributor sessions, 5–10 clip batches, draft/retry/duplicate protection, and protected audio delivery.
 6. Add two independent submissions, reviewer comparison, character-level difference display, adjudication, and final transcript records without overwriting raw annotations.
@@ -89,8 +97,8 @@ The service must distinguish speaker, annotator, reviewer, and rights holder. Ra
 ## Remaining limitations
 
 - No external-source catalogue, master upload, FFmpeg pipeline, segmentation editor, clip entity, or voice-activity detection exists yet.
-- No remote contributor identity, invite, task claim, API, protected media URL, independent annotation, reviewer queue, or adjudication exists.
-- Web-created projects currently remain in verified local browser storage and portable JSON; they are not synchronized to Android or a server.
+- The API foundation exists locally, but it is not deployed or connected to the public web client. No scoped admin session, remote contributor identity, invite, task claim, media upload route, independent annotation, reviewer queue, or adjudication exists.
+- Web-created projects currently remain in verified local browser storage and portable JSON. The Neon project API exists, but connecting it safely requires scoped administrator authentication rather than exposing the server token in JavaScript.
 - The Mashi seed scenario supports only the current short-audio bridge; it is not a substitute for source-rights records.
 - No listed external Mashi source has been language-verified or permission-approved by this code change.
 - Full Android regression, real Mashi audio, browser compatibility, and five-clip end-to-end community testing remain manual gates.

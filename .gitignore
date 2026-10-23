@@ -34,6 +34,8 @@ yarn-error.*
 # local env files
 .env*.local
 .env
+server/.env
+server-dist/
 
 # SautiForge field data and build artifacts
 *.db

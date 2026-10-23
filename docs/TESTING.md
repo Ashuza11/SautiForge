@@ -10,11 +10,13 @@ npx expo-doctor
 npx expo export --platform android
 ```
 
-Current automated suite: 41 files, 147 tests.
+Current automated suite: 48 files, 172 tests.
 
 The `Android pilot APK` GitHub Actions workflow repeats type-checking/tests, runs Expo prebuild, builds `:app:assembleRelease` with Java 17, and publishes the APK plus SHA-256. A green workflow proves compilation and artifact creation, but not installation, microphone behavior, or offline device persistence.
 
 The `Web annotation workspace` workflow runs TypeScript and web tests, builds `web-dist/`, uploads only that static directory, and deploys it through the protected `github-pages` environment. Pages must first be enabled with **GitHub Actions** as its source. A green deployment does not replace browser tests with a real pilot ZIP.
+
+The `Community service verification` workflow type-checks the isolated server configuration and runs all server/migration tests. It uses no cloud credentials and does not deploy or migrate a live database.
 
 Release assembly first passed in [run 35874820535](https://github.com/Ashuza11/SautiForge/actions/runs/35874820535) for commit `142375373dd4ac119abb5b6627bf9d46a0cdc916`. The evidence and its limits are recorded in `BUILD_VERIFICATION.md`.
 
@@ -35,5 +37,6 @@ Release assembly first passed in [run 35874820535](https://github.com/Ashuza11/S
 | Settings | Strict local settings and storage-recovery report schemas, complete English/French/Kiswahili dictionaries, critical-workflow localization, and write-read verification of the interface language | Permission presentation, language switching across screens, and restart persistence |
 | File recovery | Verified/missing/empty/orphan classification | Startup quarantine with real interrupted files and process death |
 | Web annotation | Real ZIP fixtures covering complete import, SHA-256/size tampering, unsafe references, undeclared private members, administrative-backup rejection, count mismatch, search matching, audio MIME mapping, profile-aware transcript prefill, Mashi business-label isolation, draft validation, save/reload/removal, write failure, silently ignored persistence, derivative revision provenance, original-audio preservation, rebuilt hashes, and generated-ZIP revalidation | Browser playback, draft recovery, and downloads across target desktop/mobile browsers; memory behavior with a full pilot archive; offline static-host use; independent validation of a real annotated export |
+| Community service | Environment/credential validation, bounded requests, exact-origin and bearer-token enforcement, reusable project CRUD/archival, parameterized Neon mapping, migration constraints, persisted-row validation, private-key/checksum/size/expiry controls, and non-leaking readiness failures | Real Neon migration/backup, private-bucket/IAM verification, deployed TLS endpoint, and future scoped browser sessions |
 
 The migration tests execute all eight migration SQL scripts against an in-memory SQLite database and check table creation, foreign-key enforcement, speaker-code uniqueness, imported-audio provenance, scenario examples, elicitation linkage, prompt-correction history, transcription context, project annotation configuration, and the Mashi seed. Native modules cannot be proven by Node unit tests: all microphone, multi-file document-provider, sharing, ZIP-native, reboot, and interruption cases remain explicit gates in `FIELD_TEST_CHECKLIST.md`.

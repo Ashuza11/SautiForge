@@ -2,9 +2,11 @@
 
 ## Shape
 
-SautiForge is a single offline-first Expo application. Screens depend on repository interfaces; SQLite implementations live below those interfaces. This keeps presentation code independent from storage details and leaves room for a later opt-in synchronization adapter without building a backend now.
+SautiForge's field client is a single offline-first Expo application. Screens depend on repository interfaces; SQLite implementations live below those interfaces. This keeps presentation code independent from storage details and leaves room for later opt-in synchronization without making the Android workflow depend on a backend.
 
 The repository also contains a separate static React/Vite web workspace for computer-assisted review and annotation. Its first slice reuses the mobile export schemas, validates a selected research ZIP entirely in the browser, and exposes audio and metadata without a server. It rejects administrative backups. It does not modify the Android database or the original ZIP.
+
+A separate Node/Hono service foundation now owns future remote project persistence and protected media integration. It uses a Neon/PostgreSQL repository and private S3-compatible adapter, but the static page is deliberately not connected until scoped administrator and contributor sessions exist. Database, object-storage, and administrator credentials are server-only. Android remains fully functional without this service.
 
 The interface language is an app-level presentation preference stored in `app_settings`. The i18n provider exposes complete English, French, and Kiswahili dictionaries to navigation and shared controls. Changing it does not translate or mutate researcher-entered projects, prompts, metadata, transcripts, or annotations.
 
@@ -64,10 +66,10 @@ browser ZIP extraction + manifest/schema/hash verification
 in-memory recording index, audio object URLs, and transcript view
 ```
 
-There are no analytics, external scripts, accounts, network writes, or server-side storage in this workflow. Annotation drafts are validated with Zod, keyed by the source manifest hash and recording UUID, written to browser storage, and immediately read back before the UI reports success. A failed, blocked, or silently ignored write is reported as an error. Export creates human transcription and business-annotation revisions, copies original audio bytes, rebuilds the manifest and hashes, then reopens the completed ZIP through the same validator before passing it to browser downloads. It never overwrites the source archive.
+There are no analytics, external scripts, accounts, network writes, or server-side storage in this local ZIP workflow. Annotation drafts are validated with Zod, keyed by the source manifest hash and recording UUID, written to browser storage, and immediately read back before the UI reports success. A failed, blocked, or silently ignored write is reported as an error. Export creates human transcription and business-annotation revisions, copies original audio bytes, rebuilds the manifest and hashes, then reopens the completed ZIP through the same validator before passing it to browser downloads. It never overwrites the source archive.
 
 ## Export boundary
 
 Research ZIP creation is a domain service below the screens. It rechecks current per-use consent, removes private administrative fields, preserves original audio, hashes each member, then extracts and verifies the completed ZIP. The separate administrative backup serializes SQLite and all audio. Restore verifies schema, hashes, SQLite integrity, foreign keys, and audio references before replacement, with a local rollback copy during the operation.
 
-`react-native-zip-archive` adds native code, so export/restore works in a development or standalone APK but not Expo Go. No backend, account, network request, or automatic upload exists.
+`react-native-zip-archive` adds native code, so export/restore works in a development or standalone APK but not Expo Go. No account, network request, automatic upload, or backend connection exists in the Android application.
