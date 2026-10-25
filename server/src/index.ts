@@ -3,6 +3,8 @@ import { serve } from '@hono/node-server';
 import { parseServerConfig } from './config';
 import { createNeonExecutor } from './database/neon';
 import { createServerApp } from './http/app';
+import { NeonSourceMediaRepository } from './media/neon-source-media-repository';
+import { SourceMediaService } from './media/source-media-service';
 import { NeonProjectRepository } from './projects/neon-project-repository';
 import { ProjectService } from './projects/project-service';
 import { ReadinessService } from './readiness';
@@ -21,9 +23,15 @@ const objectStore = createPrivateObjectStore({
   forcePathStyle: config.s3ForcePathStyle,
   credentials: config.awsCredentials,
 });
+const sourceService = new SourceService(sourceRepository, projectRepository);
 const app = createServerApp({
   projects: new ProjectService(projectRepository),
-  sources: new SourceService(sourceRepository, projectRepository),
+  sources: sourceService,
+  media: new SourceMediaService(
+    new NeonSourceMediaRepository(database),
+    sourceService,
+    objectStore,
+  ),
   readiness: new ReadinessService(projectRepository, objectStore),
   adminApiToken: config.adminApiToken,
   webOrigin: config.webOrigin,

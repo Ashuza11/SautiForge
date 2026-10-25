@@ -40,4 +40,4 @@ All routes require the temporary administrator bearer token and the configured w
 | `GET` | `/v1/admin/sources/:sourceId/rights` | Read the complete chronological rights history |
 | `POST` | `/v1/admin/sources/:sourceId/rights` | Append a permission decision; never overwrites previous decisions |
 
-There is deliberately no media upload, YouTube download, task sharing, public source endpoint, or delete endpoint in this batch. The next media-ingestion batch must call the service's use-specific authorization gate before issuing an upload URL or creating a clip.
+The later master-ingestion slice uses this catalogue's `internalProcessing` gate before issuing a short-lived upload URL and again before verification is persisted; see [Authorized master-media ingestion](MEDIA_INGESTION.md). There is still no automatic YouTube download, task sharing, public source endpoint, or destructive source delete endpoint.

@@ -121,6 +121,10 @@ export class SourceService {
     if (!detail || detail.source.status !== 'approved' || detail.latestRights?.decision !== 'approved' || !detail.latestRights.authorizedUses[use]) {
       throw new SourceLifecycleError('use_not_authorized', `The source is not authorized for ${use}.`);
     }
+    const project = await this.projects.getById(detail.source.projectId);
+    if (!project || project.status !== 'active') {
+      throw new SourceLifecycleError('project_unavailable', 'Source use requires an active project.');
+    }
   }
 }
 

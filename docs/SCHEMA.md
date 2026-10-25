@@ -31,6 +31,9 @@ The separate Neon/PostgreSQL service has its own numbered migrations under `serv
 | `projects` | Language-independent remote project configuration compatible with the shared project contract |
 | `sources` | Project-scoped discovery/provenance metadata, language verification, speaker-identification status, lifecycle status, and current rights revision number |
 | `source_rights_revisions` | Append-only rights holder, evidence reference, attribution, decision, administrator provenance, and five independent authorized-use flags |
+| `source_media` | Original authorized audio/video master upload attempts, private object keys, exact authorizing rights revisions, expected SHA-256/size/type, and verified or failed storage state |
 | `schema_migrations` | Applied migration names, SHA-256 checksums, and timestamps |
 
-The service deliberately has no media, clip, task, remote participant, or annotation tables yet. These are introduced only with their working lifecycle and authorization rules.
+`source_media` is not an audio blob table: bytes remain in private S3-compatible storage. The database accepts a verified transition only while current source rights still authorize internal processing. It retains failed attempts for auditability and does not imply that verified media remains authorized after a later revocation.
+
+The service deliberately has no clip, task, remote participant, or community annotation tables yet. These are introduced only with their working lifecycle and authorization rules.

@@ -13,14 +13,14 @@ Facts in this section were verified from the repository and automated tests. Rec
 | WhatsApp collection | Researcher shares scenario examples manually; returned files are selected with Android's document picker, played, explicitly matched, hashed, and saved | Preserve as collection path B and reliable fallback | A future Android share target may reduce picker friction; private WhatsApp directories must not be scanned automatically |
 | Participants and consent | Pseudonymous participants, append-only consent revisions, per-use export gates; server-side third-party source rights are now separate append-only records | Reuse consent for participant speech and source rights for external media | Future media/clip records must retain the applicable rights revision |
 | Sessions and scenarios | Project-scoped, resumable sessions and versioned scenario snapshots | Reuse for Android recordings and short authorized imports | Long source material needs clips, not artificial participant sessions |
-| Recording provenance | Android captures source, transport, prompt exposure, import time, MIME type, SHA-256, submission code, and frozen prompt; the server now has a normalized external-source and rights catalogue | Reuse Android provenance and link only authorized future media to catalogue sources | Exact long-media file provenance and clip offsets are not implemented |
+| Recording provenance | Android captures source, transport, prompt exposure, import time, MIME type, SHA-256, submission code, and frozen prompt; the server has normalized source/rights records and verified private master metadata | Reuse Android provenance and derive future clips only from authorized verified masters | Clip offsets are not implemented |
 | Android annotation | Revisioned human transcription and schema-versioned annotations | Keep for offline review | Project annotation profile now prevents Mashi from requiring Kingwana business fields |
 | Web administration and annotation | Static React/Vite page remains local-only; protected server APIs now persist projects and source rights but are not connected to the page | Reuse the shared schemas and add a scoped admin session before connecting the UI | No source-admin UI, task assignment, independent submissions, or reviewer accounts exist |
 | Android/web relationship | Verified research ZIP export/import bridge only | Keep this transitional boundary for the first Mashi pilot slice | Optional synchronization should be evidence-driven, not added before the community service is proven |
 | Browser persistence | ZIP in IndexedDB; per-recording drafts in local storage, both source-manifest-bound | Reuse for researcher mode and failed-edit recovery | It is neither encrypted backup nor safe multi-user remote storage |
 | Export | Consent-filtered JSON/JSONL/CSV, original audio, stable IDs, sizes and SHA-256; strict Zod validation and ZIP revalidation | Extend compatibly | Schema 1.4 adds project language code and annotation profile |
 | Backup/restore | Separate sensitive SQLite/audio archive with preflight, hash, integrity, foreign-key, and rollback checks | Preserve for Android administration | It must not be accepted by the public/community web workflow |
-| Backend and accounts | A separate Hono service now provides protected project CRUD, a Neon repository/migration, private S3-compatible storage boundary, and readiness checks; it is not connected to the public web client | Reuse this server boundary for source rights and later task sessions | Scoped admin/contributor sessions, source/task records, and a deployed service are still required |
+| Backend and accounts | A separate Hono service now provides protected project/source/master APIs, Neon migrations, a private S3-compatible storage boundary, and readiness checks; it is not connected to the public web client | Reuse this server boundary for segmentation and later task sessions | Scoped admin/contributor sessions, task records, and a deployed service are still required |
 | Deployment | Standalone APK GitHub Action and static GitHub Pages workflow | Continue both | A community service will need a separate deployment and threat review |
 | Automated tests | Type/domain/migration/repository/export/web tests using Vitest and Node SQLite | Extend with each slice | Native microphone, document-provider, browser/device, and field tests remain manual acceptance gates |
 
@@ -66,6 +66,15 @@ The third slice adds a reusable external-source and permission catalogue:
 - Approval requires target-language verification, a rights holder, permission evidence, and at least one explicit use. Rejection and revocation block use without erasing history.
 - The four researcher-provided Mashi discovery URLs are retained as unverified candidate templates only. Nothing downloads or approves them automatically.
 
+The fourth slice adds controlled original-master ingestion:
+
+- Only the latest approved rights revision with `internalProcessing` can initiate an upload.
+- The server generates a private object key and returns a short-lived URL whose request binds media type, byte size, SHA-256, and encryption.
+- A source-media record retains the exact authorizing rights revision and never stores audio bytes in Neon.
+- Completion independently reads object metadata and marks the master verified only when size, type, checksum, and encryption all match.
+- Database-side authorization is repeated at creation and completion so a concurrent revocation fails closed.
+- Candidate URLs are still metadata only. No YouTube or third-party stream is downloaded.
+
 ## Recommended target architecture (not yet implemented)
 
 ```text
@@ -88,10 +97,11 @@ The service must distinguish speaker, annotator, reviewer, and rights holder. Ra
 1. **Completed:** project-aware Mashi transcription profile through Android configuration, reusable web project creation, ZIP interchange, web editing, and verified derivative export.
 2. **Completed in Batch 2:** introduce the small API, Neon project repository/migration, private S3-compatible adapter, and server-side permission boundary without changing the Android offline workflow.
 3. **Completed in Batch 3:** add protected source catalogue records with language/speaker verification, append-only rights decisions, and explicit rights-by-use states. Candidate URLs remain unapproved metadata.
-4. **Next:** add authorized master upload and manual 8–30 second segmentation with exact offsets and clip hashes. FFmpeg runs on the administration computer or service, not on the Android recorder.
-5. Add scoped invites, pseudonymous contributor sessions, 5–10 clip batches, draft/retry/duplicate protection, and protected audio delivery.
-6. Add two independent submissions, reviewer comparison, character-level difference display, adjudication, and final transcript records without overwriting raw annotations.
-7. Extend verified export with source rights references, clip offsets, review status, variant notes, and source/speaker-grouped split guidance.
+4. **Completed in Batch 4:** add permission-gated original-master upload with private generated keys, exact rights-revision provenance, and post-upload integrity verification.
+5. **Next:** add manual 8–30 second segmentation with exact offsets, derived clip hashes, and human boundary adjustment. FFmpeg runs on the administration computer or service, not on the Android recorder.
+6. Add scoped invites, pseudonymous contributor sessions, 5–10 clip batches, draft/retry/duplicate protection, and protected audio delivery.
+7. Add two independent submissions, reviewer comparison, character-level difference display, adjudication, and final transcript records without overwriting raw annotations.
+8. Extend verified export with source rights references, clip offsets, review status, variant notes, and source/speaker-grouped split guidance.
 
 ## Security and compatibility decisions
 
@@ -104,8 +114,9 @@ The service must distinguish speaker, annotator, reviewer, and rights holder. Ra
 
 ## Remaining limitations
 
-- The external-source and rights catalogue exists, but no master upload, FFmpeg pipeline, segmentation editor, clip entity, or voice-activity detection exists yet.
-- The API foundation exists locally, but it is not deployed or connected to the public web client. No scoped admin session, remote contributor identity, invite, task claim, media upload route, independent annotation, reviewer queue, or adjudication exists.
+- The external-source, rights, and master-ingestion APIs exist, but no FFmpeg pipeline, segmentation editor, clip entity, or voice-activity detection exists yet.
+- No source/master administration UI exists, and real private-bucket upload verification remains a deployment acceptance test.
+- The API foundation exists locally, but it is not deployed or connected to the public web client. No scoped admin session, remote contributor identity, invite, task claim, segmentation route, independent annotation, reviewer queue, or adjudication exists.
 - Web-created projects currently remain in verified local browser storage and portable JSON. The Neon project API exists, but connecting it safely requires scoped administrator authentication rather than exposing the server token in JavaScript.
 - The Mashi seed scenario supports only the current short-audio bridge; it is not a substitute for source-rights records.
 - No listed external Mashi source has been language-verified or permission-approved by this code change.

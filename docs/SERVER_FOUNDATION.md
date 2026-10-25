@@ -8,13 +8,14 @@ Batch 2 adds a small, separate Node.js service for future remote administration 
 - Shared Zod project contract, so the API accepts the same language-independent project fields as Android and the web project editor.
 - Neon/PostgreSQL project repository with parameterized SQL, soft archival, UTC-normalized ISO 8601 timestamps, and an explicit migration.
 - Project-scoped source catalogue with separate language/speaker verification, append-only rights revisions, use-specific authorization, and immediate rejection/revocation gates.
-- Private S3-compatible storage adapter with bucket readiness checks and short-lived upload/download signing. Upload signatures bind the media type, byte size, base64 SHA-256 checksum, and server-side encryption request.
+- Private S3-compatible storage adapter with bucket readiness checks, short-lived signing, and checksum-enabled object inspection. Upload signatures bind the media type, byte size, base64 SHA-256 checksum, and server-side encryption request.
+- Permission-gated source-master ingestion that records the authorizing rights revision and verifies storage size, type, checksum, and encryption before setting `verified`.
 - Exact-origin CORS checks, a 64 KiB administration-request limit, and a temporary administrator bearer token boundary.
 - Readiness checks that verify the database and bucket without returning hostnames, credentials, or provider errors to the caller.
 
 The API is not yet connected to the public web page. Putting `ADMIN_API_TOKEN` in Vite or Expo configuration would expose it to every user. A later batch must add scoped administrator sessions before the web administration screen uses these endpoints.
 
-No media upload route, segmentation, contributor invite, remote annotation, or review workflow is implemented yet.
+No segmentation, contributor invite, remote annotation, review workflow, or browser upload screen is implemented yet. Media upload routes exist only behind the server administrator boundary and are documented in [Authorized master-media ingestion](MEDIA_INGESTION.md).
 
 ## Local configuration
 
@@ -43,6 +44,7 @@ Production hosts should inject the same variables through their secret manager i
 | `POST` | `/v1/admin/projects/:projectId/archive` | Admin bearer token | Soft-archive a project |
 
 Source catalogue routes are documented in [External source catalogue and rights workflow](SOURCE_CATALOGUE.md).
+Source-master routes and their direct-to-private-storage protocol are documented in [Authorized master-media ingestion](MEDIA_INGESTION.md).
 
 Example readiness request:
 
@@ -52,7 +54,7 @@ curl -H "Authorization: Bearer $ADMIN_API_TOKEN" http://127.0.0.1:8787/v1/admin/
 
 ## Migration safety
 
-`npm run server:migrate` creates `schema_migrations`, checks each migration's SHA-256, and refuses to continue if an already-applied migration was edited. Create a new numbered migration rather than changing an applied file. Migration 1 creates projects; migration 2 adds sources only alongside its language, speaker, rights, revision, and revocation rules. Media, clip, and task tables remain deferred until their complete lifecycles exist.
+`npm run server:migrate` creates `schema_migrations`, checks each migration's SHA-256, and refuses to continue if an already-applied migration was edited. Create a new numbered migration rather than changing an applied file. Migration 1 creates projects; migration 2 adds sources and rights; migration 3 adds rights-bound source masters with explicit pending, verified, and failed states. Clip and task tables remain deferred until their complete lifecycles exist.
 
 Before migrating a non-empty environment, take a provider backup or branch. Migration execution against a real Neon project remains a deployment acceptance test because repository tests use controlled doubles and do not contain live credentials.
 
@@ -66,4 +68,4 @@ npm test
 npm run web:build
 ```
 
-Automated tests cover environment validation, credential pairing, administrator authorization, exact-origin handling, project CRUD/archive behavior, parameterized Neon queries and persisted-row validation, migration constraints, storage key/checksum/expiry rules, and readiness failure behavior. A real Neon connection, real private bucket, IAM policy, deployed TLS endpoint, and browser-to-service administrator session are not yet verified.
+Automated tests cover environment validation, credential pairing, administrator authorization, exact-origin handling, project CRUD/archive behavior, parameterized Neon queries and persisted-row validation, migration constraints, storage key/checksum/expiry rules, permission races, exact post-upload verification, and readiness failure behavior. A real Neon connection, real private bucket/CORS/IAM policy, deployed TLS endpoint, large-file upload, and browser-to-service administrator session are not yet verified.

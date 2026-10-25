@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Project, ProjectDraft } from '../../../src/features/projects/domain/project';
+import type { SourceMediaService } from '../media/source-media-service';
 import type { ProjectRepository } from '../projects/project-repository';
 import { ProjectService } from '../projects/project-service';
 import type { ReadinessService } from '../readiness';
@@ -51,6 +52,7 @@ function testApp(ready = true) {
     app: createServerApp({
       projects,
       sources: {} as SourceService,
+      media: {} as SourceMediaService,
       readiness,
       adminApiToken: adminToken,
       webOrigin: 'https://annotation.example.org',

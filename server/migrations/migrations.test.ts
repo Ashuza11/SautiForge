@@ -33,4 +33,17 @@ describe('community service database migrations', () => {
     const sql = (await readFile(new URL('./0002_sources_and_rights.sql', import.meta.url), 'utf8')).toLowerCase();
     expect(sql).not.toMatch(/create table (media|clips|tasks|annotations)/);
   });
+
+  it('adds rights-bound source masters with immutable hashes and explicit verification states', async () => {
+    const sql = await readFile(new URL('./0003_source_media.sql', import.meta.url), 'utf8');
+    expect(sql).toContain('CREATE TABLE source_media');
+    expect(sql).toContain('CREATE UNIQUE INDEX sources_id_project_unique_idx ON sources (id, project_id)');
+    expect(sql).toContain('FOREIGN KEY (source_id, project_id) REFERENCES sources(id, project_id) ON DELETE RESTRICT');
+    expect(sql).toContain('FOREIGN KEY (source_id, rights_revision) REFERENCES source_rights_revisions(source_id, revision) ON DELETE RESTRICT');
+    expect(sql).toContain("content_type ~ '^(audio|video)/");
+    expect(sql).toContain("sha256_hex ~ '^[a-f0-9]{64}$'");
+    expect(sql).toContain("status IN ('upload_pending', 'verified', 'verification_failed')");
+    expect(sql).toContain("status = 'verified' AND verified_at IS NOT NULL");
+    expect(sql.toLowerCase()).not.toMatch(/create table (clips|tasks|annotations)/);
+  });
 });

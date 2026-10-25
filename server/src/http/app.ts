@@ -6,6 +6,8 @@ import { cors } from 'hono/cors';
 import { z } from 'zod';
 
 import { projectDraftSchema } from '../../../src/features/projects/domain/project';
+import { sourceMediaUploadDraftSchema } from '../media/source-media';
+import { SourceMediaLifecycleError, type SourceMediaService } from '../media/source-media-service';
 import type { ProjectService } from '../projects/project-service';
 import type { ReadinessService } from '../readiness';
 import {
@@ -17,6 +19,7 @@ import { SourceLifecycleError, type SourceService } from '../sources/source-serv
 export type AppDependencies = {
   projects: ProjectService;
   sources: SourceService;
+  media: SourceMediaService;
   readiness: ReadinessService;
   adminApiToken: string;
   webOrigin: string;
@@ -24,6 +27,7 @@ export type AppDependencies = {
 
 const projectIdSchema = z.string().uuid();
 const sourceIdSchema = z.string().uuid();
+const sourceMediaIdSchema = z.string().uuid();
 
 export function createServerApp(dependencies: AppDependencies): Hono {
   const app = new Hono();
@@ -151,9 +155,36 @@ export function createServerApp(dependencies: AppDependencies): Hono {
       : context.json({ error: 'source_not_found' }, 404);
   });
 
+  app.get('/v1/admin/sources/:sourceId/media', async (context) => {
+    const id = sourceIdSchema.safeParse(context.req.param('sourceId'));
+    if (!id.success) return context.json({ error: 'invalid_source_id' }, 400);
+    const detail = await dependencies.sources.getDetail(id.data);
+    if (!detail) return context.json({ error: 'source_not_found' }, 404);
+    return context.json({ media: await dependencies.media.listForSource(id.data) });
+  });
+
+  app.post('/v1/admin/sources/:sourceId/media/uploads', async (context) => {
+    const id = sourceIdSchema.safeParse(context.req.param('sourceId'));
+    if (!id.success) return context.json({ error: 'invalid_source_id' }, 400);
+    const input = await parseValidatedBody(context, sourceMediaUploadDraftSchema);
+    if (!input.success) return input.response;
+    const result = await dependencies.media.initiateUpload(id.data, input.data);
+    return context.json(result, 201);
+  });
+
+  app.post('/v1/admin/source-media/:mediaId/complete', async (context) => {
+    const id = sourceMediaIdSchema.safeParse(context.req.param('mediaId'));
+    if (!id.success) return context.json({ error: 'invalid_media_id' }, 400);
+    return context.json({ media: await dependencies.media.completeUpload(id.data) });
+  });
+
   app.onError((error, context) => {
     if (error instanceof SourceLifecycleError) {
       return context.json({ error: error.code, message: error.message }, 409);
+    }
+    if (error instanceof SourceMediaLifecycleError) {
+      const status = ['source_not_found', 'media_not_found'].includes(error.code) ? 404 : 409;
+      return context.json({ error: error.code, message: error.message }, status);
     }
     console.error('Unhandled API error', error);
     return context.json({ error: 'internal_server_error' }, 500);

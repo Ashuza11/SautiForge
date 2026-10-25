@@ -179,6 +179,22 @@ describe('SourceService rights lifecycle', () => {
     await expect(sourceService.assertUseAuthorized(sourceId, 'internalProcessing')).rejects.toBeInstanceOf(SourceLifecycleError);
   });
 
+  it('blocks otherwise approved source use when its project is archived', async () => {
+    const repository = new MemorySourceRepository();
+    const activeService = service(repository).service;
+    await activeService.create(projectId, {
+      ...candidateDraft,
+      languageVerification: 'verified_target',
+      languageVerifiedBy: 'REVIEWER-01',
+    });
+    await activeService.addRightsRevision(sourceId, approvedRights);
+
+    const archivedService = new SourceService(repository, projectRepository({ ...project, status: 'archived' }));
+    await expect(archivedService.assertUseAuthorized(sourceId, 'internalProcessing')).rejects.toMatchObject({
+      code: 'project_unavailable',
+    });
+  });
+
   it('does not permit a revocation without a current approval', async () => {
     const { service: sourceService } = service();
     await sourceService.create(projectId, { ...candidateDraft, languageVerification: 'verified_target', languageVerifiedBy: 'REVIEWER-01' });

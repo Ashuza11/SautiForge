@@ -1,4 +1,4 @@
-import { GetObjectCommand, HeadBucketCommand, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, HeadBucketCommand, HeadObjectCommand, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -31,7 +31,14 @@ describe('private object storage', () => {
       checksumSha256: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
       contentLengthBytes: 4096,
       expiresInSeconds: 600,
-    })).resolves.toBe('https://signed.example/object');
+    })).resolves.toEqual({
+      url: 'https://signed.example/object',
+      headers: {
+        'content-type': 'audio/ogg',
+        'x-amz-checksum-sha256': 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+        'x-amz-server-side-encryption': 'AES256',
+      },
+    });
 
     const [, command, options] = vi.mocked(getSignedUrl).mock.calls[0];
     expect(command).toBeInstanceOf(PutObjectCommand);
@@ -51,5 +58,28 @@ describe('private object storage', () => {
     expect(() => validatePrivateObjectKey('../private/audio.opus')).toThrow(/unsafe/i);
     expect(() => validatePrivateObjectKey('/private/audio.opus')).toThrow();
     expect(() => store.createDownloadUrl('safe/audio.opus', 901)).toThrow();
+  });
+
+  it('reads checksum-enabled object metadata used to verify completed uploads', async () => {
+    send.mockResolvedValue({
+      ContentLength: 4096,
+      ContentType: 'audio/ogg',
+      ChecksumSHA256: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      ServerSideEncryption: 'AES256',
+    });
+    await expect(store.inspectObject('projects/project-id/masters/media-id')).resolves.toEqual({
+      contentLengthBytes: 4096,
+      contentType: 'audio/ogg',
+      checksumSha256: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      serverSideEncryption: 'AES256',
+    });
+    const command = send.mock.calls[0][0];
+    expect(command).toBeInstanceOf(HeadObjectCommand);
+    expect(command.input).toMatchObject({ ChecksumMode: 'ENABLED' });
+  });
+
+  it('refuses to verify objects whose storage metadata omits the checksum', async () => {
+    send.mockResolvedValue({ ContentLength: 4096, ContentType: 'audio/ogg' });
+    await expect(store.inspectObject('safe/audio.opus')).rejects.toThrow(/checksum/i);
   });
 });

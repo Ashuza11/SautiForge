@@ -1,6 +1,7 @@
 import {
   GetObjectCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -27,10 +28,27 @@ export type UploadUrlRequest = {
   expiresInSeconds?: number;
 };
 
+export type SignedUpload = {
+  url: string;
+  headers: {
+    'content-type': string;
+    'x-amz-checksum-sha256': string;
+    'x-amz-server-side-encryption': 'AES256';
+  };
+};
+
+export type PrivateObjectMetadata = {
+  contentLengthBytes: number;
+  contentType: string;
+  checksumSha256: string;
+  serverSideEncryption: string | null;
+};
+
 export interface PrivateObjectStore {
   assertReady(): Promise<void>;
-  createUploadUrl(request: UploadUrlRequest): Promise<string>;
+  createUploadUrl(request: UploadUrlRequest): Promise<SignedUpload>;
   createDownloadUrl(key: string, expiresInSeconds?: number): Promise<string>;
+  inspectObject(key: string): Promise<PrivateObjectMetadata>;
 }
 
 export type PrivateObjectStoreConfig = {
@@ -54,13 +72,13 @@ export class S3PrivateObjectStore implements PrivateObjectStore {
     await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
   }
 
-  createUploadUrl(request: UploadUrlRequest): Promise<string> {
+  async createUploadUrl(request: UploadUrlRequest): Promise<SignedUpload> {
     const key = objectKeySchema.parse(request.key);
     const contentType = mediaTypeSchema.parse(request.contentType);
     const checksumSha256 = checksumSchema.parse(request.checksumSha256);
     const contentLength = contentLengthSchema.parse(request.contentLengthBytes);
     const expiresIn = expirySchema.parse(request.expiresInSeconds ?? 300);
-    return getSignedUrl(this.client, new PutObjectCommand({
+    const url = await getSignedUrl(this.client, new PutObjectCommand({
       Bucket: this.bucket,
       Key: key,
       ContentType: contentType,
@@ -68,6 +86,14 @@ export class S3PrivateObjectStore implements PrivateObjectStore {
       ChecksumSHA256: checksumSha256,
       ServerSideEncryption: 'AES256',
     }), { expiresIn });
+    return {
+      url,
+      headers: {
+        'content-type': contentType,
+        'x-amz-checksum-sha256': checksumSha256,
+        'x-amz-server-side-encryption': 'AES256',
+      },
+    };
   }
 
   createDownloadUrl(keyInput: string, expiresInSeconds = 300): Promise<string> {
@@ -77,6 +103,28 @@ export class S3PrivateObjectStore implements PrivateObjectStore {
       Bucket: this.bucket,
       Key: key,
     }), { expiresIn });
+  }
+
+  async inspectObject(keyInput: string): Promise<PrivateObjectMetadata> {
+    const key = objectKeySchema.parse(keyInput);
+    const response = await this.client.send(new HeadObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      ChecksumMode: 'ENABLED',
+    }));
+    if (
+      response.ContentLength === undefined ||
+      !response.ContentType ||
+      !response.ChecksumSHA256
+    ) {
+      throw new Error('The object does not expose the required size, media type, and SHA-256 checksum.');
+    }
+    return {
+      contentLengthBytes: response.ContentLength,
+      contentType: response.ContentType,
+      checksumSha256: response.ChecksumSHA256,
+      serverSideEncryption: response.ServerSideEncryption ?? null,
+    };
   }
 }
 
