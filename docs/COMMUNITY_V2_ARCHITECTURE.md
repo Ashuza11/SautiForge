@@ -11,11 +11,11 @@ Facts in this section were verified from the repository and automated tests. Rec
 | Audio storage | Verified files in app document storage; metadata in SQLite | Keep direct recording and imported voice notes unchanged | External long-media masters belong in web/server storage, not Android SQLite |
 | Direct recording | Real `expo-audio` microphone capture, playback, verified accept/save, recovery checks | Preserve as collection path A | Physical-device regression tests remain required |
 | WhatsApp collection | Researcher shares scenario examples manually; returned files are selected with Android's document picker, played, explicitly matched, hashed, and saved | Preserve as collection path B and reliable fallback | A future Android share target may reduce picker friction; private WhatsApp directories must not be scanned automatically |
-| Participants and consent | Pseudonymous participants, append-only consent revisions, per-use export gates | Reuse for directly collected and verified remotely returned speech | Third-party media rights must later be represented separately from speaker consent |
+| Participants and consent | Pseudonymous participants, append-only consent revisions, per-use export gates; server-side third-party source rights are now separate append-only records | Reuse consent for participant speech and source rights for external media | Future media/clip records must retain the applicable rights revision |
 | Sessions and scenarios | Project-scoped, resumable sessions and versioned scenario snapshots | Reuse for Android recordings and short authorized imports | Long source material needs clips, not artificial participant sessions |
-| Recording provenance | Capture source, transport, prompt exposure, import time, MIME type, SHA-256, submission code, and frozen prompt are already stored | Reuse for microphone and manual imports | A normalized source catalogue and exact clip offsets are not implemented |
+| Recording provenance | Android captures source, transport, prompt exposure, import time, MIME type, SHA-256, submission code, and frozen prompt; the server now has a normalized external-source and rights catalogue | Reuse Android provenance and link only authorized future media to catalogue sources | Exact long-media file provenance and clip offsets are not implemented |
 | Android annotation | Revisioned human transcription and schema-versioned annotations | Keep for offline review | Project annotation profile now prevents Mashi from requiring Kingwana business fields |
-| Web administration and annotation | Static React/Vite page; creates verified local project configurations, opens a verified research ZIP locally, plays audio, persists drafts, searches recordings, and creates a revalidated derivative ZIP | Reuse the shared project schema, repository boundary, audio player, draft repository, and export verifier | No remote project store, task assignment, independent submissions, reviewer accounts, or server permissions exist |
+| Web administration and annotation | Static React/Vite page remains local-only; protected server APIs now persist projects and source rights but are not connected to the page | Reuse the shared schemas and add a scoped admin session before connecting the UI | No source-admin UI, task assignment, independent submissions, or reviewer accounts exist |
 | Android/web relationship | Verified research ZIP export/import bridge only | Keep this transitional boundary for the first Mashi pilot slice | Optional synchronization should be evidence-driven, not added before the community service is proven |
 | Browser persistence | ZIP in IndexedDB; per-recording drafts in local storage, both source-manifest-bound | Reuse for researcher mode and failed-edit recovery | It is neither encrypted backup nor safe multi-user remote storage |
 | Export | Consent-filtered JSON/JSONL/CSV, original audio, stable IDs, sizes and SHA-256; strict Zod validation and ZIP revalidation | Extend compatibly | Schema 1.4 adds project language code and annotation profile |
@@ -58,6 +58,14 @@ The second slice adds the server foundation without changing that working bridge
 - Secrets remain server-only. GitHub Pages and the Expo bundle do not receive the database URL, object-storage credentials, or administrator token.
 - Protected project endpoints use a temporary administrator bearer token. The browser remains local-only until scoped administrator sessions are added.
 
+The third slice adds a reusable external-source and permission catalogue:
+
+- Candidate URLs, creator-provided files, authorized uploads, existing SautiForge recordings, and other references share one project-scoped source contract.
+- Language verification, speaker identification, creator, and rights holder remain distinct; the sender or publisher is never silently treated as the speaker.
+- Permission decisions are append-only revisions with separate gates for internal processing, volunteer access, transcription, ML research, and public distribution.
+- Approval requires target-language verification, a rights holder, permission evidence, and at least one explicit use. Rejection and revocation block use without erasing history.
+- The four researcher-provided Mashi discovery URLs are retained as unverified candidate templates only. Nothing downloads or approves them automatically.
+
 ## Recommended target architecture (not yet implemented)
 
 ```text
@@ -79,8 +87,8 @@ The service must distinguish speaker, annotator, reviewer, and rights holder. Ra
 
 1. **Completed:** project-aware Mashi transcription profile through Android configuration, reusable web project creation, ZIP interchange, web editing, and verified derivative export.
 2. **Completed in Batch 2:** introduce the small API, Neon project repository/migration, private S3-compatible adapter, and server-side permission boundary without changing the Android offline workflow.
-3. **Next:** add web-admin source catalogue records with explicit rights-by-use states. Candidate URLs remain unapproved metadata; only an authorized file can proceed.
-4. Add authorized master upload and manual 8–30 second segmentation with exact offsets and clip hashes. FFmpeg runs on the administration computer or service, not on the Android recorder.
+3. **Completed in Batch 3:** add protected source catalogue records with language/speaker verification, append-only rights decisions, and explicit rights-by-use states. Candidate URLs remain unapproved metadata.
+4. **Next:** add authorized master upload and manual 8–30 second segmentation with exact offsets and clip hashes. FFmpeg runs on the administration computer or service, not on the Android recorder.
 5. Add scoped invites, pseudonymous contributor sessions, 5–10 clip batches, draft/retry/duplicate protection, and protected audio delivery.
 6. Add two independent submissions, reviewer comparison, character-level difference display, adjudication, and final transcript records without overwriting raw annotations.
 7. Extend verified export with source rights references, clip offsets, review status, variant notes, and source/speaker-grouped split guidance.
@@ -96,7 +104,7 @@ The service must distinguish speaker, annotator, reviewer, and rights holder. Ra
 
 ## Remaining limitations
 
-- No external-source catalogue, master upload, FFmpeg pipeline, segmentation editor, clip entity, or voice-activity detection exists yet.
+- The external-source and rights catalogue exists, but no master upload, FFmpeg pipeline, segmentation editor, clip entity, or voice-activity detection exists yet.
 - The API foundation exists locally, but it is not deployed or connected to the public web client. No scoped admin session, remote contributor identity, invite, task claim, media upload route, independent annotation, reviewer queue, or adjudication exists.
 - Web-created projects currently remain in verified local browser storage and portable JSON. The Neon project API exists, but connecting it safely requires scoped administrator authentication rather than exposing the server token in JavaScript.
 - The Mashi seed scenario supports only the current short-audio bridge; it is not a substitute for source-rights records.

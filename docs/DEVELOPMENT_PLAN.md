@@ -14,12 +14,13 @@
 - Consent-filtered research ZIP, portable JSON/JSONL/CSV metadata, SHA-256 manifest, post-compression extraction verification, Android folder/share flows, and export history.
 - Separate sensitive administrative backup and verified rollback-capable restore.
 - Portable computer-side export validator for post-transfer size, SHA-256, path, count, and audio-reference checks.
-- Automated tests across the Android, web, export, and server feature boundaries, including localization, SQLite relationships, recording recovery/provenance, verified browser persistence/exports, server authorization, reusable project CRUD, Neon row mapping, PostgreSQL migration constraints, readiness, and private-object-storage controls (48 files, 172 tests).
+- Automated tests across the Android, web, export, and server feature boundaries, including localization, SQLite relationships, recording recovery/provenance, verified browser persistence/exports, server authorization, reusable project/source CRUD, append-only rights lifecycles, Neon row mapping, PostgreSQL migration constraints, readiness, and private-object-storage controls (52 files, 194 tests).
 - Static responsive web annotation workspace with local-only research ZIP selection, shared runtime schemas, manifest/file hash validation, administrative-backup rejection, searchable recordings, audio playback, project-aware transcription/context editing, Kingwana-only business labels, read-after-write-verified browser drafts, and verified derivative research ZIP export with original audio.
 - Reusable web project administration using the shared Android project schema, verified local repository persistence, edit/archive actions, and portable configuration download. A remote repository adapter remains a later backend batch.
 - Separate Hono community-service foundation with server-only configuration, protected project endpoints, Neon/PostgreSQL migration and repository, private S3-compatible signing boundary, bounded requests, readiness checks, CI verification, and deployment documentation. It is deliberately not connected to GitHub Pages before scoped administrator sessions exist.
+- Protected external-source catalogue with language/speaker verification, append-only evidence-backed permission revisions, five independent use gates, rejection/revocation enforcement, and unverified metadata-only Mashi candidate templates. It does not download or upload media.
 
-The V2 repository audit and phased Mashi/community plan are maintained in `COMMUNITY_V2_ARCHITECTURE.md`. The first two V2 slices are implemented; deployment, scoped web sessions, source rights, segmentation, remote community tasks, independent annotation, and review are not.
+The V2 repository audit and phased Mashi/community plan are maintained in `COMMUNITY_V2_ARCHITECTURE.md`. The first three V2 slices are implemented; deployment, scoped web sessions, authorized media ingestion, segmentation, remote community tasks, independent annotation, and review are not.
 
 ## Web annotation sequence
 

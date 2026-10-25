@@ -1,0 +1,58 @@
+[
+  {
+    "sourceType": "youtube_reference",
+    "title": "Researcher-provided YouTube candidate WUbuG4DE1gM",
+    "originalUrl": "https://www.youtube.com/watch?v=WUbuG4DE1gM",
+    "creator": null,
+    "sourceDate": null,
+    "durationMs": null,
+    "externalReference": null,
+    "languageVerification": "unverified",
+    "languageVerifiedBy": null,
+    "languageVerificationNotes": "Candidate only. It may refer to a different language named Mashi and requires community verification.",
+    "speakerIdentification": "not_assessed",
+    "speakerNotes": "Do not assume that the publisher is the speaker."
+  },
+  {
+    "sourceType": "youtube_reference",
+    "title": "Researcher-provided YouTube candidate 4AgIHo5xhyQ",
+    "originalUrl": "https://www.youtube.com/watch?v=4AgIHo5xhyQ",
+    "creator": null,
+    "sourceDate": null,
+    "durationMs": null,
+    "externalReference": null,
+    "languageVerification": "unverified",
+    "languageVerifiedBy": null,
+    "languageVerificationNotes": "Candidate only. Reported as South Kivu Mashi but not verified by SautiForge.",
+    "speakerIdentification": "not_assessed",
+    "speakerNotes": "Do not assume that the publisher is the speaker."
+  },
+  {
+    "sourceType": "external_url",
+    "title": "Researcher-provided film catalogue candidate",
+    "originalUrl": "https://www.jesusfilm.org/watch/mashi.html/videos",
+    "creator": null,
+    "sourceDate": null,
+    "durationMs": null,
+    "externalReference": null,
+    "languageVerification": "unverified",
+    "languageVerifiedBy": null,
+    "languageVerificationNotes": "Candidate catalogue only; language variety and individual media require verification.",
+    "speakerIdentification": "not_assessed",
+    "speakerNotes": "Rights holder and speakers have not been verified."
+  },
+  {
+    "sourceType": "external_url",
+    "title": "Researcher-provided audio Bible candidate",
+    "originalUrl": "https://www.bible.com/audio-bible-app-versions/3953-mkongobu-projet-de-traduction-bible-en-mashi-du-congo",
+    "creator": null,
+    "sourceDate": null,
+    "durationMs": null,
+    "externalReference": null,
+    "languageVerification": "unverified",
+    "languageVerifiedBy": null,
+    "languageVerificationNotes": "Candidate only; language variety and individual media require verification.",
+    "speakerIdentification": "not_assessed",
+    "speakerNotes": "Rights holder and speakers have not been verified."
+  }
+]

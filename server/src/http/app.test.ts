@@ -4,6 +4,7 @@ import type { Project, ProjectDraft } from '../../../src/features/projects/domai
 import type { ProjectRepository } from '../projects/project-repository';
 import { ProjectService } from '../projects/project-service';
 import type { ReadinessService } from '../readiness';
+import type { SourceService } from '../sources/source-service';
 import { createServerApp } from './app';
 
 const adminToken = 'test-admin-token-that-is-long-enough';
@@ -49,6 +50,7 @@ function testApp(ready = true) {
   return {
     app: createServerApp({
       projects,
+      sources: {} as SourceService,
       readiness,
       adminApiToken: adminToken,
       webOrigin: 'https://annotation.example.org',

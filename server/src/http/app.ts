@@ -8,15 +8,22 @@ import { z } from 'zod';
 import { projectDraftSchema } from '../../../src/features/projects/domain/project';
 import type { ProjectService } from '../projects/project-service';
 import type { ReadinessService } from '../readiness';
+import {
+  sourceMetadataDraftSchema,
+  sourceRightsDraftSchema,
+} from '../sources/source';
+import { SourceLifecycleError, type SourceService } from '../sources/source-service';
 
 export type AppDependencies = {
   projects: ProjectService;
+  sources: SourceService;
   readiness: ReadinessService;
   adminApiToken: string;
   webOrigin: string;
 };
 
 const projectIdSchema = z.string().uuid();
+const sourceIdSchema = z.string().uuid();
 
 export function createServerApp(dependencies: AppDependencies): Hono {
   const app = new Hono();
@@ -63,7 +70,7 @@ export function createServerApp(dependencies: AppDependencies): Hono {
   });
 
   app.post('/v1/admin/projects', async (context) => {
-    const input = await parseProjectDraft(context);
+    const input = await parseValidatedBody(context, projectDraftSchema);
     if (!input.success) return input.response;
     const project = await dependencies.projects.create(input.data);
     return context.json({ project }, 201);
@@ -72,7 +79,7 @@ export function createServerApp(dependencies: AppDependencies): Hono {
   app.put('/v1/admin/projects/:projectId', async (context) => {
     const id = projectIdSchema.safeParse(context.req.param('projectId'));
     if (!id.success) return context.json({ error: 'invalid_project_id' }, 400);
-    const input = await parseProjectDraft(context);
+    const input = await parseValidatedBody(context, projectDraftSchema);
     if (!input.success) return input.response;
     const project = await dependencies.projects.update(id.data, input.data);
     return project
@@ -89,7 +96,65 @@ export function createServerApp(dependencies: AppDependencies): Hono {
       : context.json({ error: 'project_not_found' }, 404);
   });
 
+  app.get('/v1/admin/projects/:projectId/sources', async (context) => {
+    const projectId = projectIdSchema.safeParse(context.req.param('projectId'));
+    if (!projectId.success) return context.json({ error: 'invalid_project_id' }, 400);
+    const includeInactive = context.req.query('includeInactive') === 'true';
+    return context.json({ sources: await dependencies.sources.list(projectId.data, includeInactive) });
+  });
+
+  app.post('/v1/admin/projects/:projectId/sources', async (context) => {
+    const projectId = projectIdSchema.safeParse(context.req.param('projectId'));
+    if (!projectId.success) return context.json({ error: 'invalid_project_id' }, 400);
+    const input = await parseValidatedBody(context, sourceMetadataDraftSchema);
+    if (!input.success) return input.response;
+    const source = await dependencies.sources.create(projectId.data, input.data);
+    return context.json({ source }, 201);
+  });
+
+  app.get('/v1/admin/sources/:sourceId', async (context) => {
+    const id = sourceIdSchema.safeParse(context.req.param('sourceId'));
+    if (!id.success) return context.json({ error: 'invalid_source_id' }, 400);
+    const detail = await dependencies.sources.getDetail(id.data);
+    return detail
+      ? context.json(detail)
+      : context.json({ error: 'source_not_found' }, 404);
+  });
+
+  app.put('/v1/admin/sources/:sourceId', async (context) => {
+    const id = sourceIdSchema.safeParse(context.req.param('sourceId'));
+    if (!id.success) return context.json({ error: 'invalid_source_id' }, 400);
+    const input = await parseValidatedBody(context, sourceMetadataDraftSchema);
+    if (!input.success) return input.response;
+    const source = await dependencies.sources.updateMetadata(id.data, input.data);
+    return source
+      ? context.json({ source })
+      : context.json({ error: 'source_not_found' }, 404);
+  });
+
+  app.get('/v1/admin/sources/:sourceId/rights', async (context) => {
+    const id = sourceIdSchema.safeParse(context.req.param('sourceId'));
+    if (!id.success) return context.json({ error: 'invalid_source_id' }, 400);
+    const detail = await dependencies.sources.getDetail(id.data);
+    if (!detail) return context.json({ error: 'source_not_found' }, 404);
+    return context.json({ revisions: await dependencies.sources.rightsHistory(id.data) });
+  });
+
+  app.post('/v1/admin/sources/:sourceId/rights', async (context) => {
+    const id = sourceIdSchema.safeParse(context.req.param('sourceId'));
+    if (!id.success) return context.json({ error: 'invalid_source_id' }, 400);
+    const input = await parseValidatedBody(context, sourceRightsDraftSchema);
+    if (!input.success) return input.response;
+    const result = await dependencies.sources.addRightsRevision(id.data, input.data);
+    return result
+      ? context.json(result, 201)
+      : context.json({ error: 'source_not_found' }, 404);
+  });
+
   app.onError((error, context) => {
+    if (error instanceof SourceLifecycleError) {
+      return context.json({ error: error.code, message: error.message }, 409);
+    }
     console.error('Unhandled API error', error);
     return context.json({ error: 'internal_server_error' }, 500);
   });
@@ -104,7 +169,7 @@ function constantTimeMatches(candidate: string, expected: string): boolean {
   return candidateBytes.length === expectedBytes.length && timingSafeEqual(candidateBytes, expectedBytes);
 }
 
-async function parseProjectDraft(context: Context) {
+async function parseValidatedBody<Output>(context: Context, schema: z.ZodType<Output>) {
   let body: unknown;
   try {
     body = await context.req.json();
@@ -114,7 +179,7 @@ async function parseProjectDraft(context: Context) {
       response: context.json({ error: 'invalid_json' }, 400),
     };
   }
-  const parsed = projectDraftSchema.safeParse(body);
+  const parsed = schema.safeParse(body);
   if (!parsed.success) {
     return {
       success: false as const,

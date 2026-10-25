@@ -21,3 +21,16 @@ Deletion uses restrictive foreign keys for research records. Projects, scenarios
 Consent updates are new records linked through `supersedes_id`; previous decisions are not silently overwritten. Export authorization must use the latest applicable consent record at the time of export and record the selected sharing category.
 
 Database versioning starts at `1` and uses incremental migrations guarded by `PRAGMA user_version`. Version 2 adds an explicit consent-protocol version to every historical consent record. Version 3 links sessions and recordings to the exact consent revision that authorized collection. Version 4 records imported-audio source, transport, prompt exposure, import timestamp, MIME type, SHA-256 hash, and pseudonymous submission code. Version 5 adds persistent scenario example sets plus exact elicitation-example and source-filename provenance on recordings. Version 6 adds reasoned prompt-association correction history while the recording row retains the current value used by research exports. Version 7 adds editable, revisioned scenario and example context to transcriptions. Version 8 adds project ISO 639-3 and annotation-profile configuration, retains Kingwana's business profile, and adds the editable Mashi (`shr`) verbatim-transcription pilot without changing the active project. Imported audio hashes are indexed for duplicate detection; archived mistakes do not prevent a deliberate replacement import.
+
+## Community service schema
+
+The separate Neon/PostgreSQL service has its own numbered migrations under `server/migrations`; it does not replace or synchronize the Android SQLite database.
+
+| Table | Purpose |
+| --- | --- |
+| `projects` | Language-independent remote project configuration compatible with the shared project contract |
+| `sources` | Project-scoped discovery/provenance metadata, language verification, speaker-identification status, lifecycle status, and current rights revision number |
+| `source_rights_revisions` | Append-only rights holder, evidence reference, attribution, decision, administrator provenance, and five independent authorized-use flags |
+| `schema_migrations` | Applied migration names, SHA-256 checksums, and timestamps |
+
+The service deliberately has no media, clip, task, remote participant, or annotation tables yet. These are introduced only with their working lifecycle and authorization rules.

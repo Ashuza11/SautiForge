@@ -7,9 +7,13 @@ import { NeonProjectRepository } from './projects/neon-project-repository';
 import { ProjectService } from './projects/project-service';
 import { ReadinessService } from './readiness';
 import { createPrivateObjectStore } from './storage/private-object-store';
+import { NeonSourceRepository } from './sources/neon-source-repository';
+import { SourceService } from './sources/source-service';
 
 const config = parseServerConfig(process.env);
-const projectRepository = new NeonProjectRepository(createNeonExecutor(config.databaseUrl));
+const database = createNeonExecutor(config.databaseUrl);
+const projectRepository = new NeonProjectRepository(database);
+const sourceRepository = new NeonSourceRepository(database);
 const objectStore = createPrivateObjectStore({
   region: config.awsRegion,
   bucket: config.s3Bucket,
@@ -19,6 +23,7 @@ const objectStore = createPrivateObjectStore({
 });
 const app = createServerApp({
   projects: new ProjectService(projectRepository),
+  sources: new SourceService(sourceRepository, projectRepository),
   readiness: new ReadinessService(projectRepository, objectStore),
   adminApiToken: config.adminApiToken,
   webOrigin: config.webOrigin,
