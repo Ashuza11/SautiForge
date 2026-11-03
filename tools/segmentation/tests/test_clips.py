@@ -65,6 +65,17 @@ class BuildClipsTests(unittest.TestCase):
         self.assertEqual(len(clips), 2)
         self.assertIn("too_short", clips[0].flags)
 
+    def test_flags_a_long_silence_inside_a_clip(self):
+        clips = build_clips([(0, 1500), (2800, 4000)], TOTAL, ClipParams(max_gap_ms=2000))  # allowed to join across 1.3 s
+        self.assertEqual(len(clips), 1)
+        self.assertIn("long_internal_pause", clips[0].flags)
+        self.assertEqual(clips[0].max_internal_gap_ms, 1300)
+        self.assertNotIn("long_internal_pause", build_clips([(0, 1500), (1900, 4000)], TOTAL)[0].flags)
+
+    def test_default_never_joins_across_more_than_a_second_of_silence(self):
+        self.assertEqual(len(build_clips([(0, 1000), (3000, 4000)], TOTAL)), 2)
+        self.assertEqual(len(build_clips([(0, 1500), (2800, 4000)], TOTAL)), 2)
+
     def test_flags(self):
         clips = build_clips([(0, 1000), (9000, 13_000)], TOTAL)
         self.assertIn("too_short", clips[0].flags)

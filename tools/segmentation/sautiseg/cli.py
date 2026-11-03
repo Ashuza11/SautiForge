@@ -13,6 +13,7 @@ from .audio import (WORKING_SAMPLE_RATE, clip_metrics, extract_working_wav, ffmp
 from .clips import ClipParams, build_clips
 from .manifest import build_clip_record, build_manifest, write_manifest
 from .cutting import cut_accepted
+from .separate import MODEL_NAME, ensure_separation
 from .vad import VadParams, detect, speech_stats
 
 
@@ -46,18 +47,27 @@ def cmd_prepare(args: argparse.Namespace) -> int:
     extract_working_wav(source, working)
     samples, rate = read_wav_int16(working)
 
-    print("[3/4] Detecting speech with Silero VAD")
-    spans, probs = detect(samples, rate, vad)
+    separation = None
+    detect_samples = samples
+    if args.separate:
+        print("[2b/4] Removing background music (vocal separation)")
+        separation = ensure_separation(source, sha, out, model_name=args.separation_model)
+        detect_samples, _ = read_wav_int16(out / separation["vocals16"])
+
+    print(f"[3/4] Detecting speech with Silero VAD{' on the separated vocals' if separation else ''}")
+    spans, probs = detect(detect_samples, rate, vad)
 
     print("[4/4] Building clip proposals")
     clips = build_clips(spans, total_ms, params)
     records = []
     for clip in clips:
         metrics = clip_metrics(samples, rate, clip.start_ms, clip.end_ms)
+        if separation:
+            metrics["vocalsRmsDb"] = clip_metrics(detect_samples, rate, clip.start_ms, clip.end_ms)["rmsDb"]
         metrics.update(speech_stats(probs, clip.start_ms, clip.end_ms, vad.threshold))
         if metrics["clippedRatio"] > 0.001:
             clip.flags.append("clipping")
-        if metrics["speechRatio"] < 0.5:
+        if metrics["speechRatio"] < 0.5 and not separation:
             clip.flags.append("low_speech_ratio")  # often music or noise held open as speech
         records.append(build_clip_record(clip, metrics))
 
@@ -65,9 +75,13 @@ def cmd_prepare(args: argparse.Namespace) -> int:
         source={"fileName": source.name, "sha256": sha, "sizeBytes": source.stat().st_size,
                 "durationMs": total_ms, "sourceUrl": args.source_url, "notes": args.notes,
                 "hasBackgroundMusic": args.has_music, "workingAudio": working.name,
-                "workingSampleRate": WORKING_SAMPLE_RATE},
+                "workingSampleRate": WORKING_SAMPLE_RATE,
+                **({"vocalsAudio": separation["vocals16"], "vocals44Audio": separation["vocals44"],
+                    "vocals44Sha256": separation["vocals44Sha256"]} if separation else {})},
         processing={"tool": "sautiseg", "toolVersion": __version__, "ffmpeg": ffmpeg_version(),
-                    "vad": {"model": "silero-vad", **vad.as_dict()}, "clips": params.__dict__},
+                    "vad": {"model": "silero-vad", "audio": "vocals" if separation else "original", **vad.as_dict()},
+                    "clips": params.__dict__,
+                    **({"separation": {k: separation[k] for k in ("model", "device", "overlap", "seconds")}} if separation else {})},
         spans=spans, clips=records)
     write_manifest(out / "manifest.json", manifest)
 
@@ -95,6 +109,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--source-url", default=None, help="Where the source is published.")
     p.add_argument("--notes", default=None)
     p.add_argument("--has-music", action="store_true", help="Record that the source contains background music.")
+    p.add_argument("--separate", action="store_true", help="Remove background music first (Demucs vocals) and detect speech on the cleaned voice.")
+    p.add_argument("--separation-model", default=MODEL_NAME)
     p.add_argument("--threshold", type=float, default=0.5, help="VAD speech probability threshold.")
     p.add_argument("--min-speech-ms", type=int, default=250)
     p.add_argument("--min-silence-ms", type=int, default=300)
@@ -103,7 +119,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--target-max-s", type=float, default=12.0)
     p.add_argument("--hard-max-s", type=float, default=20.0)
     p.add_argument("--sentence-pause-ms", type=int, default=700)
-    p.add_argument("--max-gap-ms", type=int, default=2500)
+    p.add_argument("--max-gap-ms", type=int, default=1000)
     p.add_argument("--pad-ms", type=int, default=150)
     p.set_defaults(func=cmd_prepare)
 

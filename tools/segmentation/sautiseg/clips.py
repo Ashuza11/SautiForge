@@ -19,7 +19,8 @@ class ClipParams:
     target_max_ms: int = 12000       # preferred ceiling (TTS-friendly)
     hard_max_ms: int = 20000         # absolute ceiling; longer needs a manual split
     sentence_pause_ms: int = 700     # a pause this long is treated as a sentence boundary
-    max_gap_ms: int = 2500           # never join speech across a longer silence
+    max_gap_ms: int = 1000           # never join speech across a longer silence
+    long_pause_ms: int = 1000        # a silence this long inside a clip is flagged (bad for TTS)
     pad_ms: int = 150                # silence kept on each side, never into a neighbour
 
     def validate(self) -> None:
@@ -40,6 +41,7 @@ class Clip:
     speech_end_ms: int
     span_count: int
     cut_candidates_ms: list[int] = field(default_factory=list)
+    max_internal_gap_ms: int = 0
     flags: list[str] = field(default_factory=list)
 
     @property
@@ -110,6 +112,7 @@ def build_clips(spans: list[Span], total_ms: int, params: ClipParams = ClipParam
             index=i + 1, start_ms=start, end_ms=end,
             speech_start_ms=speech_start, speech_end_ms=speech_end,
             span_count=len(group), cut_candidates_ms=candidates,
+            max_internal_gap_ms=max((b[0] - a[1] for a, b in zip(group, group[1:])), default=0),
         )
         clip.flags = flag_clip(clip, params)
         clips.append(clip)
@@ -125,6 +128,8 @@ def flag_clip(clip: Clip, params: ClipParams) -> list[str]:
         flags.append("needs_manual_split")
     elif ms > params.target_max_ms:
         flags.append("over_target")
+    if clip.max_internal_gap_ms > params.long_pause_ms:
+        flags.append("long_internal_pause")
     if 2000 <= ms <= params.target_max_ms:
         flags.append("tts_length_ok")
     return flags
