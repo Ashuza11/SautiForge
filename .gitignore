@@ -64,3 +64,19 @@ example
 # generated native folders
 /ios
 /android
+
+# Source media and segmentation working data (never commit)
+/Data/
+/data/
+*.mp4
+*.mkv
+*.mov
+*.avi
+*.mp3
+*.flac
+segmentation-output/
+
+# Assistant tooling folders (never commit)
+.claude/
+.agents/
+.codex/
