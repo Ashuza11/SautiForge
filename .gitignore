@@ -80,3 +80,8 @@ segmentation-output/
 .claude/
 .agents/
 .codex/
+
+# Segmentation tool local environment
+tools/segmentation/.venv/
+__pycache__/
+*.pyc
