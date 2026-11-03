@@ -23,12 +23,12 @@ Requires `ffmpeg` and `ffprobe` on the PATH. CPU only; a 7-minute video takes ab
 .venv/bin/python -m sautiseg prepare --input ../../Data/<file>.mp4 --out ../../segmentation-output \
   --source-url https://www.jesusfilm.org/watch --has-music
 
-# 2. Review: play each clip, adjust boundaries, write the transcript, accept or reject.
-#    Edit manifest.json (the web review screen will do this) so each reviewed clip has
-#    review.status = accepted|rejected, a transcript, and tier = asr | asr_tts.
+# 2. Review in the web app: run `npm run web:dev`, open Segmentation, choose manifest.json and
+#    audio_16k.wav from the output folder, review every clip, then Download reviewed manifest.
+#    Save it as manifest.reviewed.json in the same output folder.
 
 # 3. Export accepted clips cut from the ORIGINAL media at 24 kHz mono, with SHA-256 hashes
-.venv/bin/python -m sautiseg cut --manifest ../../segmentation-output/<name>/manifest.json --source ../../Data/<file>.mp4
+.venv/bin/python -m sautiseg cut --manifest ../../segmentation-output/<name>/manifest.reviewed.json --source ../../Data/<file>.mp4
 ```
 
 Tests: `.venv/bin/python -m unittest discover -s tests -t .`
@@ -53,3 +53,7 @@ Tests: `.venv/bin/python -m unittest discover -s tests -t .`
 ## Privacy
 
 Source media, working audio, and outputs live under `Data/` and `segmentation-output/`, which are git-ignored together with all media file types and the `.venv`.
+
+## Review screen (web app, local only)
+
+Nothing is uploaded; the two files are read in the browser and progress is saved to browser storage after every change (each save is read back to confirm it). Per clip you can play and loop it, click the waveform to place a marker, nudge either edge, split at a detected pause or at the marker, merge with the next clip, write the verbatim transcript, record speaker and music, choose the tier, then accept or reject (with a reason). Splitting, merging or moving an edge sends the clip back to review. The downloaded manifest is validated by the same rules `cut` enforces.

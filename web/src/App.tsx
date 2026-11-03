@@ -9,6 +9,7 @@ import { initialDraft, LocalDraftRepository, prefillVerbatimForProject, prepareD
 import { audioMimeType, loadResearchDataset, matchesRecordingQuery, recordingIsInSearchScope, type LoadedResearchDataset, type ResearchRecording } from './domain/dataset';
 import { IndexedDbWorkspaceArchiveStorage, WorkspaceArchiveRepository } from './domain/workspace-archive';
 import { ProjectAdmin } from './ProjectAdmin';
+import { SegmentationReview } from './SegmentationReview';
 
 export function App() {
   const picker = useRef<HTMLInputElement>(null);
@@ -18,7 +19,9 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [showProjects, setShowProjects] = useState(false);
+  const [view, setView] = useState<'annotation' | 'projects' | 'segmentation'>('annotation');
+  const showProjects = view === 'projects';
+  const showSegmentation = view === 'segmentation';
   const archiveRepository = useMemo(() => new WorkspaceArchiveRepository(new IndexedDbWorkspaceArchiveStorage()), []);
 
   useEffect(() => {
@@ -94,20 +97,21 @@ export function App() {
           <h1>Dataset annotation</h1>
         </div>
         <div className="header-actions">
-          <button className="secondary" onClick={() => setShowProjects((value) => !value)}>{showProjects ? 'Annotation' : 'Projects'}</button>
-          {!showProjects && dataset ? <><button className="secondary" onClick={() => picker.current?.click()}>Open another ZIP</button><button className="quiet" onClick={() => void forgetWorkspace()}>Close &amp; forget ZIP</button></> : null}
+          <button className="secondary" onClick={() => setView(showProjects ? 'annotation' : 'projects')}>{showProjects ? 'Annotation' : 'Projects'}</button>
+          <button className="secondary" onClick={() => setView(showSegmentation ? 'annotation' : 'segmentation')}>{showSegmentation ? 'Annotation' : 'Segmentation'}</button>
+          {view === 'annotation' && dataset ? <><button className="secondary" onClick={() => picker.current?.click()}>Open another ZIP</button><button className="quiet" onClick={() => void forgetWorkspace()}>Close &amp; forget ZIP</button></> : null}
         </div>
       </header>
 
       <input ref={picker} hidden type="file" accept=".zip,application/zip" onChange={(event) => void open(event.target.files?.[0])} />
 
-      {showProjects ? <ProjectAdmin onClose={() => setShowProjects(false)} /> : !dataset ? (
+      {showSegmentation ? <SegmentationReview onClose={() => setView('annotation')} /> : showProjects ? <ProjectAdmin onClose={() => setView('annotation')} /> : !dataset ? (
         <main className="welcome">
           <section className="hero-card">
             <p className="eyebrow">Local browser workflow</p>
             <h2>Open a verified SautiForge research dataset</h2>
             <p>The archive is validated and read on this device. It is not uploaded.</p>
-            <div className="welcome-actions"><button disabled={loading} onClick={() => picker.current?.click()}>{loading ? 'Checking saved workspace…' : 'Choose research ZIP'}</button><button className="secondary" onClick={() => setShowProjects(true)}>Create project</button></div>
+            <div className="welcome-actions"><button disabled={loading} onClick={() => picker.current?.click()}>{loading ? 'Checking saved workspace…' : 'Choose research ZIP'}</button><button className="secondary" onClick={() => setView('projects')}>Create project</button><button className="secondary" onClick={() => setView('segmentation')}>Review video segments</button></div>
             {error ? <div className="error" role="alert">{error}</div> : null}
           </section>
           <div className="privacy-note"><span aria-hidden="true">✓</span> Private administrative backups are rejected.</div>
