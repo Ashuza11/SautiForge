@@ -9,7 +9,7 @@ from pathlib import Path
 from .audio import cut_clip, probe_duration_ms, sha256_file
 from .manifest import load_manifest
 
-COLUMNS = ["clip_id", "file", "start_ms", "end_ms", "duration_s", "sample_rate", "sha256", "transcript",
+COLUMNS = ["clip_id", "file", "audio_variant", "start_ms", "end_ms", "duration_s", "sample_rate", "sha256", "transcript",
            "speaker", "has_music", "tier", "source_file", "source_sha256", "source_url"]
 
 
@@ -24,26 +24,38 @@ def cut_accepted(manifest_path: Path, source: Path, *, sample_rate: int = 24000)
 
     stem = manifest_path.parent.name
     out = manifest_path.parent / "export"
-    clips_dir = out / "clips"
-    rows = []
-    for clip in accepted:
+
+    # TTS clips come from the music-free vocals; the originals stay untouched for ASR.
+    vocals = None
+    if any(c["review"]["tier"] == "asr_tts" for c in accepted):
+        vocals_name = src.get("vocals44Audio")
+        vocals = manifest_path.parent / vocals_name if vocals_name else None
+        if not vocals or not vocals.is_file():
+            raise ValueError("TTS-tier clips need the separated vocals file. Run `prepare --separate` first.")
+        if sha256_file(vocals) != src.get("vocals44Sha256"):
+            raise ValueError("The separated vocals file does not match the manifest SHA-256.")
+    variant_name = f"vocals_{manifest['processing'].get('separation', {}).get('model', 'separated')}"
+
+    def export(clip, media: Path, folder: str, variant: str) -> dict:
         review = clip["review"]
-        target = clips_dir / f"{stem}_{clip['id']}.wav"
-        cut_clip(source, target, clip["startMs"], clip["endMs"], sample_rate)
+        target = out / folder / f"{stem}_{clip['id']}.wav"
+        cut_clip(media, target, clip["startMs"], clip["endMs"], sample_rate)
         actual_ms = probe_duration_ms(target)
         if abs(actual_ms - clip["durationMs"]) > 50:
             raise RuntimeError(f"{clip['id']}: exported {actual_ms} ms, expected {clip['durationMs']} ms.")
-        rows.append({
-            "clip_id": clip["id"], "file": f"clips/{target.name}", "start_ms": clip["startMs"], "end_ms": clip["endMs"],
+        return {
+            "clip_id": clip["id"], "file": f"{folder}/{target.name}", "audio_variant": variant,
+            "start_ms": clip["startMs"], "end_ms": clip["endMs"],
             "duration_s": f"{actual_ms / 1000:.3f}", "sample_rate": sample_rate, "sha256": sha256_file(target),
             "transcript": review["transcript"].strip(), "speaker": review.get("speaker") or "",
             "has_music": "" if review.get("hasMusic") is None else str(review["hasMusic"]).lower(),
             "tier": review["tier"], "source_file": src["fileName"], "source_sha256": src["sha256"],
             "source_url": src.get("sourceUrl") or "",
-        })
+        }
 
+    rows = [export(clip, source, "clips", "original") for clip in accepted]
+    tts_rows = [export(clip, vocals, "tts_clips", variant_name) for clip in accepted if clip["review"]["tier"] == "asr_tts"]
     _write_csv(out / "metadata.csv", rows)
-    tts_rows = [r for r in rows if r["tier"] == "asr_tts"]
     _write_csv(out / "metadata_tts.csv", tts_rows)
     (out / "export.json").write_text(json.dumps({
         "schema": "sautiforge.segmentation.export/1", "sourceSha256": src["sha256"], "sampleRate": sample_rate,

@@ -19,15 +19,17 @@ Requires `ffmpeg` and `ffprobe` on the PATH. CPU only; a 7-minute video takes ab
 ## Use
 
 ```bash
-# 1. Propose clips (the media file is only read)
+# 1. Propose clips (the media file is only read). --separate removes background music first
+#    (Demucs vocals, about 1.4x real time on CPU, cached for re-runs) and detects speech on the cleaned voice.
 .venv/bin/python -m sautiseg prepare --input ../../Data/<file>.mp4 --out ../../segmentation-output \
-  --source-url https://www.jesusfilm.org/watch --has-music
+  --source-url https://www.jesusfilm.org/watch --has-music --separate
 
 # 2. Review in the web app: run `npm run web:dev`, open Segmentation, choose manifest.json and
 #    audio_16k.wav from the output folder, review every clip, then Download reviewed manifest.
 #    Save it as manifest.reviewed.json in the same output folder.
 
-# 3. Export accepted clips cut from the ORIGINAL media at 24 kHz mono, with SHA-256 hashes
+# 3. Export accepted clips at 24 kHz mono with SHA-256 hashes: all clips from the ORIGINAL media (clips/),
+#    TTS-tier clips also from the cleaned voice (tts_clips/)
 .venv/bin/python -m sautiseg cut --manifest ../../segmentation-output/<name>/manifest.reviewed.json --source ../../Data/<file>.mp4
 ```
 
@@ -42,13 +44,15 @@ Tests: `.venv/bin/python -m unittest discover -s tests -t .`
 | Target maximum | 12 s | TTS-friendly; longer is flagged `over_target` |
 | Hard maximum | 20 s | Longer is flagged `needs_manual_split` |
 | Sentence pause | 700 ms | A pause this long can end a clip |
-| Never join across | 2.5 s of silence | Different utterances stay separate |
+| Never join across | 1 s of silence | Different utterances stay separate; no dead air inside TTS clips |
 | Padding | 150 ms | Never extends into a neighbouring clip |
 
 ## Tiers
 
 - `asr`: reviewed, correctly transcribed; background music is allowed.
-- `asr_tts`: also confirmed free of music, one speaker; also written to `metadata_tts.csv`. A TTS-eligible clip must have `hasMusic = false`.
+- `asr_tts`: also confirmed free of music on the cleaned voice, one speaker. It is cut from the separated vocals into `tts_clips/` and listed in `metadata_tts.csv` with `audio_variant = vocals_<model>`. A TTS-eligible clip must have `hasMusic = false`.
+
+Separated audio is processed audio, not an original recording: say so when reporting the dataset. Cleaned vocals contain digital silence where music-only passages were, so clips never join speech across more than 1 s of silence (`--max-gap-ms`), and a clip with a longer internal silence is flagged `long_internal_pause`.
 
 ## Privacy
 
