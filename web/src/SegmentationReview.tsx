@@ -8,10 +8,10 @@ import { LocalSegmentationDraftRepository } from './domain/segmentation-draft';
 import { parseWav16Mono, peakEnvelope, type WavAudio } from './domain/wav';
 
 type Filter = 'all' | 'todo' | 'accepted' | 'rejected' | 'flagged';
-const WARNING_FLAGS = ['too_short', 'over_target', 'needs_manual_split', 'clipping', 'low_speech_ratio'];
+const WARNING_FLAGS = ['too_short', 'over_target', 'needs_manual_split', 'clipping', 'low_speech_ratio', 'long_internal_pause'];
 const FLAG_TEXT: Record<string, string> = {
   too_short: 'Very short', over_target: 'Longer than 12 s', needs_manual_split: 'Over 20 s: split it',
-  clipping: 'Audio clipping', low_speech_ratio: 'May be music or noise', tts_length_ok: 'TTS length',
+  clipping: 'Audio clipping', long_internal_pause: 'Long silence inside', low_speech_ratio: 'May be music or noise', tts_length_ok: 'TTS length',
 };
 const NUDGES = [-250, -50, 50, 250];
 const REVIEWER_KEY = 'sautiforge.segmentation.reviewer';
@@ -20,7 +20,8 @@ export function SegmentationReview({ onClose }: { onClose: () => void }) {
   const repository = useMemo(() => new LocalSegmentationDraftRepository(window.localStorage), []);
   const picker = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [loaded, setLoaded] = useState<{ audio: WavAudio; audioUrl: string; original: SegmentationManifest } | null>(null);
+  const [loaded, setLoaded] = useState<{ audio: WavAudio; audioUrl: string; vocals: { audio: WavAudio; url: string } | null; original: SegmentationManifest } | null>(null);
+  const [variant, setVariant] = useState<'original' | 'vocals'>('original');
   const [manifest, setManifest] = useState<SegmentationManifest | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
@@ -32,7 +33,7 @@ export function SegmentationReview({ onClose }: { onClose: () => void }) {
   const [playing, setPlaying] = useState(false);
   const [loop, setLoop] = useState(true);
 
-  useEffect(() => () => { if (loaded) URL.revokeObjectURL(loaded.audioUrl); }, [loaded]);
+  useEffect(() => () => { if (loaded) { URL.revokeObjectURL(loaded.audioUrl); if (loaded.vocals) URL.revokeObjectURL(loaded.vocals.url); } }, [loaded]);
 
   const open = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -40,20 +41,33 @@ export function SegmentationReview({ onClose }: { onClose: () => void }) {
     try {
       const list = Array.from(files);
       const manifestFile = list.find((file) => file.name.toLowerCase().endsWith('.json'));
-      const wavFile = list.find((file) => file.name.toLowerCase().endsWith('.wav'));
-      if (!manifestFile || !wavFile) throw new Error('Select both files from the output folder: manifest.json and audio_16k.wav.');
+      if (!manifestFile) throw new Error('Select the files from the output folder: manifest.json, audio_16k.wav and, if present, vocals_16k.wav.');
       const original = parseManifest(await manifestFile.text());
-      if (wavFile.name !== original.source.workingAudio) throw new Error(`This manifest expects ${original.source.workingAudio}, but ${wavFile.name} was selected.`);
+      const wavFile = list.find((file) => file.name === original.source.workingAudio);
+      if (!wavFile) throw new Error(`This manifest needs ${original.source.workingAudio}. Select it together with manifest.json.`);
+      const vocalsName = original.source.vocalsAudio;
+      const vocalsFile = vocalsName ? list.find((file) => file.name === vocalsName) : undefined;
+      if (vocalsName && !vocalsFile) throw new Error(`This manifest has cleaned-voice audio. Also select ${vocalsName}.`);
+      const checkLength = (wav: WavAudio, name: string) => {
+        if (Math.abs((wav.samples.length / wav.sampleRate) * 1000 - original.source.durationMs) > 1_500) throw new Error(`${name} does not match the manifest length. These files are from different runs.`);
+      };
       const buffer = await wavFile.arrayBuffer();
       const audio = parseWav16Mono(buffer);
-      const audioMs = (audio.samples.length / audio.sampleRate) * 1000;
-      if (Math.abs(audioMs - original.source.durationMs) > 1_500) throw new Error('The audio length does not match the manifest. These files are from different runs.');
+      checkLength(audio, wavFile.name);
+      let vocals: { audio: WavAudio; url: string } | null = null;
+      if (vocalsFile) {
+        const vocalsBuffer = await vocalsFile.arrayBuffer();
+        const vocalsAudio = parseWav16Mono(vocalsBuffer);
+        checkLength(vocalsAudio, vocalsFile.name);
+        vocals = { audio: vocalsAudio, url: URL.createObjectURL(new Blob([vocalsBuffer], { type: 'audio/wav' })) };
+      }
       let working = original;
       let restored = false;
       const draft = repository.load(original.source.sha256);
       if (draft) { working = draft; restored = true; }
       const audioUrl = URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
-      setLoaded((current) => { if (current) URL.revokeObjectURL(current.audioUrl); return { audio, audioUrl, original }; });
+      setLoaded((current) => { if (current) { URL.revokeObjectURL(current.audioUrl); if (current.vocals) URL.revokeObjectURL(current.vocals.url); } return { audio, audioUrl, vocals, original }; });
+      setVariant(vocals ? 'vocals' : 'original');
       setManifest(working);
       setSelectedId(working.clips.find((clip) => clip.review.status === 'proposed')?.id ?? working.clips[0]?.id ?? null);
       setMessage(restored ? 'Restored your saved review for this video from this browser.' : `Opened ${original.clips.length} proposed clips. Nothing is uploaded.`);
@@ -77,6 +91,8 @@ export function SegmentationReview({ onClose }: { onClose: () => void }) {
     return true;
   }, [manifest, repository]);
 
+  const shownAudio = loaded ? (variant === 'vocals' && loaded.vocals ? loaded.vocals.audio : loaded.audio) : null;
+  const shownUrl = loaded ? (variant === 'vocals' && loaded.vocals ? loaded.vocals.url : loaded.audioUrl) : undefined;
   const clips = manifest?.clips ?? [];
   const visible = useMemo(() => clips.filter((clip) => {
     if (filter === 'todo') return clip.review.status === 'proposed';
@@ -153,7 +169,7 @@ export function SegmentationReview({ onClose }: { onClose: () => void }) {
         <div>
           <p className="eyebrow">Segmentation review</p>
           <h2>{manifest ? manifest.source.fileName : 'Review proposed speech clips'}</h2>
-          {!manifest ? <p className="seg-lead">Open the two files the segmentation tool wrote: <code>manifest.json</code> and <code>audio_16k.wav</code>. They are read on this device and never uploaded.</p> : null}
+          {!manifest ? <p className="seg-lead">Open the files the segmentation tool wrote: <code>manifest.json</code>, <code>audio_16k.wav</code> and, when music was removed, <code>vocals_16k.wav</code>. They are read on this device and never uploaded.</p> : null}
         </div>
         <div className="header-actions">
           <button className="secondary" disabled={busy} onClick={() => picker.current?.click()}>{manifest ? 'Open other files' : busy ? 'Opening…' : 'Choose manifest and audio'}</button>
@@ -172,8 +188,16 @@ export function SegmentationReview({ onClose }: { onClose: () => void }) {
             <Stat label="Rejected" value={progress.rejected} /><Stat label="Accepted time" value={`${progress.acceptedSeconds.toFixed(0)} s`} />
             <label className="field seg-reviewer"><span>Reviewer</span><input value={reviewer} onChange={(event) => rememberReviewer(event.target.value)} placeholder="Your name or code" /></label>
           </div>
-          <audio ref={audioRef} src={loaded.audioUrl} preload="auto" onEnded={() => setPlaying(false)} />
-          <Waveform audio={loaded.audio} manifest={manifest} selectedId={selectedId} playheadMs={playheadMs} onSelect={(id, ms) => { setSelectedId(id); seek(ms); }} />
+          {loaded.vocals ? (
+            <div className="seg-variant" role="group" aria-label="Audio version">
+              <span>Listen to</span>
+              <button className={variant === 'vocals' ? '' : 'secondary'} onClick={() => { stop(); setVariant('vocals'); }}>Cleaned voice (music removed)</button>
+              <button className={variant === 'original' ? '' : 'secondary'} onClick={() => { stop(); setVariant('original'); }}>Original (with music)</button>
+              <small>TTS clips are cut from the cleaned voice, so judge them there. ASR-only clips use the original.</small>
+            </div>
+          ) : null}
+          <audio ref={audioRef} src={shownUrl} preload="auto" onEnded={() => setPlaying(false)} />
+          <Waveform audio={shownAudio ?? loaded.audio} manifest={manifest} selectedId={selectedId} playheadMs={playheadMs} onSelect={(id, ms) => { setSelectedId(id); seek(ms); }} />
           <div className="seg-grid">
             <aside className="seg-list">
               <label className="field"><span>Show</span>
@@ -195,7 +219,7 @@ export function SegmentationReview({ onClose }: { onClose: () => void }) {
               </div>
             </aside>
             {selected ? (
-              <ClipEditor key={`${selected.id}:${selected.startMs}:${selected.endMs}:${selected.review.status}`} clip={selected} manifest={manifest} audio={loaded.audio} playheadMs={playheadMs} playing={playing} loop={loop}
+              <ClipEditor hasVocals={Boolean(loaded.vocals)} key={`${selected.id}:${selected.startMs}:${selected.endMs}:${selected.review.status}`} clip={selected} manifest={manifest} audio={shownAudio ?? loaded.audio} playheadMs={playheadMs} playing={playing} loop={loop}
                 reviewer={reviewer} hasPrev={selectedIndex > 0} hasNext={selectedIndex < clips.length - 1}
                 onLoop={setLoop} onPlay={() => playRange(selected.startMs)} onStop={stop} onSeek={seek} onPlayFrom={() => playRange(playheadMs)}
                 onPrev={() => go(-1)} onNext={() => go(1)} apply={apply} />
@@ -207,8 +231,8 @@ export function SegmentationReview({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ClipEditor({ clip, manifest, audio, playheadMs, playing, loop, reviewer, hasPrev, hasNext, onLoop, onPlay, onStop, onSeek, onPlayFrom, onPrev, onNext, apply }: {
-  clip: SegmentClip; manifest: SegmentationManifest; audio: WavAudio; playheadMs: number; playing: boolean; loop: boolean; reviewer: string;
+function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loop, reviewer, hasPrev, hasNext, onLoop, onPlay, onStop, onSeek, onPlayFrom, onPrev, onNext, apply }: {
+  hasVocals: boolean; clip: SegmentClip; manifest: SegmentationManifest; audio: WavAudio; playheadMs: number; playing: boolean; loop: boolean; reviewer: string;
   hasPrev: boolean; hasNext: boolean; onLoop: (value: boolean) => void; onPlay: () => void; onStop: () => void; onSeek: (ms: number) => void; onPlayFrom: () => void;
   onPrev: () => void; onNext: () => void; apply: (change: (current: SegmentationManifest) => SegmentationManifest, success?: string) => boolean;
 }) {
@@ -278,7 +302,7 @@ function ClipEditor({ clip, manifest, audio, playheadMs, playing, loop, reviewer
         <textarea rows={4} value={text} disabled={locked} onChange={(event) => setText(event.target.value)} onBlur={() => !locked && commitNotes()} placeholder="Type the Mashi exactly as heard. Do not copy subtitles or a script unless it matches the audio." /></label>
       <div className="form-grid">
         <label className="field"><span>Speaker (optional)</span><input value={speaker} disabled={locked} onChange={(event) => setSpeaker(event.target.value)} onBlur={() => !locked && commitNotes()} placeholder="e.g. narrator, voice A" /></label>
-        <label className="field"><span>Music under the voice</span>
+        <label className="field"><span>Music under the voice{hasVocals ? ' (check the cleaned voice)' : ''}</span>
           <select value={review.hasMusic === null ? 'unknown' : review.hasMusic ? 'yes' : 'no'} disabled={locked}
             onChange={(event) => commitNotes({ hasMusic: event.target.value === 'unknown' ? null : event.target.value === 'yes' })}>
             <option value="unknown">Not checked</option><option value="no">No music heard</option><option value="yes">Music audible</option>

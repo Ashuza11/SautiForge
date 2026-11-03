@@ -5,6 +5,7 @@ export const MIN_CLIP_MS = 500;
 
 const DEFAULT_LIMITS = { min_clip_ms: 1_500, target_max_ms: 12_000, hard_max_ms: 20_000 };
 const DURATION_FLAGS = ['too_short', 'over_target', 'needs_manual_split', 'tts_length_ok'];
+const LONG_PAUSE_MS = 1_000;
 
 export const clipReviewSchema = z.object({
   status: z.enum(['proposed', 'accepted', 'rejected']),
@@ -40,6 +41,7 @@ export const segmentationManifestSchema = z.object({
     durationMs: z.number().int().positive(),
     workingAudio: z.string().min(1),
     workingSampleRate: z.number().int().positive(),
+    vocalsAudio: z.string().min(1).optional(),
   }).passthrough(),
   processing: z.record(z.string(), z.unknown()),
   speechSpans: z.array(z.object({ startMs: z.number(), endMs: z.number() })),
@@ -166,7 +168,7 @@ export function splitClip(manifest: SegmentationManifest, id: string, atMs: numb
   if (!Number.isInteger(atMs) || atMs < clip.startMs + MIN_CLIP_MS || atMs > clip.endMs - MIN_CLIP_MS) {
     throw new Error(`Split at least ${MIN_CLIP_MS} ms away from both edges.`);
   }
-  const base = { ...clip, review: newReview(), metrics: {}, flags: clip.flags.filter((flag) => !DURATION_FLAGS.includes(flag)) };
+  const base = { ...clip, review: newReview(), metrics: {}, flags: clip.flags.filter((flag) => !DURATION_FLAGS.includes(flag) && flag !== 'long_internal_pause') };
   const left = withBounds({ ...base, cutCandidatesMs: clip.cutCandidatesMs.filter((at) => at < atMs) }, clip.startMs, atMs, manifest);
   const right = withBounds({ ...base, id: nextClipId(manifest), cutCandidatesMs: clip.cutCandidatesMs.filter((at) => at > atMs) }, atMs, clip.endMs, manifest);
   return rebuild(manifest, [...manifest.clips.slice(0, index), left, right, ...manifest.clips.slice(index + 1)]);
@@ -178,8 +180,11 @@ export function mergeWithNext(manifest: SegmentationManifest, id: string): Segme
   const first = manifest.clips[index]!;
   const second = manifest.clips[index + 1];
   if (!second) throw new Error('There is no following clip to merge with.');
+  const gapMs = second.startMs - first.endMs;
+  const joinedFlags = [...first.flags, ...second.flags.filter((flag) => !first.flags.includes(flag))];
   const joined = withBounds({
     ...first, review: newReview(), metrics: {},
+    flags: gapMs > LONG_PAUSE_MS && !joinedFlags.includes('long_internal_pause') ? [...joinedFlags, 'long_internal_pause'] : joinedFlags,
     spanCount: first.spanCount + second.spanCount,
     cutCandidatesMs: [...first.cutCandidatesMs, Math.round((first.endMs + second.startMs) / 2), ...second.cutCandidatesMs],
     speechEndMs: second.speechEndMs,

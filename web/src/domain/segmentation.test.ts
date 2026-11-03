@@ -71,6 +71,19 @@ describe('split and merge', () => {
     expect(nextClipId(split)).toBe('c005');
   });
 
+  it('flags a long silence created by merging and clears it when splitting', () => {
+    const merged = mergeWithNext(fixture(), 'c002'); // 18_000 -> 30_000 gap of 12 s
+    expect(merged.clips[1]!.flags).toContain('long_internal_pause');
+    const split = splitClip(merged, 'c002', 24_000);
+    expect(split.clips.flatMap((clip) => clip.flags)).not.toContain('long_internal_pause');
+  });
+
+  it('accepts a manifest that names a separated vocals file', () => {
+    const raw = JSON.parse(serializeManifest(fixture()));
+    raw.source.vocalsAudio = 'vocals_16k.wav';
+    expect(parseManifest(JSON.stringify(raw)).source.vocalsAudio).toBe('vocals_16k.wav');
+  });
+
   it('refuses a split too close to an edge', () => {
     expect(() => splitClip(fixture(), 'c001', 1_200)).toThrow(/away from both edges/);
   });
