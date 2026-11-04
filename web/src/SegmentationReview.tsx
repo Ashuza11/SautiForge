@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
-  acceptClip, acceptanceProblems, adjustClip, editReview, mergeWithNext, parseManifest, rejectClip, rejectReasons,
-  reopenClip, reviewProgress, serializeManifest, splitClip, type SegmentClip, type SegmentationManifest,
+  acceptClip, adjustClip, editReview, mergeWithNext, parseManifest, pausesInside, rejectClip, rejectReasons,
+  reopenClip, reviewProgress, serializeManifest, splitAtPause, splitClip, type SegmentClip, type SegmentationManifest,
 } from './domain/segmentation';
 import { LocalSegmentationDraftRepository } from './domain/segmentation-draft';
 import { createAudioView, parseWav16Mono, type AudioView } from './domain/wav';
@@ -16,6 +16,7 @@ const FLAG_TEXT: Record<string, string> = {
   clipping: 'Audio clipping', long_internal_pause: 'Long silence inside', low_speech_ratio: 'May be music or noise', tts_length_ok: 'TTS length',
 };
 const NUDGES = [-250, -50, 50, 250];
+const TTS_PAUSE_CAP_MS = 500; // must match the export default (cut --max-pause-ms)
 const REVIEWER_KEY = 'sautiforge.segmentation.reviewer';
 const FILTER_LABEL: Record<Filter, string> = { all: 'All', todo: 'To do', flagged: 'Flagged', accepted: 'Accepted', rejected: 'Rejected' };
 
@@ -283,13 +284,14 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState<string>(rejectReasons[0]);
   const locked = review.status !== 'proposed';
-  const problems = acceptanceProblems({ ...review, transcript: text, speaker });
+  const [tts, setTts] = useState(review.tier === 'asr_tts');
+  const pauses = useMemo(() => pausesInside(manifest, clip, TTS_PAUSE_CAP_MS), [manifest, clip]);
 
   const commitNotes = (patch: Partial<typeof review> = {}) =>
     apply((current) => editReview(current, clip.id, { transcript: text.trim() ? text : null, speaker: speaker.trim() || null, ...patch }), 'Notes saved in this browser.');
 
   const accept = () => {
-    const done = apply((current) => acceptClip(editReview(current, clip.id, { transcript: text, speaker: speaker.trim() || null }), clip.id, reviewer, new Date()), `${clip.id} accepted.`);
+    const done = apply((current) => acceptClip(editReview(current, clip.id, { transcript: text.trim() ? text : null, speaker: speaker.trim() || null, tier: tts ? 'asr_tts' : 'asr', hasMusic: tts ? false : review.hasMusic }), clip.id, reviewer, new Date()), `${clip.id} accepted.`);
     if (done && hasNext) onNext();
   };
   const reject = () => {
@@ -300,7 +302,6 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
     apply((current) => adjustClip(current, clip.id, clip.startMs + (edge === 'start' ? delta : 0), clip.endMs + (edge === 'end' ? delta : 0)), 'Boundary moved. Check it by ear.');
 
   const warnings = clip.flags.filter((flag) => WARNING_FLAGS.includes(flag));
-  const metrics = clip.metrics;
 
   return (
     <section className="seg-card seg-editor">
@@ -338,41 +339,46 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
         </div>
       </details>
 
-      {Object.keys(metrics).length ? (
-        <div className="seg-metrics">
-          {metrics.meanSpeechProb !== undefined ? <span>Speech confidence <b>{(metrics.meanSpeechProb * 100).toFixed(0)}%</b></span> : null}
-          {metrics.speechRatio !== undefined ? <span>Speech share <b>{(metrics.speechRatio * 100).toFixed(0)}%</b></span> : null}
-          {metrics.rmsDb !== undefined ? <span>Level <b>{metrics.rmsDb} dB</b></span> : null}
+      {pauses.length ? (
+        <div className="seg-pauses">
+          <p><b>{pauses.length === 1 ? '1 silence' : `${pauses.length} silences`} inside this clip.</b> The TTS version shortens each to {TTS_PAUSE_CAP_MS / 1000} s; the original audio is not changed. If they separate two sentences, split and drop the silence instead.</p>
+          <ul>
+            {pauses.slice(0, 4).map((pause) => (
+              <li key={pause.startMs}>
+                <span>{(pause.lengthMs / 1000).toFixed(1)} s at {fmt(pause.startMs)}</span>
+                <button className="secondary" disabled={locked} onClick={() => apply((current) => splitAtPause(current, clip.id, pause), 'Split and dropped the silence. Review both parts.')}>Split and drop</button>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 
-      <div className="seg-form">
-        <label className="field"><span>What was actually spoken</span>
-          <textarea rows={4} value={text} disabled={locked} onChange={(event) => setText(event.target.value)} onBlur={() => !locked && commitNotes()}
-            placeholder="Type the Mashi exactly as heard. Do not copy subtitles or a script unless it matches the audio." /></label>
-        <div className="form-grid">
-          <label className="field"><span>Speaker (optional)</span><input value={speaker} disabled={locked} onChange={(event) => setSpeaker(event.target.value)} onBlur={() => !locked && commitNotes()} placeholder="e.g. narrator, voice A" /></label>
-          <label className="field"><span>Music under the voice{hasVocals ? ' (check cleaned voice)' : ''}</span>
-            <select value={review.hasMusic === null ? 'unknown' : review.hasMusic ? 'yes' : 'no'} disabled={locked}
-              onChange={(event) => commitNotes({ hasMusic: event.target.value === 'unknown' ? null : event.target.value === 'yes' })}>
-              <option value="unknown">Not checked</option><option value="no">No music heard</option><option value="yes">Music audible</option>
-            </select></label>
-          <label className="field"><span>Dataset tier</span>
-            <select value={review.tier ?? ''} disabled={locked} onChange={(event) => commitNotes({ tier: event.target.value ? (event.target.value as 'asr' | 'asr_tts') : null })}>
-              <option value="">Choose…</option><option value="asr">ASR only (music allowed)</option><option value="asr_tts">ASR and TTS (clean, no music)</option>
-            </select></label>
+      {hasVocals ? (
+        <label className="seg-tts">
+          <input type="checkbox" checked={tts} disabled={locked} onChange={(event) => { setTts(event.target.checked); }} />
+          <span><b>Also use for TTS</b><small>Tick only if the cleaned voice sounds clean: no music left and nothing robotic or watery. Every accepted clip is already used for ASR.</small></span>
+        </label>
+      ) : null}
+
+      <details className="seg-optional">
+        <summary>Optional details</summary>
+        <p className="seg-sub">Leave these empty if community annotators will transcribe later.</p>
+        <div className="seg-form">
+          <label className="field"><span>Transcript</span>
+            <textarea rows={3} value={text} disabled={locked} onChange={(event) => setText(event.target.value)} onBlur={() => !locked && commitNotes()}
+              placeholder="What was actually spoken, exactly as heard." /></label>
+          <label className="field"><span>Speaker</span><input value={speaker} disabled={locked} onChange={(event) => setSpeaker(event.target.value)} onBlur={() => !locked && commitNotes()} placeholder="e.g. narrator, voice A" /></label>
         </div>
-      </div>
+      </details>
 
       {review.status === 'rejected' ? <p className="seg-sub">Rejected: {review.rejectReason}</p> : null}
-      {!locked && problems.length ? <p className="seg-sub">To accept: {problems.join(' ')}</p> : null}
       {rejecting ? (
         <div className="editor-actions"><label className="field seg-reason"><span>Reason</span><select value={reason} onChange={(event) => setReason(event.target.value)}>{rejectReasons.map((item) => <option key={item}>{item}</option>)}</select></label>
           <button onClick={reject}>Confirm reject</button><button className="quiet" onClick={() => setRejecting(false)}>Cancel</button></div>
       ) : (
         <div className="editor-actions">
           {locked ? <button className="secondary" onClick={() => apply((current) => reopenClip(current, clip.id), `${clip.id} reopened.`)}>Reopen for editing</button>
-            : <><button disabled={problems.length > 0} onClick={accept}>Accept and next</button><button className="quiet" onClick={() => setRejecting(true)}>Reject…</button></>}
+            : <><button onClick={accept}>Accept and next</button><button className="quiet" onClick={() => setRejecting(true)}>Reject…</button></>}
         </div>
       )}
     </section>

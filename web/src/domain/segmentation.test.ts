@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { acceptClip, acceptanceProblems, adjustClip, editReview, mergeWithNext, newReview, nextClipId, parseManifest, rejectClip, reopenClip, reviewProgress, serializeManifest, splitClip, validateManifest, type SegmentationManifest } from './segmentation';
+import { acceptClip, acceptanceProblems, adjustClip, editReview, mergeWithNext, newReview, nextClipId, parseManifest, pausesInside, rejectClip, reopenClip, reviewProgress, serializeManifest, splitAtPause, splitClip, validateManifest, type SegmentationManifest } from './segmentation';
 
 const NOW = new Date('2026-11-04T10:00:00Z');
 
@@ -84,6 +84,23 @@ describe('split and merge', () => {
     expect(parseManifest(JSON.stringify(raw)).source.vocalsAudio).toBe('vocals_16k.wav');
   });
 
+  it('splits inside a silence and drops most of it', () => {
+    const merged = mergeWithNext(fixture(), 'c002'); // c002 now spans 12_000 -> 33_000
+    const split = splitAtPause(merged, 'c002', { startMs: 18_000, endMs: 30_000 }, 150);
+    const [left, right] = [split.clips[1]!, split.clips[2]!];
+    expect([left.id, left.startMs, left.endMs]).toEqual(['c002', 12_000, 18_150]);
+    expect([right.id, right.startMs, right.endMs]).toEqual(['c003', 29_850, 33_000]);
+    expect(right.startMs - left.endMs).toBe(11_700); // the silence belongs to neither clip
+    expect(left.review.status).toBe('proposed');
+    expect(left.flags).not.toContain('long_internal_pause');
+  });
+
+  it('refuses a silence split that would leave a tiny part or sit outside the clip', () => {
+    const manifest = fixture();
+    expect(() => splitAtPause(manifest, 'c001', { startMs: 1_000, endMs: 1_900 })).toThrow(/not inside/);
+    expect(() => splitAtPause(manifest, 'c001', { startMs: 1_100, endMs: 8_000 }, 150)).toThrow(/at least/);
+  });
+
   it('refuses a split too close to an edge', () => {
     expect(() => splitClip(fixture(), 'c001', 1_200)).toThrow(/away from both edges/);
   });
@@ -100,20 +117,25 @@ describe('split and merge', () => {
 });
 
 describe('review decisions', () => {
-  it('requires transcript, tier and confirmed no-music for TTS before accepting', () => {
-    expect(acceptanceProblems(newReview())).toHaveLength(2);
-    expect(() => acceptClip(fixture(), 'c001', 'Amani', NOW)).toThrow(/spoken/);
+  it('accepts without a transcript, defaulting to the ASR tier', () => {
+    expect(acceptanceProblems(newReview())).toEqual(['Choose a tier.']);
+    const manifest = acceptClip(fixture(), 'c001', 'Amani', NOW);
+    expect(manifest.clips[0]!.review).toMatchObject({ status: 'accepted', transcript: null, tier: 'asr', reviewedBy: 'Amani', reviewedAt: NOW.toISOString() });
+    validateManifest(manifest);
+  });
+
+  it('requires confirmed no-music before a clip joins the TTS tier and trims any transcript', () => {
     let manifest = editReview(fixture(), 'c001', { transcript: '  mbote  ', tier: 'asr_tts', hasMusic: null });
     expect(() => acceptClip(manifest, 'c001', 'Amani', NOW)).toThrow(/free of music/);
     manifest = editReview(manifest, 'c001', { hasMusic: false });
     manifest = acceptClip(manifest, 'c001', 'Amani', NOW);
-    expect(manifest.clips[0]!.review).toMatchObject({ status: 'accepted', transcript: 'mbote', reviewedBy: 'Amani', reviewedAt: NOW.toISOString() });
+    expect(manifest.clips[0]!.review).toMatchObject({ status: 'accepted', transcript: 'mbote', tier: 'asr_tts' });
   });
 
   it('demotes an accepted clip when an edit makes it invalid', () => {
-    let manifest = editReview(fixture(), 'c001', { transcript: 'x', tier: 'asr' });
+    let manifest = editReview(fixture(), 'c001', { tier: 'asr_tts', hasMusic: false });
     manifest = acceptClip(manifest, 'c001', 'A', NOW);
-    manifest = editReview(manifest, 'c001', { transcript: '   ' });
+    manifest = editReview(manifest, 'c001', { hasMusic: null });
     expect(manifest.clips[0]!.review.status).toBe('proposed');
   });
 
@@ -123,6 +145,16 @@ describe('review decisions', () => {
     expect(manifest.clips[1]!.review.status).toBe('rejected');
     manifest = reopenClip(manifest, 'c002');
     expect(manifest.clips[1]!.review).toMatchObject({ status: 'proposed', rejectReason: null });
+  });
+
+  it('finds the silences inside a clip that the TTS export shortens', () => {
+    const base = fixture();
+    const manifest = { ...base, speechSpans: [{ startMs: 1_200, endMs: 2_000 }, { startMs: 4_600, endMs: 6_000 }, { startMs: 6_800, endMs: 8_500 }, { startMs: 12_500, endMs: 13_000 }] };
+    const pauses = pausesInside(manifest, manifest.clips[0]!, 500);
+    expect(pauses.map((pause) => pause.lengthMs)).toEqual([2_600, 800]);
+    expect(pauses[0]).toMatchObject({ startMs: 2_000, endMs: 4_600 });
+    expect(pausesInside(manifest, manifest.clips[0]!, 3_000)).toEqual([]);
+    expect(pausesInside(manifest, manifest.clips[2]!, 500)).toEqual([]);
   });
 
   it('summarises progress', () => {

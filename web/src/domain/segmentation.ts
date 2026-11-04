@@ -58,10 +58,9 @@ export function newReview(): ClipReview {
   return { status: 'proposed', transcript: null, speaker: null, hasMusic: null, tier: null, rejectReason: null, reviewedBy: null, reviewedAt: null };
 }
 
-/** Same acceptance rules as the Python exporter; empty means the clip can be accepted. */
+/** Same acceptance rules as the Python exporter; empty means the clip can be accepted. A transcript is optional: community annotators write it later. */
 export function acceptanceProblems(review: ClipReview): string[] {
   const problems: string[] = [];
-  if (!(review.transcript ?? '').trim()) problems.push('Write what was actually spoken.');
   if (!review.tier) problems.push('Choose a tier.');
   if (review.tier === 'asr_tts' && review.hasMusic !== false) problems.push('TTS clips must be confirmed free of music.');
   return problems;
@@ -174,6 +173,26 @@ export function splitClip(manifest: SegmentationManifest, id: string, atMs: numb
   return rebuild(manifest, [...manifest.clips.slice(0, index), left, right, ...manifest.clips.slice(index + 1)]);
 }
 
+/**
+ * Split inside a silence and drop most of it: the left clip keeps padMs after the speech, the right clip
+ * starts padMs before the next speech. The audio between them belongs to neither clip. Both return to review.
+ */
+export function splitAtPause(manifest: SegmentationManifest, id: string, pause: { startMs: number; endMs: number }, padMs = 150): SegmentationManifest {
+  const index = find(manifest, id);
+  const clip = manifest.clips[index]!;
+  if (pause.startMs <= clip.startMs || pause.endMs >= clip.endMs) throw new Error('That silence is not inside this clip.');
+  const middle = Math.round((pause.startMs + pause.endMs) / 2);
+  const leftEnd = Math.min(pause.startMs + padMs, middle);
+  const rightStart = Math.max(pause.endMs - padMs, middle);
+  if (leftEnd - clip.startMs < MIN_CLIP_MS || clip.endMs - rightStart < MIN_CLIP_MS) {
+    throw new Error(`Both parts must be at least ${MIN_CLIP_MS} ms long. Merge or move the edges first.`);
+  }
+  const base = { ...clip, review: newReview(), metrics: {}, flags: clip.flags.filter((flag) => !DURATION_FLAGS.includes(flag) && flag !== 'long_internal_pause') };
+  const left = withBounds({ ...base, cutCandidatesMs: clip.cutCandidatesMs.filter((at) => at < leftEnd) }, clip.startMs, leftEnd, manifest);
+  const right = withBounds({ ...base, id: nextClipId(manifest), cutCandidatesMs: clip.cutCandidatesMs.filter((at) => at > rightStart) }, rightStart, clip.endMs, manifest);
+  return rebuild(manifest, [...manifest.clips.slice(0, index), left, right, ...manifest.clips.slice(index + 1)]);
+}
+
 /** Merge a clip with the one after it; the pause between them becomes a cut candidate. */
 export function mergeWithNext(manifest: SegmentationManifest, id: string): SegmentationManifest {
   const index = find(manifest, id);
@@ -209,10 +228,14 @@ export function editReview(manifest: SegmentationManifest, id: string, patch: Pa
 
 export function acceptClip(manifest: SegmentationManifest, id: string, reviewer: string, now: Date): SegmentationManifest {
   const clip = manifest.clips[find(manifest, id)]!;
-  const review: ClipReview = { ...clip.review, status: 'accepted', rejectReason: null, reviewedBy: reviewer.trim() || null, reviewedAt: now.toISOString() };
+  const review: ClipReview = {
+    ...clip.review, tier: clip.review.tier ?? 'asr', status: 'accepted', rejectReason: null,
+    reviewedBy: reviewer.trim() || null, reviewedAt: now.toISOString(),
+    transcript: clip.review.transcript?.trim() || null,
+  };
   const problems = acceptanceProblems(review);
   if (problems.length) throw new Error(problems.join(' '));
-  return replaceReview(manifest, id, { ...review, transcript: review.transcript!.trim() });
+  return replaceReview(manifest, id, review);
 }
 
 export function rejectClip(manifest: SegmentationManifest, id: string, reason: string, reviewer: string, now: Date): SegmentationManifest {
@@ -224,6 +247,22 @@ export function rejectClip(manifest: SegmentationManifest, id: string, reason: s
 export function reopenClip(manifest: SegmentationManifest, id: string): SegmentationManifest {
   const clip = manifest.clips[find(manifest, id)]!;
   return replaceReview(manifest, id, { ...clip.review, status: 'proposed', rejectReason: null, reviewedAt: null });
+}
+
+export interface InternalPause { startMs: number; endMs: number; lengthMs: number }
+
+/** Silences between detected speech inside a clip, longest first. These are what the TTS export shortens. */
+export function pausesInside(manifest: SegmentationManifest, clip: SegmentClip, minMs: number): InternalPause[] {
+  const inside = manifest.speechSpans
+    .filter((span) => span.endMs > clip.startMs && span.startMs < clip.endMs)
+    .map((span) => ({ startMs: Math.max(span.startMs, clip.startMs), endMs: Math.min(span.endMs, clip.endMs) }))
+    .sort((a, b) => a.startMs - b.startMs);
+  const pauses: InternalPause[] = [];
+  for (let i = 0; i + 1 < inside.length; i += 1) {
+    const lengthMs = inside[i + 1]!.startMs - inside[i]!.endMs;
+    if (lengthMs > minMs) pauses.push({ startMs: inside[i]!.endMs, endMs: inside[i + 1]!.startMs, lengthMs });
+  }
+  return pauses.sort((a, b) => b.lengthMs - a.lengthMs);
 }
 
 export function reviewProgress(manifest: SegmentationManifest) {
