@@ -3,11 +3,14 @@ import json
 import subprocess
 import tempfile
 import unittest
+
+import numpy as np
 from pathlib import Path
 
 from sautiseg.audio import sha256_file
 from sautiseg.cutting import cut_accepted
 from sautiseg.manifest import build_clip_record, build_manifest, write_manifest
+from sautiseg.separate import write_mono_wav
 from sautiseg.clips import build_clips
 
 
@@ -81,6 +84,48 @@ class CutTests(unittest.TestCase):
         cut_accepted(path, self.source)
         rows = list(csv.DictReader((self.work / "export" / "metadata_tts.csv").open(encoding="utf-8")))
         self.assertEqual(rows, [])
+
+    def pause_manifest(self):
+        rate = 44100
+        t = np.arange(rate * 12) / rate
+        tone = 0.5 * np.sin(2 * np.pi * 440 * t)
+        voice = np.zeros_like(tone)
+        for a, b in ((0.5, 2.0), (4.6, 6.1)):  # speech, then a 2.6 s silence, then more speech
+            voice[int(a * rate):int(b * rate)] = tone[int(a * rate):int(b * rate)]
+        vocals = self.work / "vocals_44k.wav"
+        write_mono_wav(vocals, voice, rate)
+        clip = build_clip_record(build_clips([(500, 2000)], 12_000)[0], {})
+        clip.update({"startMs": 300, "endMs": 6300, "durationMs": 6000})
+        clip["review"].update({"status": "accepted", "tier": "asr_tts", "hasMusic": False})
+        source = {"fileName": "src.wav", "sha256": sha256_file(self.source), "durationMs": 12_000,
+                  "vocals44Audio": vocals.name, "vocals44Sha256": sha256_file(vocals)}
+        path = self.work / "manifest.json"
+        write_manifest(path, build_manifest(source=source, processing={}, spans=[(500, 2000), (4600, 6100)], clips=[clip]))
+        return path
+
+    def test_tts_copy_shortens_long_silences_but_asr_copy_is_untouched(self):
+        path = self.pause_manifest()
+        cut_accepted(path, self.source, sample_rate=16000, max_pause_ms=500)
+        asr = list(csv.DictReader((self.work / "export" / "metadata.csv").open(encoding="utf-8")))[0]
+        tts = list(csv.DictReader((self.work / "export" / "metadata_tts.csv").open(encoding="utf-8")))[0]
+        self.assertAlmostEqual(float(asr["duration_s"]), 6.0, delta=0.05)
+        self.assertEqual(asr["trimmed_ms"], "0")
+        self.assertAlmostEqual(float(tts["duration_s"]), 3.9, delta=0.05)   # 6000 - (2600 - 500)
+        self.assertEqual(tts["trimmed_ms"], "2100")
+        self.assertEqual(json.loads((self.work / "export" / "export.json").read_text())["maxPauseMs"], 500)
+
+    def test_pause_shortening_can_be_switched_off(self):
+        path = self.pause_manifest()
+        cut_accepted(path, self.source, sample_rate=16000, max_pause_ms=0)
+        tts = list(csv.DictReader((self.work / "export" / "metadata_tts.csv").open(encoding="utf-8")))[0]
+        self.assertAlmostEqual(float(tts["duration_s"]), 6.0, delta=0.05)
+        self.assertEqual(tts["trimmed_ms"], "0")
+
+    def test_accepted_clip_without_a_transcript_exports_with_an_empty_transcript(self):
+        path = self.manifest({"status": "accepted", "tier": "asr"}, with_vocals=False)
+        cut_accepted(path, self.source)
+        rows = list(csv.DictReader((self.work / "export" / "metadata.csv").open(encoding="utf-8")))
+        self.assertEqual(rows[0]["transcript"], "")
 
     def test_refuses_wrong_source(self):
         path = self.manifest({"status": "accepted", "transcript": "x", "tier": "asr"})

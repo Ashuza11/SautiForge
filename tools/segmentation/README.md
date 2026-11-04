@@ -49,10 +49,10 @@ Tests: `.venv/bin/python -m unittest discover -s tests -t .`
 
 ## Tiers
 
-- `asr`: reviewed, correctly transcribed; background music is allowed.
+- `asr`: every accepted clip. Cut from the original audio; background music is allowed. A transcript is optional, since community annotators can transcribe later.
 - `asr_tts`: also confirmed free of music on the cleaned voice, one speaker. It is cut from the separated vocals into `tts_clips/` and listed in `metadata_tts.csv` with `audio_variant = vocals_<model>`. A TTS-eligible clip must have `hasMusic = false`.
 
-Separated audio is processed audio, not an original recording: say so when reporting the dataset. Cleaned vocals contain digital silence where music-only passages were, so clips never join speech across more than 1 s of silence (`--max-gap-ms`), and a clip with a longer internal silence is flagged `long_internal_pause`.
+Separated audio is processed audio, not an original recording: say so when reporting the dataset. Cleaned vocals contain digital silence where music-only passages were, so clips never join speech across more than 1 s of silence (`--max-gap-ms`), and a clip with a longer internal silence is flagged `long_internal_pause`. At export, silences between speech in the **TTS copies only** are capped at `--max-pause-ms` (default 500; 0 disables) and the removed time is recorded in `trimmed_ms`. ASR copies are never altered. In the review screen, "Split and drop" cuts a clip inside a silence and leaves the silence out of both parts.
 
 ## Privacy
 

@@ -12,7 +12,7 @@ from .audio import (WORKING_SAMPLE_RATE, clip_metrics, extract_working_wav, ffmp
                     probe_duration_ms, read_wav_int16, sha256_file)
 from .clips import ClipParams, build_clips
 from .manifest import build_clip_record, build_manifest, write_manifest
-from .cutting import cut_accepted
+from .cutting import DEFAULT_MAX_PAUSE_MS, cut_accepted
 from .separate import MODEL_NAME, ensure_separation
 from .vad import VadParams, detect, speech_stats
 
@@ -93,7 +93,7 @@ def cmd_prepare(args: argparse.Namespace) -> int:
 
 
 def cmd_cut(args: argparse.Namespace) -> int:
-    result = cut_accepted(Path(args.manifest), Path(args.source), sample_rate=args.sample_rate)
+    result = cut_accepted(Path(args.manifest), Path(args.source), sample_rate=args.sample_rate, max_pause_ms=args.max_pause_ms)
     print(f"Exported {result['count']} clips ({result['seconds']:.1f} s) -> {result['dir']}")
     print(f"ASR-ready: {result['count']}, TTS-eligible: {result['tts']}")
     return 0
@@ -127,6 +127,7 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--manifest", required=True, help="Reviewed manifest.json.")
     c.add_argument("--source", required=True, help="The original media file the manifest was made from.")
     c.add_argument("--sample-rate", type=int, default=24000, help="Output rate; clips are cut from the original, not the 16 kHz copy.")
+    c.add_argument("--max-pause-ms", type=int, default=DEFAULT_MAX_PAUSE_MS, help="Cap silences between speech in the TTS copies (0 disables). ASR copies are never changed.")
     c.set_defaults(func=cmd_cut)
     return parser
 

@@ -68,8 +68,6 @@ def validate_manifest(manifest: dict) -> None:
         if review.get("status") not in REVIEW_STATUSES:
             raise ValueError(f"{cid}: invalid review status.")
         if review["status"] == "accepted":
-            if not (review.get("transcript") or "").strip():
-                raise ValueError(f"{cid}: an accepted clip needs a transcript.")
             if review.get("tier") not in TIERS:
                 raise ValueError(f"{cid}: an accepted clip needs a tier ({sorted(TIERS)}).")
             if review.get("tier") == "asr_tts" and review.get("hasMusic") is not False:

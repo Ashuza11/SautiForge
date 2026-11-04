@@ -19,9 +19,10 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(manifest["schema"], SCHEMA)
         validate_manifest(manifest)
 
-    def test_accepted_needs_transcript_and_tier(self):
+    def test_accepted_needs_a_tier_but_not_a_transcript(self):
         with self.assertRaises(ValueError):
             validate_manifest(manifest_with({"status": "accepted"}))
+        validate_manifest(manifest_with({"status": "accepted", "tier": "asr"}))  # community transcribes later
         validate_manifest(manifest_with({"status": "accepted", "transcript": "x", "tier": "asr"}))
 
     def test_tts_tier_requires_confirmed_no_music(self):
