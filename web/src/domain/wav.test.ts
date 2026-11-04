@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseWav16Mono, peakEnvelope } from './wav';
+import { createAudioView, parseWav16Mono, peakEnvelope } from './wav';
 
 function wav(samples: number[], rate = 16_000, extraChunk = false): ArrayBuffer {
   const data = new Int16Array(samples);
@@ -39,5 +39,17 @@ describe('wav parsing', () => {
     const peaks = peakEnvelope(audio, 0, 1_000, 4);
     expect(Array.from(peaks).map((value) => Math.round(value * 100))).toEqual([0, 0, 50, 0]);
     expect(peakEnvelope(audio, 2_000, 3_000, 4)).toEqual(new Float32Array(4));
+  });
+
+  it('exposes audio through a view that hides the raw samples from React props', () => {
+    const samples = new Array(16_000).fill(0);
+    samples[8_000] = 16_384;
+    const audio = parseWav16Mono(wav(samples));
+    const view = createAudioView(audio);
+    expect(view.durationMs).toBe(1_000);
+    expect(view.sampleRate).toBe(16_000);
+    expect(view.peaks(0, 1_000, 4)).toEqual(peakEnvelope(audio, 0, 1_000, 4));
+    expect(Object.values(view).some((value) => value instanceof Int16Array)).toBe(false);
+    expect(JSON.stringify(view).length).toBeLessThan(200);
   });
 });

@@ -46,3 +46,19 @@ export function peakEnvelope(audio: WavAudio, startMs: number, endMs: number, bu
   }
   return peaks;
 }
+
+/**
+ * A read-only handle on decoded audio. The samples live in a closure, so React never sees (or in
+ * development mode, inspects) millions of numbers when this is passed as a prop.
+ */
+export interface AudioView {
+  readonly sampleRate: number;
+  readonly durationMs: number;
+  peaks(startMs: number, endMs: number, buckets: number): Float32Array;
+}
+
+export function createAudioView(audio: WavAudio): AudioView {
+  const { sampleRate, samples } = audio;
+  const durationMs = Math.round((samples.length / sampleRate) * 1000);
+  return { sampleRate, durationMs, peaks: (startMs, endMs, buckets) => peakEnvelope({ sampleRate, samples }, startMs, endMs, buckets) };
+}

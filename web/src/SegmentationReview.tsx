@@ -5,9 +5,11 @@ import {
   reopenClip, reviewProgress, serializeManifest, splitClip, type SegmentClip, type SegmentationManifest,
 } from './domain/segmentation';
 import { LocalSegmentationDraftRepository } from './domain/segmentation-draft';
-import { parseWav16Mono, peakEnvelope, type WavAudio } from './domain/wav';
+import { createAudioView, parseWav16Mono, type AudioView } from './domain/wav';
 
 type Filter = 'all' | 'todo' | 'accepted' | 'rejected' | 'flagged';
+type Variant = 'original' | 'vocals';
+
 const WARNING_FLAGS = ['too_short', 'over_target', 'needs_manual_split', 'clipping', 'low_speech_ratio', 'long_internal_pause'];
 const FLAG_TEXT: Record<string, string> = {
   too_short: 'Very short', over_target: 'Longer than 12 s', needs_manual_split: 'Over 20 s: split it',
@@ -15,14 +17,17 @@ const FLAG_TEXT: Record<string, string> = {
 };
 const NUDGES = [-250, -50, 50, 250];
 const REVIEWER_KEY = 'sautiforge.segmentation.reviewer';
+const FILTER_LABEL: Record<Filter, string> = { all: 'All', todo: 'To do', flagged: 'Flagged', accepted: 'Accepted', rejected: 'Rejected' };
 
-export function SegmentationReview({ onClose }: { onClose: () => void }) {
+interface Loaded { original: AudioView; vocals: AudioView | null; originalUrl: string; vocalsUrl: string | null; source: SegmentationManifest }
+
+export function SegmentationReview() {
   const repository = useMemo(() => new LocalSegmentationDraftRepository(window.localStorage), []);
   const picker = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [loaded, setLoaded] = useState<{ audio: WavAudio; audioUrl: string; vocals: { audio: WavAudio; url: string } | null; original: SegmentationManifest } | null>(null);
-  const [variant, setVariant] = useState<'original' | 'vocals'>('original');
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [manifest, setManifest] = useState<SegmentationManifest | null>(null);
+  const [variant, setVariant] = useState<Variant>('original');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [reviewer, setReviewer] = useState(() => { try { return window.localStorage.getItem(REVIEWER_KEY) ?? ''; } catch { return ''; } });
@@ -33,7 +38,9 @@ export function SegmentationReview({ onClose }: { onClose: () => void }) {
   const [playing, setPlaying] = useState(false);
   const [loop, setLoop] = useState(true);
 
-  useEffect(() => () => { if (loaded) { URL.revokeObjectURL(loaded.audioUrl); if (loaded.vocals) URL.revokeObjectURL(loaded.vocals.url); } }, [loaded]);
+  useEffect(() => () => {
+    if (loaded) { URL.revokeObjectURL(loaded.originalUrl); if (loaded.vocalsUrl) URL.revokeObjectURL(loaded.vocalsUrl); }
+  }, [loaded]);
 
   const open = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -42,35 +49,34 @@ export function SegmentationReview({ onClose }: { onClose: () => void }) {
       const list = Array.from(files);
       const manifestFile = list.find((file) => file.name.toLowerCase().endsWith('.json'));
       if (!manifestFile) throw new Error('Select the files from the output folder: manifest.json, audio_16k.wav and, if present, vocals_16k.wav.');
-      const original = parseManifest(await manifestFile.text());
-      const wavFile = list.find((file) => file.name === original.source.workingAudio);
-      if (!wavFile) throw new Error(`This manifest needs ${original.source.workingAudio}. Select it together with manifest.json.`);
-      const vocalsName = original.source.vocalsAudio;
+      const source = parseManifest(await manifestFile.text());
+      const wavFile = list.find((file) => file.name === source.source.workingAudio);
+      if (!wavFile) throw new Error(`This manifest needs ${source.source.workingAudio}. Select it together with manifest.json.`);
+      const vocalsName = source.source.vocalsAudio;
       const vocalsFile = vocalsName ? list.find((file) => file.name === vocalsName) : undefined;
       if (vocalsName && !vocalsFile) throw new Error(`This manifest has cleaned-voice audio. Also select ${vocalsName}.`);
-      const checkLength = (wav: WavAudio, name: string) => {
-        if (Math.abs((wav.samples.length / wav.sampleRate) * 1000 - original.source.durationMs) > 1_500) throw new Error(`${name} does not match the manifest length. These files are from different runs.`);
+
+      const decode = async (file: File) => {
+        const buffer = await file.arrayBuffer();
+        const view = createAudioView(parseWav16Mono(buffer));
+        if (Math.abs(view.durationMs - source.source.durationMs) > 1_500) throw new Error(`${file.name} does not match the manifest length. These files are from different runs.`);
+        return { view, url: URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' })) };
       };
-      const buffer = await wavFile.arrayBuffer();
-      const audio = parseWav16Mono(buffer);
-      checkLength(audio, wavFile.name);
-      let vocals: { audio: WavAudio; url: string } | null = null;
-      if (vocalsFile) {
-        const vocalsBuffer = await vocalsFile.arrayBuffer();
-        const vocalsAudio = parseWav16Mono(vocalsBuffer);
-        checkLength(vocalsAudio, vocalsFile.name);
-        vocals = { audio: vocalsAudio, url: URL.createObjectURL(new Blob([vocalsBuffer], { type: 'audio/wav' })) };
-      }
-      let working = original;
+      const original = await decode(wavFile);
+      const vocals = vocalsFile ? await decode(vocalsFile) : null;
+
+      let working = source;
       let restored = false;
-      const draft = repository.load(original.source.sha256);
+      const draft = repository.load(source.source.sha256);
       if (draft) { working = draft; restored = true; }
-      const audioUrl = URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
-      setLoaded((current) => { if (current) { URL.revokeObjectURL(current.audioUrl); if (current.vocals) URL.revokeObjectURL(current.vocals.url); } return { audio, audioUrl, vocals, original }; });
+      setLoaded((current) => {
+        if (current) { URL.revokeObjectURL(current.originalUrl); if (current.vocalsUrl) URL.revokeObjectURL(current.vocalsUrl); }
+        return { original: original.view, originalUrl: original.url, vocals: vocals?.view ?? null, vocalsUrl: vocals?.url ?? null, source };
+      });
       setVariant(vocals ? 'vocals' : 'original');
       setManifest(working);
       setSelectedId(working.clips.find((clip) => clip.review.status === 'proposed')?.id ?? working.clips[0]?.id ?? null);
-      setMessage(restored ? 'Restored your saved review for this video from this browser.' : `Opened ${original.clips.length} proposed clips. Nothing is uploaded.`);
+      setMessage(restored ? 'Restored your saved review for this video from this browser.' : `Opened ${source.clips.length} proposed clips. Nothing is uploaded.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The files could not be opened.');
     } finally {
@@ -91,8 +97,6 @@ export function SegmentationReview({ onClose }: { onClose: () => void }) {
     return true;
   }, [manifest, repository]);
 
-  const shownAudio = loaded ? (variant === 'vocals' && loaded.vocals ? loaded.vocals.audio : loaded.audio) : null;
-  const shownUrl = loaded ? (variant === 'vocals' && loaded.vocals ? loaded.vocals.url : loaded.audioUrl) : undefined;
   const clips = manifest?.clips ?? [];
   const visible = useMemo(() => clips.filter((clip) => {
     if (filter === 'todo') return clip.review.status === 'proposed';
@@ -104,15 +108,17 @@ export function SegmentationReview({ onClose }: { onClose: () => void }) {
   const selected = clips.find((clip) => clip.id === selectedId) ?? null;
   const selectedIndex = selected ? clips.indexOf(selected) : -1;
   const progress = manifest ? reviewProgress(manifest) : null;
+  const shown = loaded ? (variant === 'vocals' && loaded.vocals ? loaded.vocals : loaded.original) : null;
+  const shownUrl = loaded ? (variant === 'vocals' && loaded.vocalsUrl ? loaded.vocalsUrl : loaded.originalUrl) : undefined;
 
   // ---- playback ----
   const stop = useCallback(() => { audioRef.current?.pause(); setPlaying(false); }, []);
-  const playRange = useCallback((startMs: number) => {
+  const playFrom = useCallback((startMs: number) => {
     const audio = audioRef.current;
-    if (!audio || !selected) return;
+    if (!audio) return;
     audio.currentTime = startMs / 1000;
     void audio.play().then(() => setPlaying(true)).catch(() => setError('The browser blocked audio playback. Press play again.'));
-  }, [selected]);
+  }, []);
 
   useEffect(() => {
     if (!playing || !selected) return;
@@ -136,6 +142,7 @@ export function SegmentationReview({ onClose }: { onClose: () => void }) {
   useEffect(() => { stop(); if (selected) setPlayheadMs(selected.startMs); }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const seek = (ms: number) => { if (audioRef.current) audioRef.current.currentTime = ms / 1000; setPlayheadMs(Math.round(ms)); };
+  const chooseVariant = (next: Variant) => { stop(); setVariant(next); };
 
   const download = () => {
     if (!manifest) return;
@@ -145,94 +152,128 @@ export function SegmentationReview({ onClose }: { onClose: () => void }) {
       link.href = url; link.download = 'manifest.reviewed.json';
       document.body.append(link); link.click(); link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
-      setMessage('Downloaded manifest.reviewed.json. Put it in the same output folder and run the cut command.');
+      setMessage('Downloaded manifest.reviewed.json. Put it in the same output folder, then run the cut command.');
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'The manifest could not be downloaded.'); }
   };
 
   const resetDraft = () => {
     if (!loaded || !window.confirm('Discard all review work for this video in this browser and start again from the file you opened?')) return;
-    try { repository.clear(loaded.original.source.sha256); } catch (cause) { setError(cause instanceof Error ? cause.message : 'The draft could not be removed.'); return; }
-    setManifest(loaded.original); setSelectedId(loaded.original.clips[0]?.id ?? null); setMessage('Review reset to the opened file.');
+    try { repository.clear(loaded.source.source.sha256); } catch (cause) { setError(cause instanceof Error ? cause.message : 'The draft could not be removed.'); return; }
+    setManifest(loaded.source); setSelectedId(loaded.source.clips[0]?.id ?? null); setMessage('Review reset to the opened file.');
   };
 
   const rememberReviewer = (value: string) => { setReviewer(value); try { window.localStorage.setItem(REVIEWER_KEY, value); } catch { /* optional convenience */ } };
-
-  const go = (offset: number) => {
-    const target = clips[selectedIndex + offset];
-    if (target) setSelectedId(target.id);
-  };
+  const go = (offset: number) => { const target = clips[selectedIndex + offset]; if (target) setSelectedId(target.id); };
 
   return (
     <main className="seg-review">
       <input ref={picker} hidden multiple type="file" accept=".json,.wav,application/json,audio/wav" onChange={(event) => void open(event.target.files)} />
+
       <div className="seg-head">
-        <div>
-          <p className="eyebrow">Segmentation review</p>
-          <h2>{manifest ? manifest.source.fileName : 'Review proposed speech clips'}</h2>
-          {!manifest ? <p className="seg-lead">Open the files the segmentation tool wrote: <code>manifest.json</code>, <code>audio_16k.wav</code> and, when music was removed, <code>vocals_16k.wav</code>. They are read on this device and never uploaded.</p> : null}
+        <div className="seg-title">
+          <h2>Segment review</h2>
+          {manifest ? (
+            <span className="seg-file" title={manifest.source.fileName}>
+              <span className="seg-file-name">{manifest.source.fileName}</span>
+              <span className="seg-file-meta">{fmtDuration(manifest.source.durationMs)}</span>
+            </span>
+          ) : <p>Check the cut points, write the transcript, and decide which clips go into the dataset.</p>}
         </div>
-        <div className="header-actions">
-          <button className="secondary" disabled={busy} onClick={() => picker.current?.click()}>{manifest ? 'Open other files' : busy ? 'Opening…' : 'Choose manifest and audio'}</button>
-          {manifest ? <><button onClick={download}>Download reviewed manifest</button><button className="quiet" onClick={resetDraft}>Reset review</button></> : null}
-          <button className="quiet" onClick={onClose}>Back</button>
-        </div>
+        {manifest ? (
+          <div className="header-actions">
+            <button className="quiet" onClick={resetDraft}>Reset</button>
+            <button className="secondary" disabled={busy} onClick={() => picker.current?.click()}>Open other files</button>
+            <button onClick={download}>Download reviewed manifest</button>
+          </div>
+        ) : null}
       </div>
+
       {message ? <div className="save-message" role="status">{message}</div> : null}
       {error ? <div className="error" role="alert">{error}</div> : null}
 
-      {manifest && loaded && progress ? (
+      {!manifest || !loaded || !progress || !shown ? (
+        <section className="seg-empty">
+          <h3>Open a segmentation run</h3>
+          <p>Select these files together from the tool's output folder. They are read in your browser and never uploaded.</p>
+          <ul>
+            <li><code>manifest.json</code><span>the proposed clips</span></li>
+            <li><code>audio_16k.wav</code><span>the original audio</span></li>
+            <li><code>vocals_16k.wav</code><span>the cleaned voice, if music was removed</span></li>
+          </ul>
+          <button disabled={busy} onClick={() => picker.current?.click()}>{busy ? 'Opening…' : 'Choose files'}</button>
+        </section>
+      ) : (
         <>
-          <div className="seg-progress" aria-label="Review progress">
-            <Stat label="Clips" value={progress.total} /><Stat label="To review" value={progress.proposed} />
-            <Stat label="Accepted" value={progress.accepted} /><Stat label="TTS-ready" value={progress.tts} />
-            <Stat label="Rejected" value={progress.rejected} /><Stat label="Accepted time" value={`${progress.acceptedSeconds.toFixed(0)} s`} />
-            <label className="field seg-reviewer"><span>Reviewer</span><input value={reviewer} onChange={(event) => rememberReviewer(event.target.value)} placeholder="Your name or code" /></label>
-          </div>
-          {loaded.vocals ? (
-            <div className="seg-variant" role="group" aria-label="Audio version">
-              <span>Listen to</span>
-              <button className={variant === 'vocals' ? '' : 'secondary'} onClick={() => { stop(); setVariant('vocals'); }}>Cleaned voice (music removed)</button>
-              <button className={variant === 'original' ? '' : 'secondary'} onClick={() => { stop(); setVariant('original'); }}>Original (with music)</button>
-              <small>TTS clips are cut from the cleaned voice, so judge them there. ASR-only clips use the original.</small>
+          <section className="seg-summary" aria-label="Review progress">
+            <div className="seg-numbers">
+              <Stat label="Clips" value={progress.total} /><Stat label="To review" value={progress.proposed} />
+              <Stat label="Accepted" value={progress.accepted} /><Stat label="TTS-ready" value={progress.tts} />
+              <Stat label="Rejected" value={progress.rejected} /><Stat label="Kept audio" value={`${progress.acceptedSeconds.toFixed(0)} s`} />
             </div>
-          ) : null}
+            <div className="seg-bar" role="img" aria-label={`${progress.accepted} accepted, ${progress.rejected} rejected, ${progress.proposed} to review`}>
+              <span className="seg-bar-ok" style={{ width: `${(progress.accepted / progress.total) * 100}%` }} />
+              <span className="seg-bar-no" style={{ width: `${(progress.rejected / progress.total) * 100}%` }} />
+            </div>
+            <label className="seg-reviewer"><span>Reviewer</span><input value={reviewer} onChange={(event) => rememberReviewer(event.target.value)} placeholder="Name or code" /></label>
+          </section>
+
           <audio ref={audioRef} src={shownUrl} preload="auto" onEnded={() => setPlaying(false)} />
-          <Waveform audio={shownAudio ?? loaded.audio} manifest={manifest} selectedId={selectedId} playheadMs={playheadMs} onSelect={(id, ms) => { setSelectedId(id); seek(ms); }} />
+
+          <section className="seg-card seg-overview-card">
+            <div className="seg-card-head">
+              <h3>Whole video</h3>
+              {loaded.vocals ? (
+                <div className="seg-toggle" role="group" aria-label="Audio version">
+                  <button aria-pressed={variant === 'vocals'} onClick={() => chooseVariant('vocals')}>Cleaned voice</button>
+                  <button aria-pressed={variant === 'original'} onClick={() => chooseVariant('original')}>Original</button>
+                </div>
+              ) : null}
+            </div>
+            <Waveform audio={shown} manifest={manifest} selectedId={selectedId} playheadMs={playheadMs} onSelect={(id, ms) => { setSelectedId(id); seek(ms); }} />
+            {loaded.vocals ? <p className="seg-hint">TTS clips are cut from the cleaned voice, so judge them there. ASR-only clips use the original, music included.</p> : null}
+          </section>
+
           <div className="seg-grid">
-            <aside className="seg-list">
-              <label className="field"><span>Show</span>
-                <select value={filter} onChange={(event) => setFilter(event.target.value as Filter)}>
-                  <option value="all">All clips</option><option value="todo">Needs review</option><option value="flagged">Needs attention</option>
-                  <option value="accepted">Accepted</option><option value="rejected">Rejected</option>
-                </select>
-              </label>
+            <aside className="seg-card seg-list">
+              <div className="seg-filters" role="tablist" aria-label="Filter clips">
+                {(Object.keys(FILTER_LABEL) as Filter[]).map((key) => (
+                  <button key={key} role="tab" aria-selected={filter === key} onClick={() => setFilter(key)}>{FILTER_LABEL[key]}</button>
+                ))}
+              </div>
               <p className="result-count">{visible.length} of {clips.length} clips</p>
               <div className="seg-items">
-                {visible.map((clip) => (
-                  <button key={clip.id} className={`seg-item seg-${clip.review.status}${clip.id === selectedId ? ' selected' : ''}`} onClick={() => setSelectedId(clip.id)}>
-                    <strong>{clip.id}</strong><span>{fmt(clip.startMs)} · {(clip.durationMs / 1000).toFixed(1)} s</span>
-                    <em>{clip.review.status}</em>
-                    {clip.flags.some((flag) => WARNING_FLAGS.includes(flag)) ? <small>⚠ {clip.flags.filter((flag) => WARNING_FLAGS.includes(flag)).map((flag) => FLAG_TEXT[flag] ?? flag).join(', ')}</small> : null}
-                  </button>
-                ))}
+                {visible.map((clip) => {
+                  const warnings = clip.flags.filter((flag) => WARNING_FLAGS.includes(flag));
+                  return (
+                    <button key={clip.id} className={`seg-item${clip.id === selectedId ? ' selected' : ''}`} onClick={() => setSelectedId(clip.id)}>
+                      <i className={`dot dot-${clip.review.status}`} aria-hidden="true" />
+                      <strong>{clip.id}</strong>
+                      <span>{fmt(clip.startMs)} · {(clip.durationMs / 1000).toFixed(1)} s</span>
+                      <em>{clip.review.status === 'proposed' ? '' : clip.review.status}</em>
+                      {warnings.length ? <small>{warnings.map((flag) => FLAG_TEXT[flag] ?? flag).join(' · ')}</small> : null}
+                    </button>
+                  );
+                })}
                 {visible.length === 0 ? <p className="empty">No clips match this filter.</p> : null}
               </div>
             </aside>
+
             {selected ? (
-              <ClipEditor hasVocals={Boolean(loaded.vocals)} key={`${selected.id}:${selected.startMs}:${selected.endMs}:${selected.review.status}`} clip={selected} manifest={manifest} audio={shownAudio ?? loaded.audio} playheadMs={playheadMs} playing={playing} loop={loop}
-                reviewer={reviewer} hasPrev={selectedIndex > 0} hasNext={selectedIndex < clips.length - 1}
-                onLoop={setLoop} onPlay={() => playRange(selected.startMs)} onStop={stop} onSeek={seek} onPlayFrom={() => playRange(playheadMs)}
+              <ClipEditor key={`${selected.id}:${selected.startMs}:${selected.endMs}:${selected.review.status}`} hasVocals={Boolean(loaded.vocals)}
+                clip={selected} manifest={manifest} audio={shown} playheadMs={playheadMs} playing={playing} loop={loop} reviewer={reviewer}
+                hasPrev={selectedIndex > 0} hasNext={selectedIndex < clips.length - 1}
+                onLoop={setLoop} onPlay={() => playFrom(selected.startMs)} onStop={stop} onSeek={seek} onPlayFrom={() => playFrom(playheadMs)}
                 onPrev={() => go(-1)} onNext={() => go(1)} apply={apply} />
             ) : <p className="empty">Select a clip.</p>}
           </div>
         </>
-      ) : null}
+      )}
     </main>
   );
 }
 
 function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loop, reviewer, hasPrev, hasNext, onLoop, onPlay, onStop, onSeek, onPlayFrom, onPrev, onNext, apply }: {
-  hasVocals: boolean; clip: SegmentClip; manifest: SegmentationManifest; audio: WavAudio; playheadMs: number; playing: boolean; loop: boolean; reviewer: string;
+  hasVocals: boolean; clip: SegmentClip; manifest: SegmentationManifest; audio: AudioView; playheadMs: number; playing: boolean; loop: boolean; reviewer: string;
   hasPrev: boolean; hasNext: boolean; onLoop: (value: boolean) => void; onPlay: () => void; onStop: () => void; onSeek: (ms: number) => void; onPlayFrom: () => void;
   onPrev: () => void; onNext: () => void; apply: (change: (current: SegmentationManifest) => SegmentationManifest, success?: string) => boolean;
 }) {
@@ -255,68 +296,78 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
     const done = apply((current) => rejectClip(current, clip.id, reason, reviewer, new Date()), `${clip.id} rejected.`);
     if (done) { setRejecting(false); if (hasNext) onNext(); }
   };
-
   const nudge = (edge: 'start' | 'end', delta: number) =>
     apply((current) => adjustClip(current, clip.id, clip.startMs + (edge === 'start' ? delta : 0), clip.endMs + (edge === 'end' ? delta : 0)), 'Boundary moved. Check it by ear.');
 
-  const candidates = clip.cutCandidatesMs;
+  const warnings = clip.flags.filter((flag) => WARNING_FLAGS.includes(flag));
   const metrics = clip.metrics;
 
   return (
-    <section className="seg-editor">
-      <div className="editor-heading">
-        <div><h3>{clip.id} <span className={`status status-${review.status === 'accepted' ? 'validated' : review.status}`}>{review.status}</span></h3>
-          <p className="seg-sub">{fmt(clip.startMs)} → {fmt(clip.endMs)} · {(clip.durationMs / 1000).toFixed(2)} s · {clip.spanCount} phrase{clip.spanCount === 1 ? '' : 's'}</p></div>
-        <div className="compact-actions"><button className="secondary" disabled={!hasPrev} onClick={onPrev}>Previous</button><button className="secondary" disabled={!hasNext} onClick={onNext}>Next</button></div>
-      </div>
+    <section className="seg-card seg-editor">
+      <header className="seg-editor-head">
+        <div>
+          <h3>{clip.id} <span className={`pill pill-${review.status}`}>{review.status}</span></h3>
+          <p className="seg-sub">{fmt(clip.startMs)} → {fmt(clip.endMs)} · {(clip.durationMs / 1000).toFixed(2)} s · {clip.spanCount} phrase{clip.spanCount === 1 ? '' : 's'}</p>
+        </div>
+        <div className="compact-actions">
+          <button className="quiet" disabled={!hasPrev} onClick={onPrev}>Previous</button>
+          <button className="quiet" disabled={!hasNext} onClick={onNext}>Next</button>
+        </div>
+      </header>
 
-      {clip.flags.length ? <p className="seg-flags">{clip.flags.map((flag) => <span key={flag} className={WARNING_FLAGS.includes(flag) ? 'flag warn' : 'flag'}>{FLAG_TEXT[flag] ?? flag}</span>)}</p> : null}
+      {warnings.length ? <p className="seg-flags">{warnings.map((flag) => <span key={flag} className="flag warn">{FLAG_TEXT[flag] ?? flag}</span>)}</p> : null}
       <ClipWave clip={clip} audio={audio} playheadMs={playheadMs} total={manifest.source.durationMs} onSeek={onSeek} />
 
-      <div className="seg-controls">
+      <div className="seg-transport">
         <button onClick={playing ? onStop : onPlay}>{playing ? 'Stop' : 'Play clip'}</button>
         <button className="secondary" onClick={onPlayFrom}>Play from marker</button>
         <label className="seg-check"><input type="checkbox" checked={loop} onChange={(event) => onLoop(event.target.checked)} /> Loop</label>
-        <span className="seg-sub">Marker {fmt(playheadMs)}. Click the waveform to move it.</span>
+        <span className="seg-sub">Marker {fmt(playheadMs)} · click the waveform to move it</span>
       </div>
 
-      <div className="seg-bounds">
+      <details className="seg-adjust">
+        <summary>Adjust the cut</summary>
         {(['start', 'end'] as const).map((edge) => (
-          <div key={edge} className="seg-nudge"><span>{edge === 'start' ? 'Start' : 'End'} {fmt(edge === 'start' ? clip.startMs : clip.endMs)}</span>
+          <div key={edge} className="seg-nudge"><span>{edge === 'start' ? 'Start' : 'End'} <b>{fmt(edge === 'start' ? clip.startMs : clip.endMs)}</b></span>
             {NUDGES.map((delta) => <button key={delta} className="secondary" onClick={() => nudge(edge, delta)}>{delta > 0 ? '+' : ''}{delta} ms</button>)}</div>
         ))}
         <div className="seg-nudge"><span>Cut</span>
           <button className="secondary" onClick={() => apply((current) => splitClip(current, clip.id, playheadMs), 'Clip split at the marker. Review both parts.')}>Split at marker</button>
-          {candidates.map((at) => <button key={at} className="secondary" onClick={() => apply((current) => splitClip(current, clip.id, at), 'Clip split at the pause. Review both parts.')}>Split at pause {fmt(at)}</button>)}
+          {clip.cutCandidatesMs.map((at) => <button key={at} className="secondary" onClick={() => apply((current) => splitClip(current, clip.id, at), 'Clip split at the pause. Review both parts.')}>Split at pause {fmt(at)}</button>)}
           <button className="secondary" disabled={!hasNext} onClick={() => apply((current) => mergeWithNext(current, clip.id), 'Merged with the next clip. Review it again.')}>Merge with next</button>
         </div>
-      </div>
+      </details>
 
-      <div className="seg-metrics">
-        {metrics.meanSpeechProb !== undefined ? <span>Speech confidence {(metrics.meanSpeechProb * 100).toFixed(0)}%</span> : null}
-        {metrics.speechRatio !== undefined ? <span>Speech share {(metrics.speechRatio * 100).toFixed(0)}%</span> : null}
-        {metrics.rmsDb !== undefined ? <span>Level {metrics.rmsDb} dB</span> : null}
-      </div>
+      {Object.keys(metrics).length ? (
+        <div className="seg-metrics">
+          {metrics.meanSpeechProb !== undefined ? <span>Speech confidence <b>{(metrics.meanSpeechProb * 100).toFixed(0)}%</b></span> : null}
+          {metrics.speechRatio !== undefined ? <span>Speech share <b>{(metrics.speechRatio * 100).toFixed(0)}%</b></span> : null}
+          {metrics.rmsDb !== undefined ? <span>Level <b>{metrics.rmsDb} dB</b></span> : null}
+        </div>
+      ) : null}
 
-      <label className="field"><span>What was actually spoken (verbatim)</span>
-        <textarea rows={4} value={text} disabled={locked} onChange={(event) => setText(event.target.value)} onBlur={() => !locked && commitNotes()} placeholder="Type the Mashi exactly as heard. Do not copy subtitles or a script unless it matches the audio." /></label>
-      <div className="form-grid">
-        <label className="field"><span>Speaker (optional)</span><input value={speaker} disabled={locked} onChange={(event) => setSpeaker(event.target.value)} onBlur={() => !locked && commitNotes()} placeholder="e.g. narrator, voice A" /></label>
-        <label className="field"><span>Music under the voice{hasVocals ? ' (check the cleaned voice)' : ''}</span>
-          <select value={review.hasMusic === null ? 'unknown' : review.hasMusic ? 'yes' : 'no'} disabled={locked}
-            onChange={(event) => commitNotes({ hasMusic: event.target.value === 'unknown' ? null : event.target.value === 'yes' })}>
-            <option value="unknown">Not checked</option><option value="no">No music heard</option><option value="yes">Music audible</option>
-          </select></label>
-        <label className="field"><span>Dataset tier</span>
-          <select value={review.tier ?? ''} disabled={locked} onChange={(event) => commitNotes({ tier: event.target.value ? (event.target.value as 'asr' | 'asr_tts') : null })}>
-            <option value="">Choose…</option><option value="asr">ASR only (music allowed)</option><option value="asr_tts">ASR and TTS (clean, no music)</option>
-          </select></label>
+      <div className="seg-form">
+        <label className="field"><span>What was actually spoken</span>
+          <textarea rows={4} value={text} disabled={locked} onChange={(event) => setText(event.target.value)} onBlur={() => !locked && commitNotes()}
+            placeholder="Type the Mashi exactly as heard. Do not copy subtitles or a script unless it matches the audio." /></label>
+        <div className="form-grid">
+          <label className="field"><span>Speaker (optional)</span><input value={speaker} disabled={locked} onChange={(event) => setSpeaker(event.target.value)} onBlur={() => !locked && commitNotes()} placeholder="e.g. narrator, voice A" /></label>
+          <label className="field"><span>Music under the voice{hasVocals ? ' (check cleaned voice)' : ''}</span>
+            <select value={review.hasMusic === null ? 'unknown' : review.hasMusic ? 'yes' : 'no'} disabled={locked}
+              onChange={(event) => commitNotes({ hasMusic: event.target.value === 'unknown' ? null : event.target.value === 'yes' })}>
+              <option value="unknown">Not checked</option><option value="no">No music heard</option><option value="yes">Music audible</option>
+            </select></label>
+          <label className="field"><span>Dataset tier</span>
+            <select value={review.tier ?? ''} disabled={locked} onChange={(event) => commitNotes({ tier: event.target.value ? (event.target.value as 'asr' | 'asr_tts') : null })}>
+              <option value="">Choose…</option><option value="asr">ASR only (music allowed)</option><option value="asr_tts">ASR and TTS (clean, no music)</option>
+            </select></label>
+        </div>
       </div>
 
       {review.status === 'rejected' ? <p className="seg-sub">Rejected: {review.rejectReason}</p> : null}
       {!locked && problems.length ? <p className="seg-sub">To accept: {problems.join(' ')}</p> : null}
       {rejecting ? (
-        <div className="editor-actions"><label className="field"><span>Reason</span><select value={reason} onChange={(event) => setReason(event.target.value)}>{rejectReasons.map((item) => <option key={item}>{item}</option>)}</select></label>
+        <div className="editor-actions"><label className="field seg-reason"><span>Reason</span><select value={reason} onChange={(event) => setReason(event.target.value)}>{rejectReasons.map((item) => <option key={item}>{item}</option>)}</select></label>
           <button onClick={reject}>Confirm reject</button><button className="quiet" onClick={() => setRejecting(false)}>Cancel</button></div>
       ) : (
         <div className="editor-actions">
@@ -329,13 +380,18 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
 }
 
 function Stat({ label, value }: { label: string; value: number | string }) {
-  return <div className="stat"><strong>{value}</strong><span>{label}</span></div>;
+  return <div className="seg-stat"><strong>{value}</strong><span>{label}</span></div>;
 }
 
 function fmt(ms: number): string {
   const total = Math.max(0, ms) / 1000;
   const minutes = Math.floor(total / 60);
   return `${minutes}:${(total - minutes * 60).toFixed(2).padStart(5, '0')}`;
+}
+
+function fmtDuration(ms: number): string {
+  const total = Math.round(ms / 1000);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
 const COLORS = { wave: '#7f978a', bg: '#f8faf8', proposed: 'rgba(224,166,41,.28)', accepted: 'rgba(23,107,69,.30)', rejected: 'rgba(166,55,55,.25)', selected: '#0f4d32', head: '#d6342f', cut: '#176b45' };
@@ -363,10 +419,10 @@ function drawPeaks(ctx: CanvasRenderingContext2D, peaks: Float32Array, width: nu
 }
 
 function Waveform({ audio, manifest, selectedId, playheadMs, onSelect }: {
-  audio: WavAudio; manifest: SegmentationManifest; selectedId: string | null; playheadMs: number; onSelect: (id: string, ms: number) => void;
+  audio: AudioView; manifest: SegmentationManifest; selectedId: string | null; playheadMs: number; onSelect: (id: string, ms: number) => void;
 }) {
   const total = manifest.source.durationMs;
-  const peaks = useMemo(() => peakEnvelope(audio, 0, total, 1600), [audio, total]);
+  const peaks = useMemo(() => audio.peaks(0, total, 1600), [audio, total]);
   const ref = useCanvas((ctx, width, height) => {
     drawPeaks(ctx, peaks, width, height);
     for (const clip of manifest.clips) {
@@ -386,10 +442,10 @@ function Waveform({ audio, manifest, selectedId, playheadMs, onSelect }: {
   return <canvas ref={ref} className="seg-overview" width={1600} height={110} onClick={click} aria-label="Whole video waveform. Click a clip to select it." />;
 }
 
-function ClipWave({ clip, audio, playheadMs, total, onSeek }: { clip: SegmentClip; audio: WavAudio; playheadMs: number; total: number; onSeek: (ms: number) => void }) {
+function ClipWave({ clip, audio, playheadMs, total, onSeek }: { clip: SegmentClip; audio: AudioView; playheadMs: number; total: number; onSeek: (ms: number) => void }) {
   const from = Math.max(0, clip.startMs - 1_500);
   const to = Math.min(total, clip.endMs + 1_500);
-  const peaks = useMemo(() => peakEnvelope(audio, from, to, 1200), [audio, from, to]);
+  const peaks = useMemo(() => audio.peaks(from, to, 1200), [audio, from, to]);
   const at = (ms: number, width: number) => ((ms - from) / (to - from)) * width;
   const ref = useCanvas((ctx, width, height) => {
     drawPeaks(ctx, peaks, width, height);
