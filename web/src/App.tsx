@@ -91,21 +91,20 @@ export function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand-mark" aria-hidden="true">S</div>
-        <div>
-          <p className="eyebrow">SautiForge</p>
-          <h1>Dataset annotation</h1>
-        </div>
+        <div className="brand"><div className="brand-mark" aria-hidden="true">S</div><span className="brand-name">SautiForge</span></div>
+        <nav className="tabs" aria-label="Workspaces">
+          <button aria-current={view === 'annotation' ? 'page' : undefined} onClick={() => setView('annotation')}>Annotation</button>
+          <button aria-current={showSegmentation ? 'page' : undefined} onClick={() => setView('segmentation')}>Segmentation</button>
+          <button aria-current={showProjects ? 'page' : undefined} onClick={() => setView('projects')}>Projects</button>
+        </nav>
         <div className="header-actions">
-          <button className="secondary" onClick={() => setView(showProjects ? 'annotation' : 'projects')}>{showProjects ? 'Annotation' : 'Projects'}</button>
-          <button className="secondary" onClick={() => setView(showSegmentation ? 'annotation' : 'segmentation')}>{showSegmentation ? 'Annotation' : 'Segmentation'}</button>
           {view === 'annotation' && dataset ? <><button className="secondary" onClick={() => picker.current?.click()}>Open another ZIP</button><button className="quiet" onClick={() => void forgetWorkspace()}>Close &amp; forget ZIP</button></> : null}
         </div>
       </header>
 
       <input ref={picker} hidden type="file" accept=".zip,application/zip" onChange={(event) => void open(event.target.files?.[0])} />
 
-      {showSegmentation ? <SegmentationReview onClose={() => setView('annotation')} /> : showProjects ? <ProjectAdmin onClose={() => setView('annotation')} /> : !dataset ? (
+      {showSegmentation ? <SegmentationReview /> : showProjects ? <ProjectAdmin onClose={() => setView('annotation')} /> : !dataset ? (
         <main className="welcome">
           <section className="hero-card">
             <p className="eyebrow">Local browser workflow</p>
