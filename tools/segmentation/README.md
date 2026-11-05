@@ -56,6 +56,8 @@ Each clip can carry a speaker role (`narrator`, `character`, `multiple`, `unknow
 
 Separated audio is processed audio, not an original recording: say so when reporting the dataset. Cleaned vocals contain digital silence where music-only passages were, so clips never join speech across more than 1 s of silence (`--max-gap-ms`), and a clip with a longer internal silence is flagged `long_internal_pause`. At export, silences between speech in the **TTS copies only** are capped at `--max-pause-ms` (default 500; 0 disables) and the removed time is recorded in `trimmed_ms`. ASR copies are never altered. In the review screen, "Split and drop" cuts a clip inside a silence and leaves the silence out of both parts.
 
+**Removing white space inside a clip.** Drag across the clip waveform to select any stretch and click "Remove selection", or click "Shorten to 0.3 s" on a detected silence. The removed sections are stored on the clip (`removed`), skipped when you play it, and cut out of **every** exported copy (ASR and TTS); the pieces are joined with a 5 ms fade, `trimmed_ms` records the total, and your source and vocals files are never edited. They can be restored one by one or undone. A removal sends the clip back to review.
+
 ## Privacy
 
 Source media, working audio, and outputs live under `Data/` and `segmentation-output/`, which are git-ignored together with all media file types and the `.venv`.

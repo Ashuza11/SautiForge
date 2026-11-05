@@ -58,3 +58,24 @@ class AssembleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SubtractIntersectTests(unittest.TestCase):
+    def test_subtract_removes_the_middle(self):
+        from sautiseg.pauses import subtract
+        self.assertEqual(subtract(1000, 9000, [(3000, 5000)]), [(1000, 3000), (5000, 9000)])
+
+    def test_subtract_handles_edges_overlaps_and_outside_ranges(self):
+        from sautiseg.pauses import subtract
+        self.assertEqual(subtract(1000, 9000, [(0, 2000)]), [(2000, 9000)])
+        self.assertEqual(subtract(1000, 9000, [(8000, 12000)]), [(1000, 8000)])
+        self.assertEqual(subtract(1000, 9000, [(3000, 5000), (4000, 6000)]), [(1000, 3000), (6000, 9000)])
+        self.assertEqual(subtract(1000, 9000, [(0, 500), (9500, 9900)]), [(1000, 9000)])
+        self.assertEqual(subtract(1000, 9000, []), [(1000, 9000)])
+        self.assertEqual(subtract(1000, 9000, [(1000, 9000)]), [])
+
+    def test_intersect_keeps_only_what_both_keep(self):
+        from sautiseg.pauses import intersect
+        self.assertEqual(intersect([(0, 5000), (7000, 9000)], [(1000, 8000)]), [(1000, 5000), (7000, 8000)])
+        self.assertEqual(intersect([(0, 1000)], [(2000, 3000)]), [])
+        self.assertEqual(intersect([(0, 9000)], [(0, 9000)]), [(0, 9000)])

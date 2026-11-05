@@ -75,3 +75,12 @@ def cut_clip(source: Path, target: Path, start_ms: int, end_ms: int, sample_rate
     run(["ffmpeg", "-y", "-v", "error", "-i", str(source), "-ss", f"{start_ms / 1000:.3f}",
          "-t", f"{(end_ms - start_ms) / 1000:.3f}", "-vn", "-ac", "1", "-ar", str(sample_rate),
          "-c:a", "pcm_s16le", str(target)])
+
+
+def decode_mono_pcm(path: Path, rate: int) -> np.ndarray:
+    """Decode the audio of any media to mono 16-bit samples at `rate` (used to assemble clips with removed sections)."""
+    result = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-vn", "-ac", "1", "-ar", str(rate), "-f", "s16le", "-"],
+                            capture_output=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg failed: {result.stderr.decode(errors='replace')[-400:]}")
+    return np.frombuffer(result.stdout, dtype="<i2")

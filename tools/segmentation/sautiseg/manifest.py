@@ -65,6 +65,13 @@ def validate_manifest(manifest: dict) -> None:
             raise ValueError(f"{cid}: boundaries must satisfy 0 <= start < end <= source duration.")
         if clip["durationMs"] != clip["endMs"] - clip["startMs"]:
             raise ValueError(f"{cid}: durationMs does not match its boundaries.")
+        previous_removed_end = clip["startMs"]
+        for section in clip.get("removed", []):
+            if not (clip["startMs"] <= section["startMs"] < section["endMs"] <= clip["endMs"]):
+                raise ValueError(f"{cid}: a removed section must lie inside the clip.")
+            if section["startMs"] < previous_removed_end:
+                raise ValueError(f"{cid}: removed sections must be in order and not overlap.")
+            previous_removed_end = section["endMs"]
         review = clip.get("review") or {}
         if review.get("status") not in REVIEW_STATUSES:
             raise ValueError(f"{cid}: invalid review status.")

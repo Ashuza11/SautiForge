@@ -45,3 +45,34 @@ def assemble(samples: np.ndarray, rate: int, ranges: list[Span]) -> np.ndarray:
             piece[-fade:] *= np.linspace(1.0, 0.0, fade, dtype=np.float32)
         pieces.append(piece)
     return np.concatenate(pieces) if pieces else samples[:0].astype(np.float32)
+
+
+def subtract(start_ms: int, end_ms: int, removed: list[Span]) -> list[Span]:
+    """[start_ms, end_ms] with the removed ranges taken out. Returns the parts that remain, in order."""
+    pieces: list[Span] = []
+    cursor = start_ms
+    for a, b in sorted(removed):
+        a, b = max(a, start_ms), min(b, end_ms)
+        if b <= a:
+            continue
+        if a > cursor:
+            pieces.append((cursor, a))
+        cursor = max(cursor, b)
+    if cursor < end_ms:
+        pieces.append((cursor, end_ms))
+    return pieces
+
+
+def intersect(first: list[Span], second: list[Span]) -> list[Span]:
+    """Parts covered by both sorted, non-overlapping range lists."""
+    result: list[Span] = []
+    i = j = 0
+    while i < len(first) and j < len(second):
+        low, high = max(first[i][0], second[j][0]), min(first[i][1], second[j][1])
+        if high > low:
+            result.append((low, high))
+        if first[i][1] < second[j][1]:
+            i += 1
+        else:
+            j += 1
+    return result

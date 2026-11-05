@@ -121,6 +121,33 @@ class CutTests(unittest.TestCase):
         self.assertEqual(tts["trimmed_ms"], "2100")
         self.assertEqual(json.loads((self.work / "export" / "export.json").read_text())["maxPauseMs"], 500)
 
+    def removed_manifest(self, removed):
+        path = self.pause_manifest()
+        manifest = json.loads(path.read_text())
+        manifest["clips"][0]["removed"] = removed
+        manifest["clips"][0]["review"]["tier"] = "asr_tts"
+        path.write_text(json.dumps(manifest))
+        return path
+
+    def test_removed_sections_are_cut_from_both_the_asr_and_the_tts_copy(self):
+        path = self.removed_manifest([{"startMs": 2100, "endMs": 3100}])   # 1 s inside the long silence
+        cut_accepted(path, self.source, sample_rate=16000, max_pause_ms=0)
+        asr = list(csv.DictReader((self.work / "export" / "metadata.csv").open(encoding="utf-8")))[0]
+        tts = list(csv.DictReader((self.work / "export" / "metadata_tts.csv").open(encoding="utf-8")))[0]
+        self.assertAlmostEqual(float(asr["duration_s"]), 5.0, delta=0.05)   # 6000 - 1000
+        self.assertAlmostEqual(float(tts["duration_s"]), 5.0, delta=0.05)
+        self.assertEqual((asr["trimmed_ms"], tts["trimmed_ms"]), ("1000", "1000"))
+
+    def test_removed_sections_combine_with_the_tts_pause_cap(self):
+        path = self.removed_manifest([{"startMs": 2100, "endMs": 3100}])
+        cut_accepted(path, self.source, sample_rate=16000, max_pause_ms=500)
+        asr = list(csv.DictReader((self.work / "export" / "metadata.csv").open(encoding="utf-8")))[0]
+        tts = list(csv.DictReader((self.work / "export" / "metadata_tts.csv").open(encoding="utf-8")))[0]
+        self.assertAlmostEqual(float(asr["duration_s"]), 5.0, delta=0.05)    # ASR: only the manual removal
+        # TTS keeps only what both rules keep: the 0.5 s cap would leave 2000-2250 and 4350-4600 as silence, and the
+        # manual removal (2100-3100) also takes 150 ms of that, so 350 ms of silence remains (never more than the cap).
+        self.assertAlmostEqual(float(tts["duration_s"]), 3.75, delta=0.05)
+
     def test_pause_shortening_can_be_switched_off(self):
         path = self.pause_manifest()
         cut_accepted(path, self.source, sample_rate=16000, max_pause_ms=0)

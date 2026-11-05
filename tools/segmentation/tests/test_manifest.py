@@ -40,6 +40,18 @@ class ManifestTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_manifest(manifest_with({"speakerRole": "actor"}))
 
+    def test_removed_sections_must_be_inside_ordered_and_not_overlap(self):
+        def with_removed(removed):
+            manifest = manifest_with()
+            manifest["clips"][0]["removed"] = removed
+            return manifest
+        validate_manifest(with_removed([]))
+        validate_manifest(with_removed([{"startMs": 1500, "endMs": 2000}, {"startMs": 2500, "endMs": 3000}]))
+        for bad in ([{"startMs": 500, "endMs": 2000}], [{"startMs": 2000, "endMs": 1500}],
+                    [{"startMs": 2500, "endMs": 3000}, {"startMs": 1500, "endMs": 2000}], [{"startMs": 1500, "endMs": 2600}, {"startMs": 2500, "endMs": 3000}]):
+            with self.assertRaises(ValueError):
+                validate_manifest(with_removed(bad))
+
     def test_rejected_needs_reason(self):
         with self.assertRaises(ValueError):
             validate_manifest(manifest_with({"status": "rejected"}))
