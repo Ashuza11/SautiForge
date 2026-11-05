@@ -164,6 +164,11 @@ export function SegmentationReview() {
   };
 
   const rememberReviewer = (value: string) => { setReviewer(value); try { window.localStorage.setItem(REVIEWER_KEY, value); } catch { /* optional convenience */ } };
+  /** Merge the selected clip into the one before it. The merged clip keeps the earlier clip's id, so select that. */
+  const mergePrevious = () => {
+    const previous = clips[selectedIndex - 1];
+    if (previous && apply((current) => mergeWithNext(current, previous.id), 'Merged with the previous clip. Review it again.')) setSelectedId(previous.id);
+  };
   const go = (offset: number) => { const target = clips[selectedIndex + offset]; if (target) setSelectedId(target.id); };
 
   return (
@@ -264,7 +269,7 @@ export function SegmentationReview() {
                 clip={selected} manifest={manifest} audio={shown} playheadMs={playheadMs} playing={playing} loop={loop} reviewer={reviewer}
                 hasPrev={selectedIndex > 0} hasNext={selectedIndex < clips.length - 1}
                 onLoop={setLoop} onPlay={() => playFrom(selected.startMs)} onStop={stop} onSeek={seek} onPlayFrom={() => playFrom(playheadMs)}
-                onPrev={() => go(-1)} onNext={() => go(1)} apply={apply} />
+                onPrev={() => go(-1)} onNext={() => go(1)} onMergePrevious={mergePrevious} apply={apply} />
             ) : <p className="empty">Select a clip.</p>}
           </div>
         </>
@@ -273,10 +278,10 @@ export function SegmentationReview() {
   );
 }
 
-function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loop, reviewer, hasPrev, hasNext, onLoop, onPlay, onStop, onSeek, onPlayFrom, onPrev, onNext, apply }: {
+function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loop, reviewer, hasPrev, hasNext, onLoop, onPlay, onStop, onSeek, onPlayFrom, onPrev, onNext, onMergePrevious, apply }: {
   hasVocals: boolean; clip: SegmentClip; manifest: SegmentationManifest; audio: AudioView; playheadMs: number; playing: boolean; loop: boolean; reviewer: string;
   hasPrev: boolean; hasNext: boolean; onLoop: (value: boolean) => void; onPlay: () => void; onStop: () => void; onSeek: (ms: number) => void; onPlayFrom: () => void;
-  onPrev: () => void; onNext: () => void; apply: (change: (current: SegmentationManifest) => SegmentationManifest, success?: string) => boolean;
+  onPrev: () => void; onNext: () => void; onMergePrevious: () => void; apply: (change: (current: SegmentationManifest) => SegmentationManifest, success?: string) => boolean;
 }) {
   const review = clip.review;
   const [text, setText] = useState(review.transcript ?? '');
@@ -347,6 +352,7 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
         <div className="seg-nudge"><span>Cut</span>
           <button className="secondary" onClick={() => apply((current) => splitClip(current, clip.id, playheadMs), 'Clip split at the marker. Review both parts.')}>Split at marker</button>
           {clip.cutCandidatesMs.map((at) => <button key={at} className="secondary" onClick={() => apply((current) => splitClip(current, clip.id, at), 'Clip split at the pause. Review both parts.')}>Split at pause {fmt(at)}</button>)}
+          <button className="secondary" disabled={!hasPrev} onClick={onMergePrevious}>Merge with previous</button>
           <button className="secondary" disabled={!hasNext} onClick={() => apply((current) => mergeWithNext(current, clip.id), 'Merged with the next clip. Review it again.')}>Merge with next</button>
         </div>
       </details>

@@ -71,6 +71,13 @@ describe('split and merge', () => {
     expect(nextClipId(split)).toBe('c005');
   });
 
+  it('merges a clip into the previous one, which keeps its own id', () => {
+    const merged = mergeWithNext(fixture(), 'c001'); // what "Merge with previous" does when c002 is selected
+    expect(merged.clips.map((clip) => clip.id)).toEqual(['c001', 'c003']);
+    expect([merged.clips[0]!.startMs, merged.clips[0]!.endMs]).toEqual([1_000, 18_000]);
+    expect(merged.clips[0]!.cutCandidatesMs).toContain(10_500); // the old boundary stays a cut point
+  });
+
   it('flags a long silence created by merging and clears it when splitting', () => {
     const merged = mergeWithNext(fixture(), 'c002'); // 18_000 -> 30_000 gap of 12 s
     expect(merged.clips[1]!.flags).toContain('long_internal_pause');
