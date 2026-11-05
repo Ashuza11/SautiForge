@@ -38,6 +38,7 @@ export function SegmentationReview() {
   const [playheadMs, setPlayheadMs] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [loop, setLoop] = useState(true);
+  const [adjustOpen, setAdjustOpen] = useState(false); // kept here because the editor remounts after every boundary change
 
   useEffect(() => () => {
     if (loaded) { URL.revokeObjectURL(loaded.originalUrl); if (loaded.vocalsUrl) URL.revokeObjectURL(loaded.vocalsUrl); }
@@ -269,7 +270,7 @@ export function SegmentationReview() {
                 clip={selected} manifest={manifest} audio={shown} playheadMs={playheadMs} playing={playing} loop={loop} reviewer={reviewer}
                 hasPrev={selectedIndex > 0} hasNext={selectedIndex < clips.length - 1}
                 onLoop={setLoop} onPlay={() => playFrom(selected.startMs)} onStop={stop} onSeek={seek} onPlayFrom={() => playFrom(playheadMs)}
-                onPrev={() => go(-1)} onNext={() => go(1)} onMergePrevious={mergePrevious} apply={apply} />
+                onPrev={() => go(-1)} onNext={() => go(1)} onMergePrevious={mergePrevious} adjustOpen={adjustOpen} onAdjustOpen={setAdjustOpen} apply={apply} />
             ) : <p className="empty">Select a clip.</p>}
           </div>
         </>
@@ -278,10 +279,10 @@ export function SegmentationReview() {
   );
 }
 
-function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loop, reviewer, hasPrev, hasNext, onLoop, onPlay, onStop, onSeek, onPlayFrom, onPrev, onNext, onMergePrevious, apply }: {
+function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loop, reviewer, hasPrev, hasNext, onLoop, onPlay, onStop, onSeek, onPlayFrom, onPrev, onNext, onMergePrevious, adjustOpen, onAdjustOpen, apply }: {
   hasVocals: boolean; clip: SegmentClip; manifest: SegmentationManifest; audio: AudioView; playheadMs: number; playing: boolean; loop: boolean; reviewer: string;
   hasPrev: boolean; hasNext: boolean; onLoop: (value: boolean) => void; onPlay: () => void; onStop: () => void; onSeek: (ms: number) => void; onPlayFrom: () => void;
-  onPrev: () => void; onNext: () => void; onMergePrevious: () => void; apply: (change: (current: SegmentationManifest) => SegmentationManifest, success?: string) => boolean;
+  onPrev: () => void; onNext: () => void; onMergePrevious: () => void; adjustOpen: boolean; onAdjustOpen: (open: boolean) => void; apply: (change: (current: SegmentationManifest) => SegmentationManifest, success?: string) => boolean;
 }) {
   const review = clip.review;
   const [text, setText] = useState(review.transcript ?? '');
@@ -343,8 +344,12 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
         <span className="seg-sub">Marker {fmt(playheadMs)} · click the waveform to move it</span>
       </div>
 
-      <details className="seg-adjust">
+      <details className="seg-adjust" open={adjustOpen} onToggle={(event) => onAdjustOpen(event.currentTarget.open)}>
         <summary>Adjust the cut</summary>
+        <div className="seg-nudge"><span>Trim to marker <b>{fmt(playheadMs)}</b></span>
+          <button className="secondary" onClick={() => apply((current) => adjustClip(current, clip.id, playheadMs, clip.endMs), 'Start moved to the marker.')}>Start here</button>
+          <button className="secondary" onClick={() => apply((current) => adjustClip(current, clip.id, clip.startMs, playheadMs), 'End moved to the marker. The audio after it is no longer in this clip.')}>End here</button>
+          <small className="seg-sub">Click the waveform to place the marker, then trim.</small></div>
         {(['start', 'end'] as const).map((edge) => (
           <div key={edge} className="seg-nudge"><span>{edge === 'start' ? 'Start' : 'End'} <b>{fmt(edge === 'start' ? clip.startMs : clip.endMs)}</b></span>
             {NUDGES.map((delta) => <button key={delta} className="secondary" onClick={() => nudge(edge, delta)}>{delta > 0 ? '+' : ''}{delta} ms</button>)}</div>
