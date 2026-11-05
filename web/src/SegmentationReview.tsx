@@ -571,11 +571,9 @@ function ClipWave({ clip, audio, playheadMs, total, selection, onSeek, onSelect 
     drawPeaks(ctx, peaks, width, height);
     ctx.fillStyle = 'rgba(23,107,69,.14)'; ctx.fillRect(at(clip.startMs, width), 0, at(clip.endMs, width) - at(clip.startMs, width), height);
     ctx.fillStyle = COLORS.selected; ctx.fillRect(at(clip.startMs, width) - 1, 0, 3, height); ctx.fillRect(at(clip.endMs, width) - 1, 0, 3, height);
-    for (const range of removed) { // removed sections: red, striped, so they are not mistaken for audio that will be kept
-      const x = at(range.startMs, width); const w = at(range.endMs, width) - x;
-      ctx.fillStyle = 'rgba(166,55,55,.30)'; ctx.fillRect(x, 0, w, height);
-      ctx.strokeStyle = 'rgba(166,55,55,.55)'; ctx.lineWidth = 1;
-      for (let d = -height; d < w; d += 9) { ctx.beginPath(); ctx.moveTo(x + d, height); ctx.lineTo(x + d + height, 0); ctx.stroke(); }
+    for (const range of removed) { // removed sections: solid red, so they cannot be mistaken for audio that will be kept
+      const x = at(range.startMs, width);
+      ctx.fillStyle = 'rgba(196,60,60,.42)'; ctx.fillRect(x, 0, at(range.endMs, width) - x, height);
     }
     ctx.fillStyle = COLORS.cut;
     for (const cut of clip.cutCandidatesMs) for (let y = 0; y < height; y += 10) ctx.fillRect(at(cut, width), y, 2, 5);
