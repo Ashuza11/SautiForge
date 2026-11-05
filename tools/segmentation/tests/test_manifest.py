@@ -33,6 +33,13 @@ class ManifestTests(unittest.TestCase):
             validate_manifest(manifest_with({**patch, "hasMusic": True}))
         validate_manifest(manifest_with({**patch, "hasMusic": False}))
 
+    def test_speaker_role_must_be_known_but_may_be_absent(self):
+        validate_manifest(manifest_with({"speakerRole": "narrator"}))
+        validate_manifest(manifest_with({"speakerRole": "character", "speaker": "Peter"}))
+        validate_manifest(manifest_with({"speakerRole": None}))
+        with self.assertRaises(ValueError):
+            validate_manifest(manifest_with({"speakerRole": "actor"}))
+
     def test_rejected_needs_reason(self):
         with self.assertRaises(ValueError):
             validate_manifest(manifest_with({"status": "rejected"}))

@@ -8,11 +8,12 @@ from pathlib import Path
 
 SCHEMA = "sautiforge.segmentation/1"
 REVIEW_STATUSES = {"proposed", "accepted", "rejected"}
+SPEAKER_ROLES = {"narrator", "character", "multiple", "unknown"}
 TIERS = {"asr", "asr_tts"}  # asr_tts = also eligible for the clean TTS subset
 
 
 def new_review() -> dict:
-    return {"status": "proposed", "transcript": None, "speaker": None, "hasMusic": None,
+    return {"status": "proposed", "transcript": None, "speaker": None, "speakerRole": None, "hasMusic": None,
             "tier": None, "rejectReason": None, "reviewedBy": None, "reviewedAt": None}
 
 
@@ -67,6 +68,8 @@ def validate_manifest(manifest: dict) -> None:
         review = clip.get("review") or {}
         if review.get("status") not in REVIEW_STATUSES:
             raise ValueError(f"{cid}: invalid review status.")
+        if review.get("speakerRole") not in (None, *SPEAKER_ROLES):
+            raise ValueError(f"{cid}: unknown speaker role {review.get('speakerRole')!r}.")
         if review["status"] == "accepted":
             if review.get("tier") not in TIERS:
                 raise ValueError(f"{cid}: an accepted clip needs a tier ({sorted(TIERS)}).")

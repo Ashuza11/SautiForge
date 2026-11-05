@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   acceptClip, adjustClip, editReview, mergeWithNext, parseManifest, pausesInside, rejectClip, rejectReasons,
-  reopenClip, reviewProgress, serializeManifest, splitAtPause, splitClip, type SegmentClip, type SegmentationManifest,
+  reopenClip, reviewProgress, serializeManifest, speakerRoles, splitAtPause, splitClip, type SpeakerRole, type SegmentClip, type SegmentationManifest,
 } from './domain/segmentation';
 import { LocalSegmentationDraftRepository } from './domain/segmentation-draft';
 import { createAudioView, parseWav16Mono, type AudioView } from './domain/wav';
@@ -249,7 +249,7 @@ export function SegmentationReview() {
                     <button key={clip.id} className={`seg-item${clip.id === selectedId ? ' selected' : ''}`} onClick={() => setSelectedId(clip.id)}>
                       <i className={`dot dot-${clip.review.status}`} aria-hidden="true" />
                       <strong>{clip.id}</strong>
-                      <span>{fmt(clip.startMs)} · {(clip.durationMs / 1000).toFixed(1)} s</span>
+                      <span>{fmt(clip.startMs)} · {(clip.durationMs / 1000).toFixed(1)} s{clip.review.speakerRole ? ` · ${speakerRoles.find((role) => role.value === clip.review.speakerRole)?.label ?? ''}` : ''}</span>
                       <em>{clip.review.status === 'proposed' ? '' : clip.review.status === 'accepted' && clip.review.tier === 'asr_tts' ? 'accepted · TTS' : clip.review.status}</em>
                       {warnings.length ? <small>{warnings.map((flag) => FLAG_TEXT[flag] ?? flag).join(' · ')}</small> : null}
                     </button>
@@ -284,11 +284,15 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState<string>(rejectReasons[0]);
   const locked = review.status !== 'proposed';
+  const editable = review.status !== 'rejected'; // notes, speaker and the TTS choice can change after accepting
   const [tts, setTts] = useState(review.tier === 'asr_tts');
   const pauses = useMemo(() => pausesInside(manifest, clip, TTS_PAUSE_CAP_MS), [manifest, clip]);
 
   const commitNotes = (patch: Partial<typeof review> = {}) =>
     apply((current) => editReview(current, clip.id, { transcript: text.trim() ? text : null, speaker: speaker.trim() || null, ...patch }), 'Notes saved in this browser.');
+
+  const changeRole = (value: string) =>
+    apply((current) => editReview(current, clip.id, { speakerRole: value ? (value as SpeakerRole) : null }), value ? `${clip.id}: speaker set.` : `${clip.id}: speaker cleared.`);
 
   // Before accepting, the box only sets the choice used on Accept. After accepting it saves at once, so a forgotten tick can be fixed without reopening the clip.
   const changeTts = (checked: boolean) => {
@@ -363,19 +367,29 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
 
       {hasVocals ? (
         <label className="seg-tts">
-          <input type="checkbox" checked={tts} disabled={review.status === 'rejected'} onChange={(event) => changeTts(event.target.checked)} />
+          <input type="checkbox" checked={tts} disabled={!editable} onChange={(event) => changeTts(event.target.checked)} />
           <span><b>Also use for TTS</b><small>Tick only if the cleaned voice sounds clean: no music left and nothing robotic or watery. Every accepted clip is already used for ASR.</small></span>
         </label>
       ) : null}
 
+      <div className="seg-speaker">
+        <label className="field"><span>Who is speaking</span>
+          <select value={review.speakerRole ?? ''} disabled={!editable} onChange={(event) => changeRole(event.target.value)}>
+            <option value="">Not set</option>
+            {speakerRoles.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
+          </select></label>
+        <label className="field"><span>Name or code (optional)</span>
+          <input value={speaker} disabled={!editable} onChange={(event) => setSpeaker(event.target.value)} onBlur={() => editable && speaker.trim() !== (review.speaker ?? '') && commitNotes()}
+            placeholder="e.g. Jesus, Peter, voice A" /></label>
+      </div>
+
       <details className="seg-optional">
-        <summary>Optional details</summary>
-        <p className="seg-sub">Leave these empty if community annotators will transcribe later.</p>
+        <summary>Transcript (optional)</summary>
+        <p className="seg-sub">Leave empty if community annotators will transcribe later.</p>
         <div className="seg-form">
-          <label className="field"><span>Transcript</span>
-            <textarea rows={3} value={text} disabled={locked} onChange={(event) => setText(event.target.value)} onBlur={() => !locked && commitNotes()}
-              placeholder="What was actually spoken, exactly as heard." /></label>
-          <label className="field"><span>Speaker</span><input value={speaker} disabled={locked} onChange={(event) => setSpeaker(event.target.value)} onBlur={() => !locked && commitNotes()} placeholder="e.g. narrator, voice A" /></label>
+          <label className="field"><span>What was actually spoken</span>
+            <textarea rows={3} value={text} disabled={!editable} onChange={(event) => setText(event.target.value)} onBlur={() => editable && text.trim() !== (review.transcript ?? '') && commitNotes()}
+              placeholder="Exactly as heard." /></label>
         </div>
       </details>
 

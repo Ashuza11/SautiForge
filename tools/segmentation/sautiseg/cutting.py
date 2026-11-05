@@ -16,7 +16,7 @@ from .pauses import assemble, keep_ranges, kept_ms
 from .separate import write_mono_wav
 
 COLUMNS = ["clip_id", "file", "audio_variant", "start_ms", "end_ms", "duration_s", "trimmed_ms", "sample_rate", "sha256", "transcript",
-           "speaker", "has_music", "tier", "source_file", "source_sha256", "source_url"]
+           "speaker_role", "speaker", "has_music", "tier", "source_file", "source_sha256", "source_url"]
 
 
 DEFAULT_MAX_PAUSE_MS = 500
@@ -77,7 +77,7 @@ def cut_accepted(manifest_path: Path, source: Path, *, sample_rate: int = 24000,
             "start_ms": clip["startMs"], "end_ms": clip["endMs"],
             "duration_s": f"{actual_ms / 1000:.3f}", "trimmed_ms": clip["durationMs"] - expected_ms,
             "sample_rate": sample_rate, "sha256": sha256_file(target),
-            "transcript": (review.get("transcript") or "").strip(), "speaker": review.get("speaker") or "",
+            "transcript": (review.get("transcript") or "").strip(), "speaker_role": review.get("speakerRole") or "", "speaker": review.get("speaker") or "",
             "has_music": "" if review.get("hasMusic") is None else str(review["hasMusic"]).lower(),
             "tier": review["tier"], "source_file": src["fileName"], "source_sha256": src["sha256"],
             "source_url": src.get("sourceUrl") or "",

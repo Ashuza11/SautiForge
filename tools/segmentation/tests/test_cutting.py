@@ -79,6 +79,13 @@ class CutTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             cut_accepted(path, self.source)
 
+    def test_exports_speaker_role_and_name(self):
+        path = self.manifest({"status": "accepted", "tier": "asr_tts", "hasMusic": False, "speakerRole": "character", "speaker": "Peter"})
+        cut_accepted(path, self.source, sample_rate=16000)
+        for name in ("metadata.csv", "metadata_tts.csv"):
+            row = list(csv.DictReader((self.work / "export" / name).open(encoding="utf-8")))[0]
+            self.assertEqual((row["speaker_role"], row["speaker"]), ("character", "Peter"))
+
     def test_asr_tier_is_not_in_tts_file(self):
         path = self.manifest({"status": "accepted", "transcript": "x", "tier": "asr", "hasMusic": True}, with_vocals=False)
         cut_accepted(path, self.source)

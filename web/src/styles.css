@@ -236,6 +236,7 @@ input[type="search"] { width: 100%; min-height: 44px; padding: 10px 12px; border
 .seg-tts input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--green); }
 .seg-tts b, .seg-tts small { display: block; }
 .seg-tts small { margin-top: 2px; color: var(--muted); line-height: 1.45; }
+.seg-speaker { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 12px; margin-top: 14px; }
 .seg-optional { margin-top: 12px; }
 .seg-optional summary { cursor: pointer; color: var(--green-dark); font-size: 13px; font-weight: 700; }
 .seg-optional[open] summary { margin-bottom: 8px; }
@@ -249,6 +250,7 @@ input[type="search"] { width: 100%; min-height: 44px; padding: 10px 12px; border
 @media (max-width: 850px) {
   .seg-grid { grid-template-columns: 1fr; }
   .seg-list { position: static; }
+  .seg-speaker { grid-template-columns: 1fr; }
   .seg-items { max-height: 260px; }
   .seg-summary { grid-template-columns: 1fr; }
   .seg-reviewer, .seg-bar { grid-column: 1; grid-row: auto; }

@@ -3,6 +3,15 @@ import { z } from 'zod';
 export const SEGMENTATION_SCHEMA = 'sautiforge.segmentation/1';
 export const MIN_CLIP_MS = 500;
 
+/** Who is speaking. Free text in `speaker` adds a name or code (for example "Jesus" or "voice A"). */
+export const speakerRoles = [
+  { value: 'narrator', label: 'Narrator' },
+  { value: 'character', label: 'Character' },
+  { value: 'multiple', label: 'Multiple voices' },
+  { value: 'unknown', label: 'Not sure' },
+] as const;
+export type SpeakerRole = (typeof speakerRoles)[number]['value'];
+
 const DEFAULT_LIMITS = { min_clip_ms: 1_500, target_max_ms: 12_000, hard_max_ms: 20_000 };
 const DURATION_FLAGS = ['too_short', 'over_target', 'needs_manual_split', 'tts_length_ok'];
 const LONG_PAUSE_MS = 1_000;
@@ -11,6 +20,7 @@ export const clipReviewSchema = z.object({
   status: z.enum(['proposed', 'accepted', 'rejected']),
   transcript: z.string().nullable(),
   speaker: z.string().nullable(),
+  speakerRole: z.enum(['narrator', 'character', 'multiple', 'unknown']).nullable().optional(),
   hasMusic: z.boolean().nullable(),
   tier: z.enum(['asr', 'asr_tts']).nullable(),
   rejectReason: z.string().nullable(),
@@ -55,7 +65,7 @@ export type SegmentationManifest = z.infer<typeof segmentationManifestSchema>;
 export const rejectReasons = ['music only', 'overlapping speech', 'not speech', 'unclear audio', 'cut mid-phrase', 'other language', 'other'] as const;
 
 export function newReview(): ClipReview {
-  return { status: 'proposed', transcript: null, speaker: null, hasMusic: null, tier: null, rejectReason: null, reviewedBy: null, reviewedAt: null };
+  return { status: 'proposed', transcript: null, speaker: null, speakerRole: null, hasMusic: null, tier: null, rejectReason: null, reviewedBy: null, reviewedAt: null };
 }
 
 /** Same acceptance rules as the Python exporter; empty means the clip can be accepted. A transcript is optional: community annotators write it later. */

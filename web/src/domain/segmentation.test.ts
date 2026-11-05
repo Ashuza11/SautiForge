@@ -147,6 +147,24 @@ describe('review decisions', () => {
     expect(manifest.clips[1]!.review).toMatchObject({ status: 'proposed', rejectReason: null });
   });
 
+  it('keeps a speaker role and name editable after accepting, without reopening the clip', () => {
+    let manifest = acceptClip(fixture(), 'c001', 'A', NOW);
+    manifest = editReview(manifest, 'c001', { speakerRole: 'narrator' });
+    manifest = editReview(manifest, 'c001', { speaker: 'voice A' });
+    expect(manifest.clips[0]!.review).toMatchObject({ status: 'accepted', speakerRole: 'narrator', speaker: 'voice A' });
+    manifest = editReview(manifest, 'c001', { speakerRole: 'character', speaker: 'Peter' });
+    expect(manifest.clips[0]!.review).toMatchObject({ status: 'accepted', speakerRole: 'character', speaker: 'Peter' });
+    expect(parseManifest(serializeManifest(manifest)).clips[0]!.review.speakerRole).toBe('character');
+  });
+
+  it('rejects an unknown speaker role and still reads older manifests without the field', () => {
+    const raw = JSON.parse(serializeManifest(fixture()));
+    delete raw.clips[0].review.speakerRole;
+    expect(parseManifest(JSON.stringify(raw)).clips[0]!.review.speakerRole).toBeUndefined();
+    raw.clips[0].review.speakerRole = 'actor';
+    expect(() => parseManifest(JSON.stringify(raw))).toThrow();
+  });
+
   it('finds the silences inside a clip that the TTS export shortens', () => {
     const base = fixture();
     const manifest = { ...base, speechSpans: [{ startMs: 1_200, endMs: 2_000 }, { startMs: 4_600, endMs: 6_000 }, { startMs: 6_800, endMs: 8_500 }, { startMs: 12_500, endMs: 13_000 }] };
