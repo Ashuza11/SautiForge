@@ -4,6 +4,7 @@ import {
   acceptClip, adjustClip, editReview, mergeWithNext, parseManifest, pausesInside, rejectClip, rejectReasons,
   reopenClip, reviewProgress, serializeManifest, speakerRoles, splitAtPause, splitClip, type SpeakerRole, type SegmentClip, type SegmentationManifest,
 } from './domain/segmentation';
+import { History } from './domain/history';
 import { LocalSegmentationDraftRepository } from './domain/segmentation-draft';
 import { createAudioView, parseWav16Mono, type AudioView } from './domain/wav';
 
@@ -38,6 +39,9 @@ export function SegmentationReview() {
   const [playheadMs, setPlayheadMs] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [loop, setLoop] = useState(true);
+  const history = useRef(new History<SegmentationManifest>(200));
+  const [, setHistoryVersion] = useState(0);
+  const refreshHistory = () => setHistoryVersion((value) => value + 1);
   const [adjustOpen, setAdjustOpen] = useState(false); // kept here because the editor remounts after every boundary change
 
   useEffect(() => () => {
@@ -76,6 +80,7 @@ export function SegmentationReview() {
         return { original: original.view, originalUrl: original.url, vocals: vocals?.view ?? null, vocalsUrl: vocals?.url ?? null, source };
       });
       setVariant(vocals ? 'vocals' : 'original');
+      history.current.clear(); refreshHistory();
       setManifest(working);
       setSelectedId(working.clips.find((clip) => clip.review.status === 'proposed')?.id ?? working.clips[0]?.id ?? null);
       setMessage(restored ? 'Restored your saved review for this video from this browser.' : `Opened ${source.clips.length} proposed clips. Nothing is uploaded.`);
@@ -93,6 +98,7 @@ export function SegmentationReview() {
     setError(null);
     let next: SegmentationManifest;
     try { next = change(manifest); } catch (cause) { setError(cause instanceof Error ? cause.message : 'That change is not allowed.'); return false; }
+    if (next !== manifest) { history.current.record(manifest); refreshHistory(); }
     setManifest(next);
     try { repository.save(next); setMessage(success ?? 'Saved in this browser.'); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'The review could not be saved.'); }
@@ -161,8 +167,47 @@ export function SegmentationReview() {
   const resetDraft = () => {
     if (!loaded || !window.confirm('Discard all review work for this video in this browser and start again from the file you opened?')) return;
     try { repository.clear(loaded.source.source.sha256); } catch (cause) { setError(cause instanceof Error ? cause.message : 'The draft could not be removed.'); return; }
-    setManifest(loaded.source); setSelectedId(loaded.source.clips[0]?.id ?? null); setMessage('Review reset to the opened file.');
+    if (manifest) { history.current.record(manifest); refreshHistory(); }
+    setManifest(loaded.source); setSelectedId(loaded.source.clips[0]?.id ?? null); setMessage('Review reset to the opened file. You can undo this.');
   };
+
+  /** Put a previous (or next) state back, keep the same clip selected when it still exists, and save it. */
+  const restore = (target: SegmentationManifest, text: string) => {
+    stop(); setError(null); setManifest(target);
+    const here = clips.find((clip) => clip.id === selectedId);
+    const nearest = [...target.clips].sort((a, b) => Math.abs(a.startMs - (here?.startMs ?? 0)) - Math.abs(b.startMs - (here?.startMs ?? 0)))[0];
+    setSelectedId(target.clips.some((clip) => clip.id === selectedId) ? selectedId : nearest?.id ?? null);
+    try { repository.save(target); setMessage(text); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'The review could not be saved.'); }
+    refreshHistory();
+  };
+  const undo = () => {
+    if (!manifest) return;
+    const previous = history.current.undo(manifest);
+    if (previous) restore(previous, history.current.undoCount ? `Undid the last change. ${history.current.undoCount} more can be undone.` : 'Undid the last change.');
+  };
+  const redo = () => {
+    if (!manifest) return;
+    const next = history.current.redo(manifest);
+    if (next) restore(next, 'Redid the change.');
+  };
+  const undoRef = useRef(undo);
+  const redoRef = useRef(redo);
+  undoRef.current = undo;
+  redoRef.current = redo;
+  useEffect(() => {
+    const textTypes = ['text', 'search', 'email', 'number', 'tel', 'url', 'password'];
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'TEXTAREA' || target.isContentEditable || (target.tagName === 'INPUT' && textTypes.includes((target as HTMLInputElement).type)))) return; // let text fields keep their own undo
+      const key = event.key.toLowerCase();
+      if (key === 'z' && !event.shiftKey) { event.preventDefault(); undoRef.current(); }
+      else if ((key === 'z' && event.shiftKey) || key === 'y') { event.preventDefault(); redoRef.current(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const rememberReviewer = (value: string) => { setReviewer(value); try { window.localStorage.setItem(REVIEWER_KEY, value); } catch { /* optional convenience */ } };
   /** Merge the selected clip into the one before it. The merged clip keeps the earlier clip's id, so select that. */
@@ -188,6 +233,8 @@ export function SegmentationReview() {
         </div>
         {manifest ? (
           <div className="header-actions">
+            <button className="quiet" disabled={history.current.undoCount === 0} title="Undo the last change (Ctrl+Z)" onClick={undo}>Undo{history.current.undoCount ? ` (${history.current.undoCount})` : ''}</button>
+            <button className="quiet" disabled={history.current.redoCount === 0} title="Redo (Ctrl+Shift+Z)" onClick={redo}>Redo</button>
             <button className="quiet" onClick={resetDraft}>Reset</button>
             <button className="secondary" disabled={busy} onClick={() => picker.current?.click()}>Open other files</button>
             <button onClick={download}>Download reviewed manifest</button>
