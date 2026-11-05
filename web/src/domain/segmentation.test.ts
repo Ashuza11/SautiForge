@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { acceptClip, acceptanceProblems, adjustClip, editReview, mergeWithNext, newReview, nextClipId, parseManifest, pausesInside, rejectClip, reopenClip, reviewProgress, serializeManifest, splitAtPause, splitClip, validateManifest, type SegmentationManifest } from './segmentation';
+import { acceptClip, acceptanceProblems, adjustClip, editReview, mergeWithNext, newReview, nextClipId, parseManifest, keptMs, normalizeRanges, pausesInside, rejectClip, removeSection, removedMs, reopenClip, restoreSection, reviewProgress, serializeManifest, shortenPause, splitAtPause, splitClip, validateManifest, type SegmentationManifest } from './segmentation';
 
 const NOW = new Date('2026-11-04T10:00:00Z');
 
@@ -187,5 +187,98 @@ describe('review decisions', () => {
     manifest = acceptClip(manifest, 'c001', 'A', NOW);
     manifest = rejectClip(manifest, 'c003', 'not speech', 'A', NOW);
     expect(reviewProgress(manifest)).toEqual({ total: 3, accepted: 1, rejected: 1, proposed: 1, tts: 1, acceptedSeconds: 8 });
+  });
+});
+
+describe('removing sections from a clip', () => {
+  it('removes a stretch, keeps the clip range, and counts only what remains', () => {
+    const manifest = removeSection(fixture(), 'c001', { startMs: 3_000, endMs: 5_000 });
+    const clip = manifest.clips[0]!;
+    expect(clip.removed).toEqual([{ startMs: 3_000, endMs: 5_000 }]);
+    expect([clip.startMs, clip.endMs, clip.durationMs]).toEqual([1_000, 9_000, 8_000]);
+    expect([removedMs(clip), keptMs(clip)]).toEqual([2_000, 6_000]);
+    expect(parseManifest(serializeManifest(manifest)).clips[0]!.removed).toEqual([{ startMs: 3_000, endMs: 5_000 }]);
+  });
+
+  it('merges overlapping and touching removals', () => {
+    let manifest = removeSection(fixture(), 'c001', { startMs: 3_000, endMs: 4_000 });
+    manifest = removeSection(manifest, 'c001', { startMs: 3_800, endMs: 5_000 });
+    manifest = removeSection(manifest, 'c001', { startMs: 5_000, endMs: 5_500 });
+    expect(manifest.clips[0]!.removed).toEqual([{ startMs: 3_000, endMs: 5_500 }]);
+    expect(normalizeRanges([{ startMs: 5, endMs: 9 }, { startMs: 1, endMs: 3 }, { startMs: 2, endMs: 6 }], 0, 8)).toEqual([{ startMs: 1, endMs: 8 }]);
+  });
+
+  it('judges length, flags and the TTS tag by what remains after removal', () => {
+    const longer = adjustClip(fixture(), 'c003', 30_000, 44_000);              // 14 s, past the 12 s target
+    expect(longer.clips[2]!.flags).toEqual(['over_target']);
+    const trimmed = removeSection(longer, 'c003', { startMs: 32_000, endMs: 38_000 });   // 8 s left
+    expect(trimmed.clips[2]!.durationMs).toBe(14_000);
+    expect(trimmed.clips[2]!.flags).toEqual(['tts_length_ok']);
+    expect(() => removeSection(trimmed, 'c003', { startMs: 30_100, endMs: 44_000 })).toThrow(/less than 500 ms/);
+  });
+
+  it('refuses sections that are outside the clip, tiny, or not whole milliseconds', () => {
+    const manifest = fixture();
+    expect(() => removeSection(manifest, 'c001', { startMs: 500, endMs: 3_000 })).toThrow(/inside this clip/);
+    expect(() => removeSection(manifest, 'c001', { startMs: 3_000, endMs: 9_500 })).toThrow(/inside this clip/);
+    expect(() => removeSection(manifest, 'c001', { startMs: 3_000, endMs: 3_010 })).toThrow(/longer section/);
+    expect(() => removeSection(manifest, 'c001', { startMs: 3_000.5, endMs: 5_000 })).toThrow(/whole milliseconds/);
+  });
+
+  it('sends an accepted clip back to review, and restoring a section does too', () => {
+    let manifest = acceptClip(fixture(), 'c001', 'A', NOW);
+    manifest = removeSection(manifest, 'c001', { startMs: 3_000, endMs: 5_000 });
+    expect(manifest.clips[0]!.review.status).toBe('proposed');
+    manifest = acceptClip(manifest, 'c001', 'A', NOW);
+    manifest = restoreSection(manifest, 'c001', { startMs: 3_000, endMs: 5_000 });
+    expect(manifest.clips[0]!.removed).toBeUndefined();
+    expect(manifest.clips[0]!.review.status).toBe('proposed');
+    expect(() => restoreSection(manifest, 'c001', { startMs: 1, endMs: 2 })).toThrow(/not removed/);
+  });
+
+  it('shortens a silence to the amount you keep, from both sides', () => {
+    const base = fixture();
+    const manifest = { ...base, speechSpans: [{ startMs: 1_200, endMs: 2_000 }, { startMs: 6_000, endMs: 7_000 }] };
+    const pause = pausesInside(manifest, manifest.clips[0]!, 500)[0]!;
+    expect(pause.lengthMs).toBe(4_000);
+    const shortened = shortenPause(manifest, 'c001', pause, 300);
+    expect(shortened.clips[0]!.removed).toEqual([{ startMs: 2_150, endMs: 5_850 }]);
+    expect(pausesInside(shortened, shortened.clips[0]!, 100)[0]!.lengthMs).toBe(300);   // what is left of the silence
+    expect(pausesInside(shortened, shortened.clips[0]!, 500)).toEqual([]);              // no longer needs attention
+    expect(() => shortenPause(shortened, 'c001', pause, 300)).not.toThrow();           // shortening again is harmless
+    expect(() => shortenPause(manifest, 'c001', { startMs: 2_000, endMs: 2_200 }, 300)).toThrow(/already short/);
+  });
+
+  it('keeps removed sections with the right half when a clip is split, and joins them when merged', () => {
+    let manifest = removeSection(fixture(), 'c001', { startMs: 3_000, endMs: 7_000 });
+    const split = splitClip(manifest, 'c001', 5_000);
+    expect(split.clips[0]!.removed).toEqual([{ startMs: 3_000, endMs: 5_000 }]);
+    expect(split.clips[1]!.removed).toEqual([{ startMs: 5_000, endMs: 7_000 }]);
+    manifest = removeSection(fixture(), 'c002', { startMs: 14_000, endMs: 15_000 });
+    const merged = mergeWithNext(removeSection(manifest, 'c001', { startMs: 3_000, endMs: 4_000 }), 'c001');
+    expect(merged.clips[0]!.removed).toEqual([{ startMs: 3_000, endMs: 4_000 }, { startMs: 14_000, endMs: 15_000 }]);
+  });
+
+  it('drops removed sections that fall outside new edges', () => {
+    const manifest = removeSection(fixture(), 'c001', { startMs: 1_500, endMs: 2_500 });
+    const trimmed = adjustClip(manifest, 'c001', 4_000, 9_000);
+    expect(trimmed.clips[0]!.removed).toBeUndefined();
+    const clamped = adjustClip(manifest, 'c001', 2_000, 9_000);
+    expect(clamped.clips[0]!.removed).toEqual([{ startMs: 2_000, endMs: 2_500 }]);
+  });
+
+  it('subtracts removed time from the silence shown to the reviewer', () => {
+    const base = fixture();
+    const manifest = { ...base, speechSpans: [{ startMs: 1_200, endMs: 2_000 }, { startMs: 6_000, endMs: 7_000 }] };
+    const part = removeSection(manifest, 'c001', { startMs: 3_000, endMs: 4_000 });
+    expect(pausesInside(part, part.clips[0]!, 500)[0]!.lengthMs).toBe(3_000);
+  });
+
+  it('rejects a manifest whose removed sections are invalid', () => {
+    const raw = JSON.parse(serializeManifest(removeSection(fixture(), 'c001', { startMs: 3_000, endMs: 4_000 })));
+    raw.clips[0].removed = [{ startMs: 500, endMs: 2_000 }];
+    expect(() => parseManifest(JSON.stringify(raw))).toThrow(/inside the clip/);
+    raw.clips[0].removed = [{ startMs: 4_000, endMs: 5_000 }, { startMs: 3_000, endMs: 3_500 }];
+    expect(() => parseManifest(JSON.stringify(raw))).toThrow(/in order/);
   });
 });

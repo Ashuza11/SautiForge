@@ -231,6 +231,11 @@ input[type="search"] { width: 100%; min-height: 44px; padding: 10px 12px; border
 .seg-pauses p { margin: 0 0 8px; }
 .seg-pauses ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .seg-pauses li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.seg-pause-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg-selection { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 40px; margin: -4px 0 8px; font-size: 13px; }
+.seg-selection b { color: #1c3f9a; }
+.seg-selection button { min-height: 34px; padding: 4px 12px; font-size: 13px; }
+.seg-detail { touch-action: none; user-select: none; }
 .seg-pauses li button { min-height: 32px; padding: 3px 10px; font-size: 12px; }
 .seg-tts { display: flex; align-items: start; gap: 10px; margin-top: 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: #f8faf8; cursor: pointer; }
 .seg-tts input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--green); }

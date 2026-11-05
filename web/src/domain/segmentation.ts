@@ -15,6 +15,7 @@ export type SpeakerRole = (typeof speakerRoles)[number]['value'];
 const DEFAULT_LIMITS = { min_clip_ms: 1_500, target_max_ms: 12_000, hard_max_ms: 20_000 };
 const DURATION_FLAGS = ['too_short', 'over_target', 'needs_manual_split', 'tts_length_ok'];
 const LONG_PAUSE_MS = 1_000;
+const MIN_REMOVED_MS = 20;
 
 export const clipReviewSchema = z.object({
   status: z.enum(['proposed', 'accepted', 'rejected']),
@@ -37,6 +38,8 @@ export const clipSchema = z.object({
   speechEndMs: z.number().int().positive(),
   spanCount: z.number().int().nonnegative(),
   cutCandidatesMs: z.array(z.number().int()),
+  /** Sections the reviewer removed from inside this clip (for example white space). Applied to every exported copy. */
+  removed: z.array(z.object({ startMs: z.number().int().nonnegative(), endMs: z.number().int().positive() })).optional(),
   flags: z.array(z.string()),
   metrics: z.record(z.string(), z.number()),
   review: clipReviewSchema,
@@ -58,6 +61,7 @@ export const segmentationManifestSchema = z.object({
   clips: z.array(clipSchema),
 }).passthrough();
 
+export type ClipRange = { startMs: number; endMs: number };
 export type ClipReview = z.infer<typeof clipReviewSchema>;
 export type SegmentClip = z.infer<typeof clipSchema>;
 export type SegmentationManifest = z.infer<typeof segmentationManifestSchema>;
@@ -76,6 +80,27 @@ export function acceptanceProblems(review: ClipReview): string[] {
   return problems;
 }
 
+/** Sort, clamp to [startMs, endMs] and merge overlapping or touching ranges. */
+export function normalizeRanges(ranges: ClipRange[], startMs: number, endMs: number): ClipRange[] {
+  const clamped = ranges
+    .map((range) => ({ startMs: Math.max(range.startMs, startMs), endMs: Math.min(range.endMs, endMs) }))
+    .filter((range) => range.endMs > range.startMs)
+    .sort((a, b) => a.startMs - b.startMs);
+  const merged: ClipRange[] = [];
+  for (const range of clamped) {
+    const last = merged[merged.length - 1];
+    if (last && range.startMs <= last.endMs) last.endMs = Math.max(last.endMs, range.endMs);
+    else merged.push({ ...range });
+  }
+  return merged;
+}
+
+export const removedMs = (clip: { removed?: ClipRange[] | undefined }): number =>
+  (clip.removed ?? []).reduce((sum, range) => sum + (range.endMs - range.startMs), 0);
+
+/** Length of the clip once its removed sections are taken out. */
+export const keptMs = (clip: { durationMs: number; removed?: ClipRange[] | undefined }): number => clip.durationMs - removedMs(clip);
+
 export function validateManifest(manifest: SegmentationManifest): void {
   const total = manifest.source.durationMs;
   const seen = new Set<string>();
@@ -86,6 +111,13 @@ export function validateManifest(manifest: SegmentationManifest): void {
     if (!(clip.startMs >= 0 && clip.startMs < clip.endMs && clip.endMs <= total)) throw new Error(`${clip.id}: boundaries must fit inside the source.`);
     if (clip.durationMs !== clip.endMs - clip.startMs) throw new Error(`${clip.id}: duration does not match its boundaries.`);
     if (clip.startMs < previousEnd) throw new Error(`${clip.id}: overlaps the previous clip.`);
+    let previousRemovedEnd = clip.startMs;
+    for (const range of clip.removed ?? []) {
+      if (!(range.startMs >= clip.startMs && range.startMs < range.endMs && range.endMs <= clip.endMs)) throw new Error(`${clip.id}: a removed section must lie inside the clip.`);
+      if (range.startMs < previousRemovedEnd) throw new Error(`${clip.id}: removed sections must be in order and not overlap.`);
+      previousRemovedEnd = range.endMs;
+    }
+    if (keptMs(clip) < MIN_CLIP_MS) throw new Error(`${clip.id}: less than ${MIN_CLIP_MS} ms would remain after the removed sections.`);
     previousEnd = clip.endMs;
     if (clip.review.status === 'accepted') {
       const problems = acceptanceProblems(clip.review);
@@ -117,10 +149,11 @@ function limits(manifest: SegmentationManifest) {
 function recomputeFlags(clip: SegmentClip, manifest: SegmentationManifest): string[] {
   const { min_clip_ms, target_max_ms, hard_max_ms } = limits(manifest);
   const kept = clip.flags.filter((flag) => !DURATION_FLAGS.includes(flag));
-  if (clip.durationMs < min_clip_ms) kept.push('too_short');
-  if (clip.durationMs > hard_max_ms) kept.push('needs_manual_split');
-  else if (clip.durationMs > target_max_ms) kept.push('over_target');
-  if (clip.durationMs >= 2_000 && clip.durationMs <= target_max_ms) kept.push('tts_length_ok');
+  const length = keptMs(clip); // what the exported audio will actually last
+  if (length < min_clip_ms) kept.push('too_short');
+  if (length > hard_max_ms) kept.push('needs_manual_split');
+  else if (length > target_max_ms) kept.push('over_target');
+  if (length >= 2_000 && length <= target_max_ms) kept.push('tts_length_ok');
   return kept;
 }
 
@@ -138,7 +171,10 @@ function withBounds(clip: SegmentClip, startMs: number, endMs: number, manifest:
     speechEndMs: Math.min(Math.max(clip.speechEndMs, startMs + 1), endMs),
     cutCandidatesMs: clip.cutCandidatesMs.filter((at) => at > startMs + MIN_CLIP_MS && at < endMs - MIN_CLIP_MS),
   };
-  return { ...bounded, flags: recomputeFlags(bounded, manifest) };
+  const removed = normalizeRanges(clip.removed ?? [], startMs, endMs);
+  const { removed: _drop, ...rest } = bounded;
+  const next: SegmentClip = removed.length ? { ...rest, removed } : rest;
+  return { ...next, flags: recomputeFlags(next, manifest) };
 }
 
 function find(manifest: SegmentationManifest, id: string): number {
@@ -214,6 +250,7 @@ export function mergeWithNext(manifest: SegmentationManifest, id: string): Segme
   const joined = withBounds({
     ...first, review: newReview(), metrics: {},
     flags: gapMs > LONG_PAUSE_MS && !joinedFlags.includes('long_internal_pause') ? [...joinedFlags, 'long_internal_pause'] : joinedFlags,
+    removed: [...(first.removed ?? []), ...(second.removed ?? [])],
     spanCount: first.spanCount + second.spanCount,
     cutCandidatesMs: [...first.cutCandidatesMs, Math.round((first.endMs + second.startMs) / 2), ...second.cutCandidatesMs],
     speechEndMs: second.speechEndMs,
@@ -259,6 +296,41 @@ export function reopenClip(manifest: SegmentationManifest, id: string): Segmenta
   return replaceReview(manifest, id, { ...clip.review, status: 'proposed', rejectReason: null, reviewedAt: null });
 }
 
+/** Remove a stretch (for example white space) from inside a clip. Audio is never edited; every export skips it. The clip returns to review. */
+export function removeSection(manifest: SegmentationManifest, id: string, range: ClipRange): SegmentationManifest {
+  const index = find(manifest, id);
+  const clip = manifest.clips[index]!;
+  if (!Number.isInteger(range.startMs) || !Number.isInteger(range.endMs)) throw new Error('A section must start and end on whole milliseconds.');
+  if (range.startMs < clip.startMs || range.endMs > clip.endMs) throw new Error('The section must be inside this clip.');
+  if (range.endMs - range.startMs < MIN_REMOVED_MS) throw new Error('Select a longer section to remove.');
+  const removed = normalizeRanges([...(clip.removed ?? []), range], clip.startMs, clip.endMs);
+  const candidate = { ...clip, removed };
+  if (keptMs(candidate) < MIN_CLIP_MS) throw new Error(`Removing this would leave less than ${MIN_CLIP_MS} ms of audio in the clip.`);
+  const changed = withBounds(candidate, clip.startMs, clip.endMs, manifest);
+  const review = clip.review.status === 'accepted' ? { ...clip.review, status: 'proposed' as const, reviewedAt: null } : clip.review;
+  return rebuild(manifest, manifest.clips.map((item, i) => (i === index ? { ...changed, review } : item)));
+}
+
+/** Bring a removed section back. */
+export function restoreSection(manifest: SegmentationManifest, id: string, section: ClipRange): SegmentationManifest {
+  const index = find(manifest, id);
+  const clip = manifest.clips[index]!;
+  const removed = (clip.removed ?? []).filter((range) => !(range.startMs === section.startMs && range.endMs === section.endMs));
+  if (removed.length === (clip.removed ?? []).length) throw new Error('That section is not removed.');
+  const { removed: _drop, ...rest } = clip;
+  const next: SegmentClip = removed.length ? { ...rest, removed } : rest;
+  const changed = withBounds(next, clip.startMs, clip.endMs, manifest);
+  const review = clip.review.status === 'accepted' ? { ...clip.review, status: 'proposed' as const, reviewedAt: null } : clip.review;
+  return rebuild(manifest, manifest.clips.map((item, i) => (i === index ? { ...changed, review } : item)));
+}
+
+/** Reduce a silence to keepMs by removing the middle of it, leaving half of keepMs on each side. */
+export function shortenPause(manifest: SegmentationManifest, id: string, pause: { startMs: number; endMs: number }, keepMs = 300): SegmentationManifest {
+  if (pause.endMs - pause.startMs <= keepMs + MIN_REMOVED_MS) throw new Error('That silence is already short.');
+  const half = Math.floor(keepMs / 2);
+  return removeSection(manifest, id, { startMs: pause.startMs + half, endMs: pause.endMs - (keepMs - half) });
+}
+
 export interface InternalPause { startMs: number; endMs: number; lengthMs: number }
 
 /** Silences between detected speech inside a clip, longest first. These are what the TTS export shortens. */
@@ -267,10 +339,16 @@ export function pausesInside(manifest: SegmentationManifest, clip: SegmentClip, 
     .filter((span) => span.endMs > clip.startMs && span.startMs < clip.endMs)
     .map((span) => ({ startMs: Math.max(span.startMs, clip.startMs), endMs: Math.min(span.endMs, clip.endMs) }))
     .sort((a, b) => a.startMs - b.startMs);
+  const removed = clip.removed ?? [];
   const pauses: InternalPause[] = [];
   for (let i = 0; i + 1 < inside.length; i += 1) {
-    const lengthMs = inside[i + 1]!.startMs - inside[i]!.endMs;
-    if (lengthMs > minMs) pauses.push({ startMs: inside[i]!.endMs, endMs: inside[i + 1]!.startMs, lengthMs });
+    const startMs = inside[i]!.endMs;
+    const endMs = inside[i + 1]!.startMs;
+    if (endMs <= startMs) continue;
+    // Length that is still audible: the silence minus anything the reviewer already removed from it.
+    const taken = removed.reduce((sum, range) => sum + Math.max(0, Math.min(range.endMs, endMs) - Math.max(range.startMs, startMs)), 0);
+    const lengthMs = endMs - startMs - taken;
+    if (lengthMs > minMs) pauses.push({ startMs, endMs, lengthMs });
   }
   return pauses.sort((a, b) => b.lengthMs - a.lengthMs);
 }

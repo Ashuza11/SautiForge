@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
-  acceptClip, adjustClip, editReview, mergeWithNext, parseManifest, pausesInside, rejectClip, rejectReasons,
-  reopenClip, reviewProgress, serializeManifest, speakerRoles, splitAtPause, splitClip, type SpeakerRole, type SegmentClip, type SegmentationManifest,
+  acceptClip, adjustClip, editReview, keptMs, mergeWithNext, parseManifest, pausesInside, rejectClip, rejectReasons, removeSection,
+  reopenClip, restoreSection, reviewProgress, serializeManifest, shortenPause, speakerRoles, splitAtPause, splitClip, type ClipRange, type SpeakerRole, type SegmentClip, type SegmentationManifest,
 } from './domain/segmentation';
 import { History } from './domain/history';
 import { LocalSegmentationDraftRepository } from './domain/segmentation-draft';
@@ -18,6 +18,7 @@ const FLAG_TEXT: Record<string, string> = {
 };
 const NUDGES = [-250, -50, 50, 250];
 const TTS_PAUSE_CAP_MS = 500; // must match the export default (cut --max-pause-ms)
+const KEEP_PAUSE_MS = 300;    // what "Shorten" leaves of a silence
 const REVIEWER_KEY = 'sautiforge.segmentation.reviewer';
 const FILTER_LABEL: Record<Filter, string> = { all: 'All', todo: 'To do', flagged: 'Flagged', accepted: 'Accepted', rejected: 'Rejected' };
 
@@ -135,7 +136,9 @@ export function SegmentationReview() {
     const tick = (time: number) => {
       const audio = audioRef.current;
       if (audio) {
-        const ms = audio.currentTime * 1000;
+        let ms = audio.currentTime * 1000;
+        const skipped = selected.removed?.find((range) => ms >= range.startMs && ms < range.endMs);
+        if (skipped) { audio.currentTime = skipped.endMs / 1000; ms = skipped.endMs; } // play it as it will be exported
         if (ms >= selected.endMs) {
           if (loop) audio.currentTime = selected.startMs / 1000; else { audio.pause(); setPlaying(false); setPlayheadMs(selected.endMs); return; }
         }
@@ -302,7 +305,7 @@ export function SegmentationReview() {
                     <button key={clip.id} className={`seg-item${clip.id === selectedId ? ' selected' : ''}`} onClick={() => setSelectedId(clip.id)}>
                       <i className={`dot dot-${clip.review.status}`} aria-hidden="true" />
                       <strong>{clip.id}</strong>
-                      <span>{fmt(clip.startMs)} · {(clip.durationMs / 1000).toFixed(1)} s{clip.review.speakerRole ? ` · ${speakerRoles.find((role) => role.value === clip.review.speakerRole)?.label ?? ''}` : ''}</span>
+                      <span>{fmt(clip.startMs)} · {(keptMs(clip) / 1000).toFixed(1)} s{clip.review.speakerRole ? ` · ${speakerRoles.find((role) => role.value === clip.review.speakerRole)?.label ?? ''}` : ''}</span>
                       <em>{clip.review.status === 'proposed' ? '' : clip.review.status === 'accepted' && clip.review.tier === 'asr_tts' ? 'accepted · TTS' : clip.review.status}</em>
                       {warnings.length ? <small>{warnings.map((flag) => FLAG_TEXT[flag] ?? flag).join(' · ')}</small> : null}
                     </button>
@@ -340,6 +343,11 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
   const editable = review.status !== 'rejected'; // notes, speaker and the TTS choice can change after accepting
   const [tts, setTts] = useState(review.tier === 'asr_tts');
   const pauses = useMemo(() => pausesInside(manifest, clip, TTS_PAUSE_CAP_MS), [manifest, clip]);
+  const [selection, setSelection] = useState<ClipRange | null>(null);
+  const removedSections = clip.removed ?? [];
+  const removeSelected = () => {
+    if (selection && apply((current) => removeSection(current, clip.id, selection), 'Section removed. It is skipped when you play the clip and in every export. Review the clip again.')) setSelection(null);
+  };
 
   const commitNotes = (patch: Partial<typeof review> = {}) =>
     apply((current) => editReview(current, clip.id, { transcript: text.trim() ? text : null, speaker: speaker.trim() || null, ...patch }), 'Notes saved in this browser.');
@@ -373,7 +381,7 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
       <header className="seg-editor-head">
         <div>
           <h3>{clip.id} <span className={`pill pill-${review.status}`}>{review.status}</span></h3>
-          <p className="seg-sub">{fmt(clip.startMs)} → {fmt(clip.endMs)} · {(clip.durationMs / 1000).toFixed(2)} s · {clip.spanCount} phrase{clip.spanCount === 1 ? '' : 's'}</p>
+          <p className="seg-sub">{fmt(clip.startMs)} → {fmt(clip.endMs)} · {(keptMs(clip) / 1000).toFixed(2)} s{removedSections.length ? ` (${((clip.durationMs - keptMs(clip)) / 1000).toFixed(1)} s removed)` : ''} · {clip.spanCount} phrase{clip.spanCount === 1 ? '' : 's'}</p>
         </div>
         <div className="compact-actions">
           <button className="quiet" disabled={!hasPrev} onClick={onPrev}>Previous</button>
@@ -382,7 +390,16 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
       </header>
 
       {warnings.length ? <p className="seg-flags">{warnings.map((flag) => <span key={flag} className="flag warn">{FLAG_TEXT[flag] ?? flag}</span>)}</p> : null}
-      <ClipWave clip={clip} audio={audio} playheadMs={playheadMs} total={manifest.source.durationMs} onSeek={onSeek} />
+      <ClipWave clip={clip} audio={audio} playheadMs={playheadMs} total={manifest.source.durationMs} selection={selection} onSeek={onSeek} onSelect={setSelection} />
+      <div className="seg-selection">
+        {selection ? (
+          <>
+            <span>Selected <b>{fmt(selection.startMs)} → {fmt(selection.endMs)}</b> ({((selection.endMs - selection.startMs) / 1000).toFixed(2)} s)</span>
+            <button disabled={!editable} onClick={removeSelected}>Remove selection</button>
+            <button className="quiet" onClick={() => setSelection(null)}>Clear</button>
+          </>
+        ) : <span className="seg-sub">Click to place the marker. Drag across the waveform to select a section, such as white space, and remove it.</span>}
+      </div>
 
       <div className="seg-transport">
         <button onClick={playing ? onStop : onPlay}>{playing ? 'Stop' : 'Play clip'}</button>
@@ -397,6 +414,15 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
           <button className="secondary" onClick={() => apply((current) => adjustClip(current, clip.id, playheadMs, clip.endMs), 'Start moved to the marker.')}>Start here</button>
           <button className="secondary" onClick={() => apply((current) => adjustClip(current, clip.id, clip.startMs, playheadMs), 'End moved to the marker. The audio after it is no longer in this clip.')}>End here</button>
           <small className="seg-sub">Click the waveform to place the marker, then trim.</small></div>
+        {removedSections.length ? (
+          <div className="seg-nudge"><span>Removed</span>
+            {removedSections.map((range) => (
+              <button key={range.startMs} className="secondary" onClick={() => apply((current) => restoreSection(current, clip.id, range), 'Section restored. Review the clip again.')}>
+                {fmt(range.startMs)} → {fmt(range.endMs)} · restore
+              </button>
+            ))}
+          </div>
+        ) : null}
         {(['start', 'end'] as const).map((edge) => (
           <div key={edge} className="seg-nudge"><span>{edge === 'start' ? 'Start' : 'End'} <b>{fmt(edge === 'start' ? clip.startMs : clip.endMs)}</b></span>
             {NUDGES.map((delta) => <button key={delta} className="secondary" onClick={() => nudge(edge, delta)}>{delta > 0 ? '+' : ''}{delta} ms</button>)}</div>
@@ -411,12 +437,15 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
 
       {pauses.length ? (
         <div className="seg-pauses">
-          <p><b>{pauses.length === 1 ? '1 silence' : `${pauses.length} silences`} inside this clip.</b> The TTS version shortens each to {TTS_PAUSE_CAP_MS / 1000} s; the original audio is not changed. If they separate two sentences, split and drop the silence instead.</p>
+          <p><b>{pauses.length === 1 ? '1 silence' : `${pauses.length} silences`} inside this clip.</b> Shorten reduces a silence to {KEEP_PAUSE_MS / 1000} s in every copy. Otherwise the TTS copy caps each at {TTS_PAUSE_CAP_MS / 1000} s on export. If a silence separates two sentences, split and drop it instead. Your audio files are never edited.</p>
           <ul>
             {pauses.slice(0, 4).map((pause) => (
               <li key={pause.startMs}>
                 <span>{(pause.lengthMs / 1000).toFixed(1)} s at {fmt(pause.startMs)}</span>
-                <button className="secondary" disabled={locked} onClick={() => apply((current) => splitAtPause(current, clip.id, pause), 'Split and dropped the silence. Review both parts.')}>Split and drop</button>
+                <span className="seg-pause-actions">
+                  <button className="secondary" disabled={!editable} onClick={() => apply((current) => shortenPause(current, clip.id, pause, KEEP_PAUSE_MS), `Silence shortened to ${KEEP_PAUSE_MS / 1000} s. Review the clip again.`)}>Shorten to {KEEP_PAUSE_MS / 1000} s</button>
+                  <button className="secondary" disabled={!editable} onClick={() => apply((current) => splitAtPause(current, clip.id, pause), 'Split and dropped the silence. Review both parts.')}>Split and drop</button>
+                </span>
               </li>
             ))}
           </ul>
@@ -528,22 +557,58 @@ function Waveform({ audio, manifest, selectedId, playheadMs, onSelect }: {
   return <canvas ref={ref} className="seg-overview" width={1600} height={110} onClick={click} aria-label="Whole video waveform. Click a clip to select it." />;
 }
 
-function ClipWave({ clip, audio, playheadMs, total, onSeek }: { clip: SegmentClip; audio: AudioView; playheadMs: number; total: number; onSeek: (ms: number) => void }) {
+function ClipWave({ clip, audio, playheadMs, total, selection, onSeek, onSelect }: {
+  clip: SegmentClip; audio: AudioView; playheadMs: number; total: number; selection: ClipRange | null;
+  onSeek: (ms: number) => void; onSelect: (range: ClipRange | null) => void;
+}) {
   const from = Math.max(0, clip.startMs - 1_500);
   const to = Math.min(total, clip.endMs + 1_500);
   const peaks = useMemo(() => audio.peaks(from, to, 1200), [audio, from, to]);
   const at = (ms: number, width: number) => ((ms - from) / (to - from)) * width;
+  const drag = useRef<{ x: number; ms: number; moved: boolean } | null>(null);
+  const removed = clip.removed ?? [];
   const ref = useCanvas((ctx, width, height) => {
     drawPeaks(ctx, peaks, width, height);
     ctx.fillStyle = 'rgba(23,107,69,.14)'; ctx.fillRect(at(clip.startMs, width), 0, at(clip.endMs, width) - at(clip.startMs, width), height);
     ctx.fillStyle = COLORS.selected; ctx.fillRect(at(clip.startMs, width) - 1, 0, 3, height); ctx.fillRect(at(clip.endMs, width) - 1, 0, 3, height);
+    for (const range of removed) { // removed sections: red, striped, so they are not mistaken for audio that will be kept
+      const x = at(range.startMs, width); const w = at(range.endMs, width) - x;
+      ctx.fillStyle = 'rgba(166,55,55,.30)'; ctx.fillRect(x, 0, w, height);
+      ctx.strokeStyle = 'rgba(166,55,55,.55)'; ctx.lineWidth = 1;
+      for (let d = -height; d < w; d += 9) { ctx.beginPath(); ctx.moveTo(x + d, height); ctx.lineTo(x + d + height, 0); ctx.stroke(); }
+    }
     ctx.fillStyle = COLORS.cut;
     for (const cut of clip.cutCandidatesMs) for (let y = 0; y < height; y += 10) ctx.fillRect(at(cut, width), y, 2, 5);
+    if (selection) {
+      const x = at(selection.startMs, width); const w = at(selection.endMs, width) - x;
+      ctx.fillStyle = 'rgba(40,90,200,.22)'; ctx.fillRect(x, 0, w, height);
+      ctx.fillStyle = 'rgba(40,90,200,.9)'; ctx.fillRect(x - 1, 0, 2, height); ctx.fillRect(x + w - 1, 0, 2, height);
+    }
     ctx.fillStyle = COLORS.head; ctx.fillRect(at(playheadMs, width) - 1, 0, 2, height);
-  }, [peaks, clip, playheadMs, from, to]);
-  const click = (event: React.MouseEvent<HTMLCanvasElement>) => {
+  }, [peaks, clip, playheadMs, from, to, selection]);
+
+  const msAt = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    onSeek(Math.round(from + ((event.clientX - rect.left) / rect.width) * (to - from)));
+    return Math.round(from + ((event.clientX - rect.left) / rect.width) * (to - from));
   };
-  return <canvas ref={ref} className="seg-detail" width={1200} height={150} onClick={click} aria-label="Selected clip waveform with 1.5 seconds of context. Click to place the marker." />;
+  const clamp = (ms: number) => Math.min(Math.max(ms, clip.startMs), clip.endMs);
+  const down = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drag.current = { x: event.clientX, ms: msAt(event), moved: false };
+  };
+  const move = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const start = drag.current;
+    if (!start) return;
+    if (!start.moved && Math.abs(event.clientX - start.x) < 5) return; // a plain click is not a selection
+    start.moved = true;
+    const a = clamp(start.ms); const b = clamp(msAt(event));
+    onSelect({ startMs: Math.min(a, b), endMs: Math.max(a, b) });
+  };
+  const up = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const start = drag.current;
+    drag.current = null;
+    if (start && !start.moved) { onSeek(msAt(event)); onSelect(null); }
+  };
+  return <canvas ref={ref} className="seg-detail" width={1200} height={150} onPointerDown={down} onPointerMove={move} onPointerUp={up}
+    aria-label="Selected clip waveform with 1.5 seconds of context. Click to place the marker, drag to select a section." />;
 }
