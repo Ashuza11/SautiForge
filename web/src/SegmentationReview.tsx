@@ -250,7 +250,7 @@ export function SegmentationReview() {
                       <i className={`dot dot-${clip.review.status}`} aria-hidden="true" />
                       <strong>{clip.id}</strong>
                       <span>{fmt(clip.startMs)} · {(clip.durationMs / 1000).toFixed(1)} s</span>
-                      <em>{clip.review.status === 'proposed' ? '' : clip.review.status}</em>
+                      <em>{clip.review.status === 'proposed' ? '' : clip.review.status === 'accepted' && clip.review.tier === 'asr_tts' ? 'accepted · TTS' : clip.review.status}</em>
                       {warnings.length ? <small>{warnings.map((flag) => FLAG_TEXT[flag] ?? flag).join(' · ')}</small> : null}
                     </button>
                   );
@@ -289,6 +289,14 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
 
   const commitNotes = (patch: Partial<typeof review> = {}) =>
     apply((current) => editReview(current, clip.id, { transcript: text.trim() ? text : null, speaker: speaker.trim() || null, ...patch }), 'Notes saved in this browser.');
+
+  // Before accepting, the box only sets the choice used on Accept. After accepting it saves at once, so a forgotten tick can be fixed without reopening the clip.
+  const changeTts = (checked: boolean) => {
+    setTts(checked);
+    if (review.status !== 'accepted') return;
+    apply((current) => editReview(current, clip.id, { tier: checked ? 'asr_tts' : 'asr', hasMusic: checked ? false : null }),
+      checked ? `${clip.id} is now also used for TTS.` : `${clip.id} is now ASR only.`);
+  };
 
   const accept = () => {
     const done = apply((current) => acceptClip(editReview(current, clip.id, { transcript: text.trim() ? text : null, speaker: speaker.trim() || null, tier: tts ? 'asr_tts' : 'asr', hasMusic: tts ? false : review.hasMusic }), clip.id, reviewer, new Date()), `${clip.id} accepted.`);
@@ -355,7 +363,7 @@ function ClipEditor({ hasVocals, clip, manifest, audio, playheadMs, playing, loo
 
       {hasVocals ? (
         <label className="seg-tts">
-          <input type="checkbox" checked={tts} disabled={locked} onChange={(event) => { setTts(event.target.checked); }} />
+          <input type="checkbox" checked={tts} disabled={review.status === 'rejected'} onChange={(event) => changeTts(event.target.checked)} />
           <span><b>Also use for TTS</b><small>Tick only if the cleaned voice sounds clean: no music left and nothing robotic or watery. Every accepted clip is already used for ASR.</small></span>
         </label>
       ) : null}
