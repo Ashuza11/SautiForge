@@ -85,3 +85,6 @@ segmentation-output/
 tools/segmentation/.venv/
 __pycache__/
 *.pyc
+
+# Vercel
+.vercel/
