@@ -7,6 +7,8 @@ import { cors } from 'hono/cors';
 import { z } from 'zod';
 
 import { AdminSessionService, adminSessionCookieName } from '../auth/admin-session';
+import { clipDraftSchema, clipStatusSchema, clipVariantSchema } from '../clips/clip';
+import { ClipLifecycleError, type ClipService } from '../clips/clip-service';
 import { projectDraftSchema } from '../../../src/features/projects/domain/project';
 import { sourceMediaUploadDraftSchema } from '../media/source-media';
 import { SourceMediaLifecycleError, type SourceMediaService } from '../media/source-media-service';
@@ -22,6 +24,7 @@ export type AppDependencies = {
   projects: ProjectService;
   sources: SourceService;
   media: SourceMediaService;
+  clips: ClipService;
   readiness: ReadinessService;
   adminApiToken: string;
   webOrigin: string;
@@ -32,6 +35,7 @@ export type AppDependencies = {
 const projectIdSchema = z.string().uuid();
 const sourceIdSchema = z.string().uuid();
 const sourceMediaIdSchema = z.string().uuid();
+const clipIdSchema = z.string().uuid();
 
 export function createServerApp(dependencies: AppDependencies): Hono {
   const app = new Hono();
@@ -229,12 +233,53 @@ export function createServerApp(dependencies: AppDependencies): Hono {
     return context.json({ media: await dependencies.media.completeUpload(id.data) });
   });
 
+  app.get('/v1/admin/sources/:sourceId/clips', async (context) => {
+    const id = sourceIdSchema.safeParse(context.req.param('sourceId'));
+    if (!id.success) return context.json({ error: 'invalid_source_id' }, 400);
+    const statusQuery = context.req.query('status');
+    const status = statusQuery === undefined ? { success: true as const, data: undefined } : clipStatusSchema.safeParse(statusQuery);
+    if (!status.success) return context.json({ error: 'invalid_status' }, 400);
+    return context.json({ clips: await dependencies.clips.listForSource(id.data, status.data) });
+  });
+
+  app.post('/v1/admin/sources/:sourceId/clips', async (context) => {
+    const id = sourceIdSchema.safeParse(context.req.param('sourceId'));
+    if (!id.success) return context.json({ error: 'invalid_source_id' }, 400);
+    const input = await parseValidatedBody(context, clipDraftSchema);
+    if (!input.success) return input.response;
+    return context.json(await dependencies.clips.register(id.data, input.data));
+  });
+
+  app.post('/v1/admin/clips/:clipId/complete', async (context) => {
+    const id = clipIdSchema.safeParse(context.req.param('clipId'));
+    if (!id.success) return context.json({ error: 'invalid_clip_id' }, 400);
+    return context.json(await dependencies.clips.complete(id.data));
+  });
+
+  app.get('/v1/admin/clips/:clipId/audio/:variant', async (context) => {
+    const id = clipIdSchema.safeParse(context.req.param('clipId'));
+    if (!id.success) return context.json({ error: 'invalid_clip_id' }, 400);
+    const variant = clipVariantSchema.safeParse(context.req.param('variant'));
+    if (!variant.success) return context.json({ error: 'invalid_variant' }, 400);
+    return context.json({ url: await dependencies.clips.createAudioUrl(id.data, variant.data) });
+  });
+
+  app.post('/v1/admin/clips/:clipId/withdraw', async (context) => {
+    const id = clipIdSchema.safeParse(context.req.param('clipId'));
+    if (!id.success) return context.json({ error: 'invalid_clip_id' }, 400);
+    return context.json(await dependencies.clips.withdraw(id.data));
+  });
+
   app.onError((error, context) => {
     if (error instanceof SourceLifecycleError) {
       return context.json({ error: error.code, message: error.message }, 409);
     }
     if (error instanceof SourceMediaLifecycleError) {
       const status = ['source_not_found', 'media_not_found'].includes(error.code) ? 404 : 409;
+      return context.json({ error: error.code, message: error.message }, status);
+    }
+    if (error instanceof ClipLifecycleError) {
+      const status = ['source_not_found', 'clip_not_found', 'audio_not_found'].includes(error.code) ? 404 : 409;
       return context.json({ error: error.code, message: error.message }, status);
     }
     console.error('Unhandled API error', error);

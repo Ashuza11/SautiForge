@@ -1,3 +1,5 @@
+import { NeonClipRepository } from './clips/neon-clip-repository';
+import { ClipService } from './clips/clip-service';
 import { AdminSessionService } from './auth/admin-session';
 import { parseServerConfig } from './config';
 import { createNeonExecutor } from './database/neon';
@@ -32,6 +34,7 @@ export function createAppFromEnvironment(environment: NodeJS.ProcessEnv) {
       sourceService,
       objectStore,
     ),
+    clips: new ClipService(new NeonClipRepository(database), sourceService, objectStore),
     readiness: new ReadinessService(projectRepository, objectStore),
     adminApiToken: config.adminApiToken,
     webOrigin: config.webOrigin,
