@@ -46,4 +46,26 @@ describe('community service database migrations', () => {
     expect(sql).toContain("status = 'verified' AND verified_at IS NOT NULL");
     expect(sql.toLowerCase()).not.toMatch(/create table (clips|tasks|annotations)/);
   });
+
+  it('adds rights-bound clips with two verified audio variants and publish states', async () => {
+    const sql = await readFile(new URL('./0004_clips.sql', import.meta.url), 'utf8');
+    expect(sql).toContain('CREATE TABLE clips');
+    expect(sql).toContain('FOREIGN KEY (source_id, project_id) REFERENCES sources(id, project_id) ON DELETE RESTRICT');
+    expect(sql).toContain('FOREIGN KEY (source_id, rights_revision) REFERENCES source_rights_revisions(source_id, revision) ON DELETE RESTRICT');
+    expect(sql).toContain('UNIQUE (source_id, clip_key)');
+    expect(sql).toContain("speaker_role IN ('narrator', 'character', 'multiple', 'unknown')");
+    expect(sql).toContain("tier IN ('asr', 'asr_tts')");
+    expect(sql).toContain("CHECK (tier = 'asr' OR has_music = false)");
+    expect(sql).toContain("status IN ('draft', 'published', 'withdrawn')");
+    expect(sql).toContain('CREATE TABLE clip_audio_files');
+    expect(sql).toContain("variant IN ('original', 'vocals_htdemucs')");
+    expect(sql).toContain('UNIQUE (clip_id, variant)');
+    expect(sql).toContain("sha256_hex ~ '^[a-f0-9]{64}$'");
+    expect(sql).toContain("status IN ('upload_pending', 'verified', 'verification_failed')");
+  });
+
+  it('keeps transcripts and tasks out of the clip tables', async () => {
+    const sql = (await readFile(new URL('./0004_clips.sql', import.meta.url), 'utf8')).toLowerCase();
+    expect(sql).not.toMatch(/transcript|create table (batches|submissions|contributors)/);
+  });
 });
