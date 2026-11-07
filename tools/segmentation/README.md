@@ -65,3 +65,21 @@ Source media, working audio, and outputs live under `Data/` and `segmentation-ou
 ## Review screen (web app, local only)
 
 Nothing is uploaded; the two files are read in the browser and progress is saved to browser storage after every change (each save is read back to confirm it). Per clip you can play and loop it, click the waveform to place a marker, nudge either edge or trim it straight to the marker, split at a detected pause or at the marker, merge with the next clip, write the verbatim transcript, record speaker and music, choose the tier, then accept or reject (with a reason). Every change can be undone and redone (buttons or Ctrl+Z / Ctrl+Shift+Z) until the page is reloaded; the saved review itself survives a reload. Splitting, merging or moving an edge sends the clip back to review. The downloaded manifest is validated by the same rules `cut` enforces.
+
+## Publish to the SautiForge service
+
+After `cut`, upload the `export/` folder so the audio goes to private S3 and the clip records to Neon:
+
+```bash
+export SAUTIFORGE_ADMIN_TOKEN=...   # the service's ADMIN_API_TOKEN; never put it on the command line
+python -m sautiseg publish --export segmentation-output/<name>/export \
+  --api https://your-site.vercel.app --source-id <source UUID> --dry-run   # check first
+python -m sautiseg publish --export segmentation-output/<name>/export \
+  --api https://your-site.vercel.app --source-id <source UUID>
+```
+
+- Every file is re-hashed against the CSV first; a changed file stops the run.
+- The cleaned copy (`vocals_htdemucs`) is required, because volunteers hear it. The music copy (`original`) is uploaded too and kept for ASR.
+- It is safe to run again: verified audio is not uploaded twice, and speaker or tier fixes are applied in place. Changed cut points or changed audio need a new clip key (withdraw the old clip first).
+- A failed clip is reported at the end and does not stop the others.
+- The source must already be registered in the Mashi project with approved rights (internal processing, volunteer access and transcription).

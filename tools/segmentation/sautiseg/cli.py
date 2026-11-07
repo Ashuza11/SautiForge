@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
@@ -13,6 +14,7 @@ from .audio import (WORKING_SAMPLE_RATE, clip_metrics, extract_working_wav, ffmp
 from .clips import ClipParams, build_clips
 from .manifest import build_clip_record, build_manifest, write_manifest
 from .cutting import DEFAULT_MAX_PAUSE_MS, cut_accepted
+from .publish import publish
 from .separate import MODEL_NAME, ensure_separation
 from .vad import VadParams, detect, speech_stats
 
@@ -99,6 +101,20 @@ def cmd_cut(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_publish(args: argparse.Namespace) -> int:
+    token = os.environ.get(args.token_env, "")
+    if not args.dry_run and len(token) < 32:
+        print(f"Set {args.token_env} to the service's admin API token (kept out of the command line).", file=sys.stderr)
+        return 2
+    result = publish(Path(args.export), args.api, token, args.source_id, args.created_by, dry_run=args.dry_run)
+    if result["failed"]:
+        print(f"{len(result['failed'])} clip(s) failed. Fix the cause and run the same command again; finished clips are skipped.", file=sys.stderr)
+        return 1
+    if not result["dryRun"]:
+        print(f"Done: {result['published']} of {result['clips']} clips are published.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sautiseg", description="Propose, review and export speech clips.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -129,6 +145,15 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--sample-rate", type=int, default=24000, help="Output rate; clips are cut from the original, not the 16 kHz copy.")
     c.add_argument("--max-pause-ms", type=int, default=DEFAULT_MAX_PAUSE_MS, help="Cap silences between speech in the TTS copies (0 disables). ASR copies are never changed.")
     c.set_defaults(func=cmd_cut)
+
+    u = sub.add_parser("publish", help="Upload an export folder to the SautiForge service (safe to run again).")
+    u.add_argument("--export", required=True, help="The export/ folder written by `cut`.")
+    u.add_argument("--api", required=True, help="Service base URL, for example https://your-site.vercel.app")
+    u.add_argument("--source-id", required=True, help="UUID of the registered source in the Mashi project.")
+    u.add_argument("--created-by", default="ADMIN-01", help="Pseudonymous administrator code.")
+    u.add_argument("--token-env", default="SAUTIFORGE_ADMIN_TOKEN", help="Environment variable holding the admin API token.")
+    u.add_argument("--dry-run", action="store_true", help="Verify hashes and list what would be published; upload nothing.")
+    u.set_defaults(func=cmd_publish)
     return parser
 
 
