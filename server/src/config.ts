@@ -21,7 +21,16 @@ const serverEnvironmentSchema = z.object({
   AWS_ACCESS_KEY_ID: optionalNonEmptyString,
   AWS_SECRET_ACCESS_KEY: optionalNonEmptyString,
   ADMIN_API_TOKEN: z.string().min(32, 'ADMIN_API_TOKEN must contain at least 32 characters.'),
+  ADMIN_PASSWORD: optionalNonEmptyString.pipe(z.string().min(12, 'ADMIN_PASSWORD must contain at least 12 characters.').optional()),
+  SESSION_SECRET: optionalNonEmptyString.pipe(z.string().min(32, 'SESSION_SECRET must contain at least 32 characters.').optional()),
 }).superRefine((environment, context) => {
+  if ((environment.ADMIN_PASSWORD === undefined) !== (environment.SESSION_SECRET === undefined)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['SESSION_SECRET'],
+      message: 'ADMIN_PASSWORD and SESSION_SECRET must be provided together.',
+    });
+  }
   const hasAccessKey = environment.AWS_ACCESS_KEY_ID !== undefined;
   const hasSecretKey = environment.AWS_SECRET_ACCESS_KEY !== undefined;
   if (hasAccessKey !== hasSecretKey) {
@@ -47,6 +56,10 @@ export type ServerConfig = {
     secretAccessKey: string;
   };
   adminApiToken: string;
+  adminLogin?: {
+    password: string;
+    sessionSecret: string;
+  };
 };
 
 export function parseServerConfig(environment: NodeJS.ProcessEnv): ServerConfig {
@@ -65,5 +78,9 @@ export function parseServerConfig(environment: NodeJS.ProcessEnv): ServerConfig 
       secretAccessKey: parsed.AWS_SECRET_ACCESS_KEY,
     } : undefined,
     adminApiToken: parsed.ADMIN_API_TOKEN,
+    adminLogin: parsed.ADMIN_PASSWORD && parsed.SESSION_SECRET ? {
+      password: parsed.ADMIN_PASSWORD,
+      sessionSecret: parsed.SESSION_SECRET,
+    } : undefined,
   };
 }

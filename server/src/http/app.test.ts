@@ -6,6 +6,7 @@ import type { ProjectRepository } from '../projects/project-repository';
 import { ProjectService } from '../projects/project-service';
 import type { ReadinessService } from '../readiness';
 import type { SourceService } from '../sources/source-service';
+import { AdminSessionService } from '../auth/admin-session';
 import { createServerApp } from './app';
 
 const adminToken = 'test-admin-token-that-is-long-enough';
@@ -145,5 +146,71 @@ describe('SautiForge server API', () => {
     const response = await testApp(false).app.request('/v1/admin/ready', { headers: adminHeaders() });
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({ status: 'not_ready' });
+  });
+});
+
+describe('admin login', () => {
+  const origin = 'https://annotation.example.org';
+  function loginApp() {
+    const session = new AdminSessionService({ password: 'a long admin passphrase', secret: 's'.repeat(32) });
+    const app = createServerApp({
+      projects: new ProjectService(new MemoryProjectRepository()),
+      sources: {} as SourceService,
+      media: {} as SourceMediaService,
+      readiness: { check: async () => ({ ready: true }) } as ReadinessService,
+      adminApiToken: adminToken,
+      webOrigin: origin,
+      adminSession: session,
+    });
+    return app;
+  }
+  const login = (app: ReturnType<typeof loginApp>, password: string, headers: Record<string, string> = { Origin: origin }) =>
+    app.request('/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ password }),
+    });
+
+  it('sets an HttpOnly cookie that unlocks admin routes without a bearer token', async () => {
+    const app = loginApp();
+    const response = await login(app, 'a long admin passphrase');
+    expect(response.status).toBe(200);
+    const cookie = response.headers.get('set-cookie') ?? '';
+    expect(cookie).toMatch(/HttpOnly/i);
+    expect(cookie).toMatch(/SameSite=Lax/i);
+    const pair = cookie.split(';')[0];
+    expect((await app.request('/v1/admin/session')).status).toBe(401);
+    expect((await app.request('/v1/admin/session', { headers: { Cookie: pair } })).status).toBe(200);
+  });
+
+  it('rejects a wrong password and a foreign origin', async () => {
+    const app = loginApp();
+    expect((await login(app, 'wrong')).status).toBe(401);
+    expect((await login(app, 'a long admin passphrase', { Origin: 'https://evil.example' })).status).toBe(403);
+    expect((await login(app, 'a long admin passphrase', {})).status).toBe(403);
+  });
+
+  it('blocks cookie-authenticated writes from another origin', async () => {
+    const app = loginApp();
+    const pair = ((await login(app, 'a long admin passphrase')).headers.get('set-cookie') ?? '').split(';')[0];
+    const attempt = (headers: Record<string, string>) => app.request('/v1/admin/projects', {
+      method: 'POST',
+      headers: { Cookie: pair, 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(draft),
+    });
+    expect((await attempt({})).status).toBe(403);
+    expect((await attempt({ Origin: 'https://evil.example' })).status).toBe(403);
+    expect((await attempt({ Origin: origin })).status).toBe(201);
+  });
+
+  it('keeps the bearer token working for scripts', async () => {
+    const app = loginApp();
+    const response = await app.request('/v1/admin/session', { headers: { Authorization: `Bearer ${adminToken}` } });
+    expect(response.status).toBe(200);
+  });
+
+  it('reports login as not configured when no session service exists', async () => {
+    const { app } = testApp();
+    expect((await login(app as never, 'x')).status).toBe(503);
   });
 });

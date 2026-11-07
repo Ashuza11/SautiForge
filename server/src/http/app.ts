@@ -1,10 +1,12 @@
 import { timingSafeEqual } from 'node:crypto';
 
 import { Hono, type Context } from 'hono';
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { z } from 'zod';
 
+import { AdminSessionService, adminSessionCookieName } from '../auth/admin-session';
 import { projectDraftSchema } from '../../../src/features/projects/domain/project';
 import { sourceMediaUploadDraftSchema } from '../media/source-media';
 import { SourceMediaLifecycleError, type SourceMediaService } from '../media/source-media-service';
@@ -23,6 +25,8 @@ export type AppDependencies = {
   readiness: ReadinessService;
   adminApiToken: string;
   webOrigin: string;
+  adminSession?: AdminSessionService;
+  secureCookies?: boolean;
 };
 
 const projectIdSchema = z.string().uuid();
@@ -45,20 +49,67 @@ export function createServerApp(dependencies: AppDependencies): Hono {
     origin: dependencies.webOrigin,
     allowHeaders: ['Authorization', 'Content-Type'],
     allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
+    credentials: true,
     maxAge: 600,
   }));
+  app.post('/v1/auth/login', bodyLimit({
+    maxSize: 4 * 1024,
+    onError: (context) => context.json({ error: 'request_too_large' }, 413),
+  }), async (context) => {
+    const session = dependencies.adminSession;
+    if (!session) return context.json({ error: 'login_not_configured' }, 503);
+    if (context.req.header('Origin') !== dependencies.webOrigin) {
+      return context.json({ error: 'origin_not_allowed' }, 403);
+    }
+    const input = await parseValidatedBody(context, z.object({ password: z.string().min(1).max(256) }).strict());
+    if (!input.success) return input.response;
+    const result = session.login(input.data.password);
+    if (result === null) return context.json({ error: 'invalid_credentials' }, 401);
+    if ('locked' in result) return context.json({ error: 'too_many_attempts' }, 429);
+    setCookie(context, adminSessionCookieName, result.token, {
+      httpOnly: true,
+      secure: dependencies.secureCookies ?? true,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: session.maxAgeSeconds,
+    });
+    return context.json({ status: 'signed_in' });
+  });
+
+  app.post('/v1/auth/logout', (context) => {
+    if (context.req.header('Origin') !== dependencies.webOrigin) {
+      return context.json({ error: 'origin_not_allowed' }, 403);
+    }
+    deleteCookie(context, adminSessionCookieName, { path: '/' });
+    return context.json({ status: 'signed_out' });
+  });
+
   app.use('/v1/admin/*', async (context, next) => {
     const authorization = context.req.header('Authorization');
     const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : '';
-    if (!constantTimeMatches(token, dependencies.adminApiToken)) {
-      return context.json({ error: 'unauthorized' }, 401);
+    if (constantTimeMatches(token, dependencies.adminApiToken)) {
+      await next();
+      return;
     }
-    await next();
+    const session = dependencies.adminSession;
+    if (session?.verify(getCookie(context, adminSessionCookieName))) {
+      // Cookies are sent automatically by browsers, so state changes must
+      // come from the configured web origin.
+      const safeMethod = ['GET', 'HEAD', 'OPTIONS'].includes(context.req.method);
+      if (!safeMethod && context.req.header('Origin') !== dependencies.webOrigin) {
+        return context.json({ error: 'origin_not_allowed' }, 403);
+      }
+      await next();
+      return;
+    }
+    return context.json({ error: 'unauthorized' }, 401);
   });
   app.use('/v1/admin/*', bodyLimit({
     maxSize: 64 * 1024,
     onError: (context) => context.json({ error: 'request_too_large' }, 413),
   }));
+
+  app.get('/v1/admin/session', (context) => context.json({ status: 'signed_in' }));
 
   app.get('/v1/admin/ready', async (context) => {
     const readiness = await dependencies.readiness.check();

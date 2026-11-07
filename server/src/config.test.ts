@@ -52,3 +52,29 @@ describe('server configuration', () => {
     })).toThrow(/trailing slash/i);
   });
 });
+
+describe('admin login settings', () => {
+  const base: NodeJS.ProcessEnv = {
+    NODE_ENV: 'test',
+    WEB_ORIGIN: 'https://annotation.example.org',
+    DATABASE_URL: 'postgresql://user:password@example.neon.tech/sautiforge?sslmode=require',
+    AWS_REGION: 'af-south-1',
+    S3_BUCKET: 'sautiforge-test-private',
+    ADMIN_API_TOKEN: 'a-secure-test-token-with-32-characters',
+  };
+
+  it('is optional but must be configured as a pair', () => {
+    expect(parseServerConfig(base).adminLogin).toBeUndefined();
+    expect(() => parseServerConfig({ ...base, ADMIN_PASSWORD: 'a long admin passphrase' })).toThrow(/together/i);
+    expect(parseServerConfig({
+      ...base,
+      ADMIN_PASSWORD: 'a long admin passphrase',
+      SESSION_SECRET: 's'.repeat(32),
+    }).adminLogin).toEqual({ password: 'a long admin passphrase', sessionSecret: 's'.repeat(32) });
+  });
+
+  it('rejects a short password or secret', () => {
+    expect(() => parseServerConfig({ ...base, ADMIN_PASSWORD: 'short', SESSION_SECRET: 's'.repeat(32) })).toThrow(/12 characters/);
+    expect(() => parseServerConfig({ ...base, ADMIN_PASSWORD: 'a long admin passphrase', SESSION_SECRET: 'short' })).toThrow(/32 characters/);
+  });
+});

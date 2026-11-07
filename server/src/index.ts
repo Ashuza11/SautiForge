@@ -1,5 +1,6 @@
 import { serve } from '@hono/node-server';
 
+import { AdminSessionService } from './auth/admin-session';
 import { parseServerConfig } from './config';
 import { createNeonExecutor } from './database/neon';
 import { createServerApp } from './http/app';
@@ -35,6 +36,10 @@ const app = createServerApp({
   readiness: new ReadinessService(projectRepository, objectStore),
   adminApiToken: config.adminApiToken,
   webOrigin: config.webOrigin,
+  adminSession: config.adminLogin
+    ? new AdminSessionService({ password: config.adminLogin.password, secret: config.adminLogin.sessionSecret })
+    : undefined,
+  secureCookies: config.nodeEnv === 'production',
 });
 
 serve({ fetch: app.fetch, port: config.port }, (info) => {
