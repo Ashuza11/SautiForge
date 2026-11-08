@@ -34,7 +34,8 @@ Everything is online: Neon for records, private S3 for audio, Vercel for the sit
 | 4 | Clips tables | Clips and their audio variants in Neon |
 | 5 | Clips API | Signed S3 upload checked by size and hash |
 | 6 | `publish` command | Uploads an `export/` folder, safe to re-run, dry-run mode |
-| 7 | Admin Clips screen | List, play, withdraw |
+| 7 | Local sandbox | Real API on PGlite and disk audio, for testing without the cloud |
+| 7b | Admin Clips screen | List, play, withdraw |
 | 8 | Task tables | Batches, contributors, submissions (append-only) |
 | 9 | Batches | Create a batch, link and WhatsApp message |
 | 10 | Volunteer API | Pseudonym, own tasks only, signed audio, submit or skip |
@@ -44,7 +45,11 @@ Everything is online: Neon for records, private S3 for audio, Vercel for the sit
 | 14 | Final transcript | Approve or write a transcript, with a note |
 | 15 | Export | Approved clips, hashes, hours without double counting, split guidance |
 
-From batch 8 a local mode (in-memory data, audio on disk) lets the whole flow run in a browser without Neon or S3.
+## Local sandbox
+
+`npm run server:sandbox` starts the real API on `http://127.0.0.1:8787` with the real migrations and repositories on PGlite (a Postgres engine) and audio on disk behind signed, expiring links. It seeds the Mashi project and one source with local-only rights, and prints the admin password, the API token and the source id. Data is kept in `.local-data/` (git-ignored); add `-- --memory` for a throwaway database. It refuses to run when `NODE_ENV=production`.
+
+It lets every later batch be run and tested in a browser without Neon, S3 or Vercel. It does not replace one real cloud run.
 
 ## Needed from the project owner
 

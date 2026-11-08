@@ -33,6 +33,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15",
     "@types/node": "^22.20.5",
     "@types/react": "~19.2.2",
     "@types/react-dom": "19.2.3",
@@ -59,7 +60,8 @@
     "server:start": "tsx server/src/index.ts",
     "server:migrate": "tsx server/scripts/migrate.ts",
     "server:start:local": "node --env-file=server/.env --import tsx server/src/index.ts",
-    "server:migrate:local": "node --env-file=server/.env --import tsx server/scripts/migrate.ts"
+    "server:migrate:local": "node --env-file=server/.env --import tsx server/scripts/migrate.ts",
+    "server:sandbox": "tsx server/src/local/main.mts"
   },
   "private": true
 }

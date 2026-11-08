@@ -88,3 +88,6 @@ __pycache__/
 
 # Vercel
 .vercel/
+
+# Local mode data
+.local-data/
