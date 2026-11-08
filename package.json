@@ -58,9 +58,9 @@
     "validate:export": "node scripts/validate-export.mjs",
     "server:dev": "tsx watch server/src/index.ts",
     "server:start": "tsx server/src/index.ts",
-    "server:migrate": "tsx server/scripts/migrate.ts",
+    "server:migrate": "tsx server/scripts/migrate.mts",
     "server:start:local": "node --env-file=server/.env --import tsx server/src/index.ts",
-    "server:migrate:local": "node --env-file=server/.env --import tsx server/scripts/migrate.ts",
+    "server:migrate:local": "node --env-file=server/.env --import tsx server/scripts/migrate.mts",
     "server:sandbox": "tsx server/src/local/main.mts"
   },
   "private": true
