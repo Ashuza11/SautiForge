@@ -8,6 +8,7 @@ import { createAnnotatedResearchArchive } from './domain/annotated-export';
 import { initialDraft, LocalDraftRepository, prefillVerbatimForProject, prepareDraftForSave, scenarioTransactionIntent, usesBusinessAnnotations, type WebAnnotationDraft } from './domain/draft';
 import { audioMimeType, loadResearchDataset, matchesRecordingQuery, recordingIsInSearchScope, type LoadedResearchDataset, type ResearchRecording } from './domain/dataset';
 import { IndexedDbWorkspaceArchiveStorage, WorkspaceArchiveRepository } from './domain/workspace-archive';
+import { ClipsAdmin } from './ClipsAdmin';
 import { ProjectAdmin } from './ProjectAdmin';
 import { SegmentationReview } from './SegmentationReview';
 
@@ -19,9 +20,10 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [view, setView] = useState<'annotation' | 'projects' | 'segmentation'>('annotation');
+  const [view, setView] = useState<'annotation' | 'projects' | 'segmentation' | 'clips'>('annotation');
   const showProjects = view === 'projects';
   const showSegmentation = view === 'segmentation';
+  const showClips = view === 'clips';
   const archiveRepository = useMemo(() => new WorkspaceArchiveRepository(new IndexedDbWorkspaceArchiveStorage()), []);
 
   useEffect(() => {
@@ -95,6 +97,7 @@ export function App() {
         <nav className="tabs" aria-label="Workspaces">
           <button aria-current={view === 'annotation' ? 'page' : undefined} onClick={() => setView('annotation')}>Annotation</button>
           <button aria-current={showSegmentation ? 'page' : undefined} onClick={() => setView('segmentation')}>Segmentation</button>
+          <button aria-current={showClips ? 'page' : undefined} onClick={() => setView('clips')}>Clips</button>
           <button aria-current={showProjects ? 'page' : undefined} onClick={() => setView('projects')}>Projects</button>
         </nav>
         <div className="header-actions">
@@ -104,7 +107,7 @@ export function App() {
 
       <input ref={picker} hidden type="file" accept=".zip,application/zip" onChange={(event) => void open(event.target.files?.[0])} />
 
-      {showSegmentation ? <SegmentationReview /> : showProjects ? <ProjectAdmin onClose={() => setView('annotation')} /> : !dataset ? (
+      {showClips ? <ClipsAdmin /> : showSegmentation ? <SegmentationReview /> : showProjects ? <ProjectAdmin onClose={() => setView('annotation')} /> : !dataset ? (
         <main className="welcome">
           <section className="hero-card">
             <p className="eyebrow">Local browser workflow</p>
