@@ -15,6 +15,7 @@ import {
 } from '../sources/source';
 import type { SourceRepository } from '../sources/source-repository';
 import { SourceService } from '../sources/source-service';
+import type { FinalService } from '../finals/final-service';
 import type { ResultsService } from '../results/results-service';
 import { createServerApp } from './app';
 
@@ -72,6 +73,7 @@ function sourceApp() {
     batches: {} as BatchService,
     volunteer: {} as VolunteerService,
     results: {} as ResultsService,
+    finals: {} as FinalService,
     readiness: {} as ReadinessService,
     adminApiToken: token,
     webOrigin: 'https://annotation.example.org',

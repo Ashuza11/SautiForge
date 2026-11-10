@@ -111,4 +111,16 @@ describe('community service database migrations', () => {
     expect(statements.find((statement) => statement.includes('RAISE EXCEPTION'))).toMatch(/CREATE FUNCTION[\s\S]*END \$\$$/);
     expect(sql.toLowerCase()).not.toMatch(/final_transcript|approved_text/);
   });
+
+  it('keeps final transcripts as separate, versioned, append-only records', async () => {
+    const sql = await readFile(new URL('./0009_final_transcripts.sql', import.meta.url), 'utf8');
+    expect(sql).toContain('CREATE TABLE final_transcripts');
+    expect(sql).toContain('UNIQUE (clip_id, version)');
+    expect(sql).toContain("decision IN ('approved', 'excluded')");
+    expect(sql).toContain('chosen_submission_id uuid REFERENCES submissions(id)');
+    expect(sql).toContain('BEFORE UPDATE OR DELETE ON final_transcripts');
+    const statements = sql.split(/;\s*(?:\r?\n|$)/).map((statement) => statement.trim()).filter(Boolean);
+    expect(statements.filter((statement) => statement.includes('RAISE EXCEPTION'))).toHaveLength(1);
+    expect(sql).not.toMatch(/ALTER TABLE submissions/);
+  });
 });

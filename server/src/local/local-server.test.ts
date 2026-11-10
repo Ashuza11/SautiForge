@@ -229,4 +229,73 @@ describe('local mode (real SQL on PGlite, audio on disk)', () => {
     expect((await call('next', { link, contributor: one })).status).toBe(404);
     expect((await send(two, b, 'too late')).status).toBe(404);
   });
+
+  it('records versioned final transcripts and exports only approved clips with checkable audio', async () => {
+    const flacFor = (extra: number) => Buffer.from(fakeFlac(24000, 72_000, 1, 16, 400 + extra));
+    const upload = async (key: string, bytes: Buffer) => {
+      const response = await server.app.request(`${base}/v1/admin/sources/${sourceId}/clips/upload?clipKey=${key}`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'audio/flac' }, body: new Uint8Array(bytes),
+      });
+      return ((await response.json()) as { clip: { id: string } }).clip.id;
+    };
+    const files = [flacFor(1), flacFor(2), flacFor(3)];
+    const [a, b, c] = [await upload('f001', files[0]!), await upload('f002', files[1]!), await upload('f010', files[2]!)];
+    const batch = await (await api(`/v1/admin/sources/${sourceId}/batches`, 'POST', { clipIds: [a, b, c] })).json() as { batch: { id: string }; token: string };
+    const link = `${batch.batch.id}.${batch.token}`;
+    const call = (path: string, body: unknown) => server.app.request(`${base}/v1/volunteer/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const contributor = ((await (await call('join', { link, pseudonym: 'Neema' })).json()) as { token: string }).token;
+    const first = await (await call('next', { link, contributor })).json() as { clip: { clipId: string } };
+    await call('submit', { link, contributor, clipId: first.clip.clipId, text: 'volunteer words' });
+    const submissionId = ((await server.database.query('SELECT id FROM submissions WHERE clip_id = $1', [first.clip.clipId])).rows[0] as { id: string }).id;
+
+    const finalize = (clipId: string, body: unknown) => api(`/v1/admin/clips/${clipId}/final`, 'POST', body);
+    // approve by choosing a volunteer's answer, then correct it: two versions, the first is kept
+    const v1 = await finalize(first.clip.clipId, { decision: 'approved', text: 'volunteer words', chosenSubmissionId: submissionId });
+    expect(v1.status).toBe(201);
+    expect(((await v1.json()) as { final: { version: number } }).final.version).toBe(1);
+    const v2 = await (await finalize(first.clip.clipId, { decision: 'approved', text: 'corrected words', note: 'Elder corrected it' })).json() as { final: { version: number } };
+    expect(v2.final.version).toBe(2);
+    const history = await (await api(`/v1/admin/clips/${first.clip.clipId}/final`)).json() as { history: { version: number; text: string }[] };
+    expect(history.history.map((row) => [row.version, row.text])).toEqual([[1, 'volunteer words'], [2, 'corrected words']]);
+
+    // a clip outside any batch, an answer from another clip, and an unknown clip are refused
+    const lone = await upload('f099', flacFor(9));
+    expect((await finalize(lone, { decision: 'approved', text: 'x' })).status).toBe(409);
+    const other = [a, b, c].find((id) => id !== first.clip.clipId)!;
+    expect((await finalize(other, { decision: 'approved', text: 'x', chosenSubmissionId: submissionId })).status).toBe(409);
+    expect((await finalize('00000000-0000-4000-8000-0000000fffff', { decision: 'excluded' })).status).toBe(404);
+
+    // exclude one clip, approve another
+    expect((await finalize(other, { decision: 'excluded', note: 'Too noisy' })).status).toBe(201);
+    const third = [a, b, c].find((id) => id !== first.clip.clipId && id !== other)!;
+    expect((await finalize(third, { decision: 'approved', text: 'third words' })).status).toBe(201);
+
+    // the database refuses to rewrite a decision
+    await expect(server.database.query("UPDATE final_transcripts SET transcript_text = 'tampered'")).rejects.toThrow('append-only');
+    await expect(server.database.query('DELETE FROM final_transcripts')).rejects.toThrow('append-only');
+
+    // results show the newest decision
+    const results = await (await api(`/v1/admin/sources/${sourceId}/results`)).json() as { batches: { clips: { clipId: string; final: { version: number; text: string | null; decision: string } | null }[] }[] };
+    const shown = results.batches.flatMap((item) => item.clips).find((item) => item.clipId === first.clip.clipId);
+    expect(shown?.final).toMatchObject({ version: 2, decision: 'approved', text: 'corrected words' });
+
+    // export: only approved clips, with the exact audio behind each link
+    const manifest = await (await api(`/v1/admin/sources/${sourceId}/export`)).json() as {
+      totals: { approved: number; excluded: number; durationMs: number };
+      rights: { decision: string } | null;
+      clips: { clipId: string; clipKey: string; transcript: string; finalVersion: number; durationMs: number; flac: { url: string; sha256: string; sizeBytes: number } }[];
+    };
+    expect(manifest.totals).toMatchObject({ approved: 2, excluded: 1 });
+    expect(manifest.totals.durationMs).toBe(6000);
+    expect(manifest.rights?.decision).toBe('approved');
+    expect(manifest.clips.map((item) => [item.clipKey, item.transcript, item.finalVersion]).sort()).toEqual(
+      [[manifest.clips.find((item) => item.clipId === first.clip.clipId)!.clipKey, 'corrected words', 2], [manifest.clips.find((item) => item.clipId === third)!.clipKey, 'third words', 1]].sort(),
+    );
+    for (const item of manifest.clips) {
+      const bytes = Buffer.from(await (await server.app.request(item.flac.url)).arrayBuffer());
+      expect(bytes.length).toBe(item.flac.sizeBytes);
+      expect(createHash('sha256').update(bytes).digest('hex')).toBe(item.flac.sha256);
+    }
+    expect((await server.app.request(`${base}/v1/admin/sources/${sourceId}/export`)).status).toBe(401);
+  });
 });

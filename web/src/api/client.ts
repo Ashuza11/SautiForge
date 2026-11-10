@@ -115,6 +115,14 @@ export class ApiClient {
     return this.request('GET', `/v1/admin/sources/${sourceId}/results`);
   }
 
+  async saveFinal(clipId: string, body: { decision: 'approved' | 'excluded'; text?: string; chosenSubmissionId?: string; note?: string }): Promise<void> {
+    await this.request('POST', `/v1/admin/clips/${clipId}/final`, body);
+  }
+
+  async exportManifest(sourceId: string): Promise<import('../domain/export-view').ExportManifest> {
+    return this.request('GET', `/v1/admin/sources/${sourceId}/export`);
+  }
+
   async batches(sourceId: string): Promise<ApiBatch[]> {
     return (await this.request<{ batches: ApiBatch[] }>('GET', `/v1/admin/sources/${sourceId}/batches`)).batches;
   }

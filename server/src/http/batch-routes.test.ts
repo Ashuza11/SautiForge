@@ -7,6 +7,7 @@ import type { SourceMediaService } from '../media/source-media-service';
 import type { ProjectService } from '../projects/project-service';
 import type { ReadinessService } from '../readiness';
 import type { SourceService } from '../sources/source-service';
+import type { FinalService } from '../finals/final-service';
 import type { ResultsService } from '../results/results-service';
 import { createServerApp } from './app';
 
@@ -29,6 +30,7 @@ function batchApp() {
     batches,
     volunteer: {} as VolunteerService,
     results: {} as ResultsService,
+    finals: {} as FinalService,
     readiness: {} as ReadinessService,
     adminApiToken: token,
     webOrigin: 'https://annotation.example.org',

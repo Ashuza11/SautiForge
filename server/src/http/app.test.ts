@@ -10,6 +10,7 @@ import { ProjectService } from '../projects/project-service';
 import type { ReadinessService } from '../readiness';
 import type { SourceService } from '../sources/source-service';
 import { AdminSessionService } from '../auth/admin-session';
+import type { FinalService } from '../finals/final-service';
 import type { ResultsService } from '../results/results-service';
 import { createServerApp } from './app';
 
@@ -62,6 +63,7 @@ function testApp(ready = true) {
       batches: {} as BatchService,
       volunteer: {} as VolunteerService,
       results: {} as ResultsService,
+      finals: {} as FinalService,
       readiness,
       adminApiToken: adminToken,
       webOrigin: 'https://annotation.example.org',
@@ -169,6 +171,7 @@ describe('admin login', () => {
       batches: {} as BatchService,
       volunteer: {} as VolunteerService,
       results: {} as ResultsService,
+      finals: {} as FinalService,
       readiness: { check: async () => ({ ready: true }) } as ReadinessService,
       adminApiToken: adminToken,
       webOrigin: origin,

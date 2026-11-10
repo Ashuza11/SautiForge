@@ -1,7 +1,11 @@
 import { diffText } from './text-diff';
 
 export type Transcript = { id: string; contributorId: string; pseudonym: string; text: string; createdAt: string };
-export type ClipResult = { clipId: string; clipKey: string; durationMs: number; position: number; status: string; transcripts: Transcript[]; skips: number };
+export type FinalView = { version: number; decision: 'approved' | 'excluded'; text: string | null; note: string; createdAt: string };
+export type ClipResult = {
+  clipId: string; clipKey: string; durationMs: number; position: number; status: string; transcripts: Transcript[]; skips: number;
+  final: FinalView | null;
+};
 export type BatchResult = { batch: { id: string; title: string; status: 'open' | 'closed'; createdAt: string }; clips: ClipResult[]; volunteers: number };
 export type SourceResults = { required: number; volunteers: number; batches: BatchResult[] };
 
@@ -28,6 +32,11 @@ export function stateLabel(clip: ClipResult, required: number): string {
   return state === 'partial' ? `${clip.transcripts.length} of ${required}` : stateLabels[state];
 }
 
+/** A clip that differs and has no final decision yet. Once the admin decides, it stops asking for attention. */
+export function needsDecision(clip: ClipResult, required: number): boolean {
+  return clip.final === null && clipState(clip, required) === 'differ';
+}
+
 export function batchProgress(item: BatchResult, required: number) {
   const states = item.clips.map((clip) => clipState(clip, required));
   const published = item.clips.filter((clip) => clip.status === 'published').length;
@@ -36,7 +45,7 @@ export function batchProgress(item: BatchResult, required: number) {
     published,
     complete: states.filter((state) => state === 'agree' || state === 'differ').length,
     agree: states.filter((state) => state === 'agree').length,
-    differ: states.filter((state) => state === 'differ').length,
+    differ: item.clips.filter((clip) => needsDecision(clip, required)).length,
     answers: item.clips.reduce((sum, clip) => sum + Math.min(clip.transcripts.length, required), 0),
     needed: item.clips.length * required,
   };
@@ -47,12 +56,14 @@ export function percent(part: number, whole: number): number {
 }
 
 export function summarize(results: SourceResults) {
-  const all = results.batches.flatMap((item) => item.clips.map((clip) => clipState(clip, results.required)));
+  const clips = results.batches.flatMap((item) => item.clips);
+  const all = clips.map((clip) => clipState(clip, results.required));
   return {
+    approved: clips.filter((clip) => clip.final?.decision === 'approved').length,
     volunteers: results.volunteers,
     answers: results.batches.reduce((sum, item) => sum + item.clips.reduce((inner, clip) => inner + clip.transcripts.length, 0), 0),
     complete: all.filter((state) => state === 'agree' || state === 'differ').length,
-    needLook: all.filter((state) => state === 'differ').length,
+    needLook: clips.filter((clip) => needsDecision(clip, results.required)).length,
   };
 }
 
@@ -78,7 +89,7 @@ export function clipDifferenceBlock(clip: ClipResult): string {
 
 /** A message for the community group asking which version is right. */
 export function differencesMessage(clips: ClipResult[], required: number): string | null {
-  const differing = clips.filter((clip) => clipState(clip, required) === 'differ');
+  const differing = clips.filter((clip) => needsDecision(clip, required));
   if (differing.length === 0) return null;
   return [
     'Which words are right? 🤔',
@@ -88,4 +99,17 @@ export function differencesMessage(clips: ClipResult[], required: number): strin
     '',
     'Reply with the letter that is right, or write the correct words. Thank you!',
   ].join('\n');
+}
+
+export type Badge = { label: string; kind: 'approved' | 'excluded' | ClipState };
+
+/** The final decision, when there is one, is what the admin cares about most. */
+export function clipBadge(clip: ClipResult, required: number): Badge {
+  if (clip.final?.decision === 'approved') return { label: 'Approved', kind: 'approved' };
+  if (clip.final?.decision === 'excluded') return { label: 'Excluded', kind: 'excluded' };
+  return { label: stateLabel(clip, required), kind: clipState(clip, required) };
+}
+
+export function approvedCount(item: BatchResult): number {
+  return item.clips.filter((clip) => clip.final?.decision === 'approved').length;
 }

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { batchProgress, clipState, differencesMessage, firstDifference, percent, stateLabel, summarize, versions, type BatchResult, type ClipResult } from './results-view';
+import { approvedCount, batchProgress, clipBadge, clipState, differencesMessage, firstDifference, needsDecision, percent, stateLabel, summarize, versions, type BatchResult, type ClipResult } from './results-view';
 
 const t = (who: string, text: string) => ({ id: who + text, contributorId: who, pseudonym: who, text, createdAt: '2026-11-10T10:00:00.000Z' });
 const clip = (key: string, texts: [string, string][], status = 'published'): ClipResult => ({
-  clipId: key, clipKey: key, durationMs: 3000, position: 1, status, transcripts: texts.map(([who, text]) => t(who, text)), skips: 0,
+  clipId: key, clipKey: key, durationMs: 3000, position: 1, status, transcripts: texts.map(([who, text]) => t(who, text)), skips: 0, final: null,
 });
 const batch = (clips: ClipResult[]): BatchResult => ({ batch: { id: 'b', title: 'Batch 1', status: 'open', createdAt: '2026-11-10T10:00:00.000Z' }, clips, volunteers: 2 });
 
@@ -32,7 +32,7 @@ describe('results helpers', () => {
   });
 
   it('summarizes across batches', () => {
-    expect(summarize({ required: 2, volunteers: 3, batches: [batch([clip('a', [['N', 'x'], ['B', 'y']]), clip('b', [['N', 'z']])])] })).toEqual({ volunteers: 3, answers: 3, complete: 1, needLook: 1 });
+    expect(summarize({ required: 2, volunteers: 3, batches: [batch([clip('a', [['N', 'x'], ['B', 'y']]), clip('b', [['N', 'z']])])] })).toEqual({ approved: 0, volunteers: 3, answers: 3, complete: 1, needLook: 1 });
   });
 
   it('finds the first difference to show', () => {
@@ -52,5 +52,28 @@ describe('results helpers', () => {
     expect(message).not.toMatch(/Neema|Baraka/);
     expect(differencesMessage([clip('a', [['N', 'x'], ['B', 'x']])], 2)).toBeNull();
     expect(differencesMessage([clip('a', [['N', 'x'], ['B', 'y']]), clip('b', [['N', 'p'], ['B', 'q']])], 2)).toContain('2 clips');
+  });
+
+  it('shows the final decision before the volunteer state', () => {
+    const approved = { ...clip('a', [['N', 'x'], ['B', 'y']]), final: { version: 2, decision: 'approved' as const, text: 'x', note: '', createdAt: '' } };
+    const excluded = { ...clip('b', []), final: { version: 1, decision: 'excluded' as const, text: null, note: 'noise', createdAt: '' } };
+    expect(clipBadge(approved, 2)).toEqual({ label: 'Approved', kind: 'approved' });
+    expect(clipBadge(excluded, 2)).toEqual({ label: 'Excluded', kind: 'excluded' });
+    expect(clipBadge(clip('c', [['N', 'x'], ['B', 'y']]), 2)).toEqual({ label: 'Differ', kind: 'differ' });
+    expect(approvedCount(batch([approved, excluded, clip('d', [])]))).toBe(1);
+    expect(summarize({ required: 2, volunteers: 1, batches: [batch([approved, excluded])] }).approved).toBe(1);
+  });
+
+  it('stops asking about a clip once the admin has decided it', () => {
+    const differing = clip('a', [['N', 'x'], ['B', 'y']]);
+    const decided = { ...clip('z', [['N', 'p'], ['B', 'q']]), final: { version: 1, decision: 'approved' as const, text: 'x', note: '', createdAt: '' } };
+    expect(needsDecision(differing, 2)).toBe(true);
+    expect(needsDecision(decided, 2)).toBe(false);
+    expect(batchProgress(batch([differing, decided]), 2).differ).toBe(1);
+    expect(summarize({ required: 2, volunteers: 2, batches: [batch([differing, decided])] }).needLook).toBe(1);
+    expect(differencesMessage([decided], 2)).toBeNull();
+    const message = differencesMessage([differing, decided], 2) ?? '';
+    expect(message).toContain('Clip a');
+    expect(message).not.toContain('Clip z');
   });
 });

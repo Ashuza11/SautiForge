@@ -7,6 +7,7 @@ import type { ProjectService } from '../projects/project-service';
 import type { ReadinessService } from '../readiness';
 import type { SourceService } from '../sources/source-service';
 import { VolunteerError, type VolunteerService } from '../volunteer/volunteer-service';
+import type { FinalService } from '../finals/final-service';
 import type { ResultsService } from '../results/results-service';
 import { createServerApp } from './app';
 
@@ -24,7 +25,7 @@ function volunteerApp() {
   } as unknown as VolunteerService;
   const app = createServerApp({
     projects: {} as ProjectService, sources: {} as SourceService, media: {} as SourceMediaService, clips: {} as ClipService,
-    batches: {} as BatchService, volunteer, results: {} as ResultsService, readiness: {} as ReadinessService,
+    batches: {} as BatchService, volunteer, results: {} as ResultsService, finals: {} as FinalService, readiness: {} as ReadinessService,
     adminApiToken: 'test-admin-token-that-is-long-enough', webOrigin: 'https://annotation.example.org',
   });
   const post = (path: string, body: unknown) => app.request(`/v1/volunteer/${path}`, {

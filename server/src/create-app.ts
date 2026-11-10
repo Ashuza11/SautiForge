@@ -10,6 +10,8 @@ import { NeonProjectRepository } from './projects/neon-project-repository';
 import { ProjectService } from './projects/project-service';
 import { ReadinessService } from './readiness';
 import { BatchService } from './batches/batch-service';
+import { FinalService } from './finals/final-service';
+import { NeonFinalRepository } from './finals/neon-final-repository';
 import { ResultsService } from './results/results-service';
 import { NeonVolunteerRepository } from './volunteer/neon-volunteer-repository';
 import { VolunteerService } from './volunteer/volunteer-service';
@@ -37,6 +39,7 @@ export function createAppFromEnvironment(environment: NodeJS.ProcessEnv) {
   const volunteerRepository = new NeonVolunteerRepository(database);
   const clipService = new ClipService(clipRepository, sourceService, objectStore);
   const linkSecret = config.adminLogin?.sessionSecret ?? config.adminApiToken;
+  const finalRepository = new NeonFinalRepository(database);
   const batchService = new BatchService(batchRepository, sourceService, { linkSecret });
   const app = createServerApp({
     projects: projectService,
@@ -48,7 +51,8 @@ export function createAppFromEnvironment(environment: NodeJS.ProcessEnv) {
     ),
     clips: clipService,
     batches: batchService,
-    results: new ResultsService(batchRepository, clipRepository, volunteerRepository),
+    results: new ResultsService(batchRepository, clipRepository, volunteerRepository, finalRepository),
+    finals: new FinalService(finalRepository, clipRepository, volunteerRepository, sourceService, projectService, objectStore),
     volunteer: new VolunteerService(volunteerRepository, batchService, clipService, projectService, sourceService, { linkSecret }),
     readiness: new ReadinessService(projectRepository, objectStore),
     adminApiToken: config.adminApiToken,

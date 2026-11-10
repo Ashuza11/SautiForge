@@ -6,6 +6,8 @@ import { Hono } from 'hono';
 
 import { AdminSessionService } from '../auth/admin-session';
 import { BatchService } from '../batches/batch-service';
+import { FinalService } from '../finals/final-service';
+import { NeonFinalRepository } from '../finals/neon-final-repository';
 import { ResultsService } from '../results/results-service';
 import { NeonVolunteerRepository } from '../volunteer/neon-volunteer-repository';
 import { VolunteerService } from '../volunteer/volunteer-service';
@@ -65,6 +67,7 @@ export async function createLocalServer(options: LocalServerOptions): Promise<Lo
   const clipRepository = new NeonClipRepository(executor);
   const batchRepository = new NeonBatchRepository(executor);
   const volunteerRepository = new NeonVolunteerRepository(executor);
+  const finalRepository = new NeonFinalRepository(executor);
   const clipService = new ClipService(clipRepository, sources, objectStore);
   const batchService = new BatchService(batchRepository, sources, { linkSecret: options.sessionSecret });
   const api = createServerApp({
@@ -73,7 +76,8 @@ export async function createLocalServer(options: LocalServerOptions): Promise<Lo
     media: new SourceMediaService(new NeonSourceMediaRepository(executor), sources, objectStore),
     clips: clipService,
     batches: batchService,
-    results: new ResultsService(batchRepository, clipRepository, volunteerRepository),
+    results: new ResultsService(batchRepository, clipRepository, volunteerRepository, finalRepository),
+    finals: new FinalService(finalRepository, clipRepository, volunteerRepository, sources, projects, objectStore),
     volunteer: new VolunteerService(volunteerRepository, batchService, clipService, projects, sources, { linkSecret: options.sessionSecret }),
     readiness: new ReadinessService(projectRepository, objectStore),
     adminApiToken: options.adminApiToken,

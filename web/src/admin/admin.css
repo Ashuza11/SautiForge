@@ -151,3 +151,16 @@
 .ad-diff mark { padding: 0 1px; border-radius: 3px; color: #5c3b00; background: #fdd98a; }
 .ad-agree { margin: 0; color: var(--green-dark); font-weight: 650; }
 @media (min-width: 720px) { .ad-tiles { grid-template-columns: repeat(4, 1fr); } }
+
+/* final text and dataset */
+.ad-final { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #f1f8f4; }
+.ad-final-excluded { background: #f4f4f4; }
+.ad-final .ad-small { justify-self: start; }
+.ad-final-form { display: grid; gap: 10px; padding-top: 4px; }
+.ad-final-form textarea { width: 100%; padding: 12px 14px; border: 1px solid #b9c8bf; border-radius: 12px; color: var(--ink); background: #fff; font-size: 18px; line-height: 1.45; resize: vertical; }
+.ad-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.ad-choice-on { border-color: var(--green) !important; color: var(--green-dark) !important; background: var(--green-soft) !important; }
+.ad-state-approved { color: #fff; background: var(--green); }
+.ad-state-excluded { color: #4b5a52; background: #e6ebe8; text-decoration: line-through; }
+.ad-dataset { display: grid; gap: 12px; margin-top: 28px; }
+.ad-dataset h2 { margin: 0; }

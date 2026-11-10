@@ -4,6 +4,7 @@ import type { Batch, BatchWithClips } from '../batches/batch';
 import type { BatchRepository } from '../batches/batch-repository';
 import type { Clip, ClipWithFiles } from '../clips/clip';
 import type { ClipRepository } from '../clips/clip-repository';
+import type { FinalRepository } from '../finals/final-repository';
 import type { SubmissionRecord, VolunteerRepository } from '../volunteer/volunteer-repository';
 import { ResultsService } from './results-service';
 
@@ -28,6 +29,7 @@ function setup(submissions: SubmissionRecord[]) {
     { listForSource: async () => batches } as unknown as BatchRepository,
     { listForSource: async () => [clip(clipA, 'c001'), clip(clipB, 'c002', 'withdrawn'), clip(clipC, 'c003')] } as unknown as ClipRepository,
     { listSubmissionsForSource: async () => submissions } as unknown as VolunteerRepository,
+    { latestForSource: async () => [] } as unknown as FinalRepository,
   );
   return { service, first, second };
 }
