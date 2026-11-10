@@ -44,7 +44,8 @@ The admin sees three things and nothing else: **Upload · Batches · Results**.
 | 1-7b | Plan, admin login, Vercel entry, clips tables and API, `publish`, local sandbox, Clips screen | Foundation | done |
 | 7c-7e | Neon storage, projects on the server, Sources screen | Working cloud setup | done |
 | A | `pack` command | FLAC files for upload with verified round trip | done |
-| B | Upload API and FLAC-only clips | One FLAC per clip, uploaded from the browser | next |
+| B | Upload API and FLAC-only clips | One FLAC per clip, uploaded from the browser (`POST /v1/admin/sources/:id/clips/upload`, max 4 MB per file) | done |
+| B2 | Next | Batches C and D below, starting with the new admin shell | next |
 | C | New admin shell and first-run setup | Upload / Batches / Results; two-field project; one-tick source | |
 | D | Upload page | Drag in FLAC files, list, remove | |
 | E | Batches | Pick 5 clips, link, WhatsApp message | |

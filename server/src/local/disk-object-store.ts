@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 import {
   validatePrivateObjectKey,
   type PrivateObjectMetadata,
+  type PutObjectRequest,
   type PrivateObjectStore,
   type SignedUpload,
   type UploadUrlRequest,
@@ -48,6 +49,15 @@ export class DiskObjectStore implements PrivateObjectStore {
         'x-amz-server-side-encryption': 'AES256',
       },
     };
+  }
+
+  async putObject(request: PutObjectRequest): Promise<void> {
+    const key = validatePrivateObjectKey(request.key);
+    const actual = createHash('sha256').update(request.body).digest('base64');
+    if (actual !== request.checksumSha256) throw new Error('The bytes do not match the declared SHA-256.');
+    await mkdir(path.dirname(this.objectPath(key)), { recursive: true });
+    await writeFile(this.objectPath(key), request.body);
+    await writeFile(this.metaPath(key), JSON.stringify({ contentType: request.contentType, checksumSha256: actual, sizeBytes: request.body.length } satisfies StoredMeta));
   }
 
   async createDownloadUrl(keyInput: string, expiresInSeconds = 300): Promise<string> {

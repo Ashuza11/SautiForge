@@ -196,7 +196,7 @@ export class NeonClipRepository implements ClipRepository {
         AND ${authorized('c', 'allow_transcription')}
         AND EXISTS (
           SELECT 1 FROM clip_audio_files f
-          WHERE f.clip_id = c.id AND f.variant = 'listening' AND f.status = 'verified'
+          WHERE f.clip_id = c.id AND f.variant = 'master' AND f.status = 'verified'
         )
         AND NOT EXISTS (
           SELECT 1 FROM clip_audio_files f WHERE f.clip_id = c.id AND f.status <> 'verified'

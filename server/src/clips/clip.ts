@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const MAX_CLIP_AUDIO_BYTES = 20 * 1024 * 1024;
 
-/** `master` is the lossless FLAC kept for the dataset; `listening` is the small Opus copy volunteers play. */
+/** `master` is the lossless FLAC kept for the dataset, and what volunteers play. `listening` is an optional small Opus copy. */
 export const clipVariantSchema = z.enum(['master', 'listening']);
 /** Which processed audio the stored files were encoded from. */
 export const clipDerivedFromSchema = z.enum(['original', 'cleaned']);
@@ -33,11 +33,7 @@ export const clipAudioDraftSchema = z.object({
   pcmSha256: sha256Schema.nullish().transform((value) => value ?? null),
   sampleRate: z.number().int().min(8000).max(96000),
   durationMs: z.number().int().positive().max(60_000),
-}).strict().superRefine((value, context) => {
-  if (value.variant === 'master' && !value.pcmSha256) {
-    context.addIssue({ code: 'custom', path: ['pcmSha256'], message: 'The master needs the SHA-256 of the audio samples it came from.' });
-  }
-});
+}).strict();
 
 export const clipDraftSchema = z.object({
   clipKey: z.string().trim().regex(/^[A-Za-z0-9_-]{1,40}$/, 'Use letters, digits, dash or underscore (max 40).'),
@@ -51,7 +47,7 @@ export const clipDraftSchema = z.object({
   tier: clipTierSchema,
   segmenter: z.string().trim().max(80).nullish().transform((value) => value || null),
   createdBy: adminCodeSchema,
-  audio: z.array(clipAudioDraftSchema).length(2),
+  audio: z.array(clipAudioDraftSchema).min(1).max(2),
 }).strict().superRefine((value, context) => {
   if (value.endMs <= value.startMs) {
     context.addIssue({ code: 'custom', path: ['endMs'], message: 'The clip must end after it starts.' });
@@ -63,8 +59,8 @@ export const clipDraftSchema = z.object({
   if (new Set(variants).size !== variants.length) {
     context.addIssue({ code: 'custom', path: ['audio'], message: 'Each audio variant can appear only once.' });
   }
-  if (!variants.includes('master') || !variants.includes('listening')) {
-    context.addIssue({ code: 'custom', path: ['audio'], message: 'Provide both the master and the listening copy.' });
+  if (!variants.includes('master')) {
+    context.addIssue({ code: 'custom', path: ['audio'], message: 'The FLAC master is required.' });
   }
   if (new Set(value.audio.map((file) => file.derivedFrom)).size > 1) {
     context.addIssue({ code: 'custom', path: ['audio'], message: 'Both files must come from the same audio.' });

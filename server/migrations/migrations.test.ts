@@ -78,4 +78,11 @@ describe('community service database migrations', () => {
     expect(sql).toContain("content_type = 'audio/ogg'");
     expect(sql.match(/\) NOT VALID;/g)).toHaveLength(2);
   });
+
+  it('lets a clip be a single FLAC master', async () => {
+    const sql = await readFile(new URL('./0006_single_flac_clips.sql', import.meta.url), 'utf8');
+    expect(sql).toContain("variant = 'master' AND content_type = 'audio/flac'");
+    expect(sql).not.toContain('pcm_sha256_hex IS NOT NULL');
+    expect(sql).toContain(') NOT VALID;');
+  });
 });

@@ -108,10 +108,16 @@ export function createServerApp(dependencies: AppDependencies): Hono {
     }
     return context.json({ error: 'unauthorized' }, 401);
   });
-  app.use('/v1/admin/*', bodyLimit({
+  const smallBodyLimit = bodyLimit({
     maxSize: 64 * 1024,
     onError: (context) => context.json({ error: 'request_too_large' }, 413),
-  }));
+  });
+  // JSON requests are small. Only the FLAC upload route may be larger, and it sets its own 4 MB limit.
+  app.use('/v1/admin/*', (context, next) => (
+    context.req.method === 'POST' && /^\/v1\/admin\/sources\/[^/]+\/clips\/upload$/.test(context.req.path)
+      ? next()
+      : smallBodyLimit(context, next)
+  ));
 
   app.get('/v1/admin/session', (context) => context.json({ status: 'signed_in' }));
 
@@ -250,6 +256,20 @@ export function createServerApp(dependencies: AppDependencies): Hono {
     return context.json(await dependencies.clips.register(id.data, input.data));
   });
 
+  app.post('/v1/admin/sources/:sourceId/clips/upload', bodyLimit({
+    maxSize: 4 * 1024 * 1024,
+    onError: (context) => context.json({ error: 'file_too_large', message: 'Each file must be smaller than 4 MB.' }, 413),
+  }), async (context) => {
+    const id = sourceIdSchema.safeParse(context.req.param('sourceId'));
+    if (!id.success) return context.json({ error: 'invalid_source_id' }, 400);
+    const clipKey = clipDraftSchema.shape.clipKey.safeParse(context.req.query('clipKey'));
+    if (!clipKey.success) return context.json({ error: 'invalid_clip_key', message: 'Use a file name of letters, digits, dash or underscore.' }, 400);
+    const createdBy = clipDraftSchema.shape.createdBy.safeParse(context.req.query('createdBy') ?? 'ADMIN-01');
+    if (!createdBy.success) return context.json({ error: 'invalid_created_by' }, 400);
+    const bytes = new Uint8Array(await context.req.arrayBuffer());
+    return context.json(await dependencies.clips.uploadFlac(id.data, { clipKey: clipKey.data, bytes, createdBy: createdBy.data }));
+  });
+
   app.post('/v1/admin/clips/:clipId/complete', async (context) => {
     const id = clipIdSchema.safeParse(context.req.param('clipId'));
     if (!id.success) return context.json({ error: 'invalid_clip_id' }, 400);
@@ -279,7 +299,8 @@ export function createServerApp(dependencies: AppDependencies): Hono {
       return context.json({ error: error.code, message: error.message }, status);
     }
     if (error instanceof ClipLifecycleError) {
-      const status = ['source_not_found', 'clip_not_found', 'audio_not_found'].includes(error.code) ? 404 : 409;
+      const status = ['source_not_found', 'clip_not_found', 'audio_not_found'].includes(error.code) ? 404
+        : error.code === 'unsupported_audio' ? 422 : 409;
       return context.json({ error: error.code, message: error.message }, status);
     }
     console.error('Unhandled API error', error);

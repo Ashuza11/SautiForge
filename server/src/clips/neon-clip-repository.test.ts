@@ -77,6 +77,6 @@ describe('NeonClipRepository', () => {
     expect(sql[1]).toContain("f.status <> 'verified'");
     expect(sql[3]).toContain('allow_volunteer_access');
     expect(sql[3]).toContain('allow_transcription');
-    expect(sql[3]).toContain("f.variant = 'listening' AND f.status = 'verified'");
+    expect(sql[3]).toContain("f.variant = 'master' AND f.status = 'verified'");
   });
 });

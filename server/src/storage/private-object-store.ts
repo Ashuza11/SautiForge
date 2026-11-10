@@ -37,6 +37,14 @@ export type SignedUpload = {
   };
 };
 
+export type PutObjectRequest = {
+  key: string;
+  contentType: string;
+  /** Base64 SHA-256 of `body`; the store refuses to keep bytes that do not match. */
+  checksumSha256: string;
+  body: Uint8Array;
+};
+
 export type PrivateObjectMetadata = {
   contentLengthBytes: number;
   contentType: string;
@@ -52,6 +60,8 @@ export interface PrivateObjectStore {
   readonly reportsEncryption: boolean;
   assertReady(): Promise<void>;
   createUploadUrl(request: UploadUrlRequest): Promise<SignedUpload>;
+  /** Stores bytes the server already holds (browser uploads are checked first, then written here). */
+  putObject(request: PutObjectRequest): Promise<void>;
   createDownloadUrl(key: string, expiresInSeconds?: number): Promise<string>;
   inspectObject(key: string): Promise<PrivateObjectMetadata>;
 }
@@ -100,6 +110,21 @@ export class S3PrivateObjectStore implements PrivateObjectStore {
         'x-amz-server-side-encryption': 'AES256',
       },
     };
+  }
+
+  async putObject(request: PutObjectRequest): Promise<void> {
+    const key = objectKeySchema.parse(request.key);
+    const contentType = mediaTypeSchema.parse(request.contentType);
+    const checksumSha256 = checksumSchema.parse(request.checksumSha256);
+    await this.client.send(new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      Body: request.body,
+      ContentType: contentType,
+      ContentLength: contentLengthSchema.parse(request.body.length),
+      ChecksumSHA256: checksumSha256,
+      ServerSideEncryption: 'AES256',
+    }));
   }
 
   createDownloadUrl(keyInput: string, expiresInSeconds = 300): Promise<string> {

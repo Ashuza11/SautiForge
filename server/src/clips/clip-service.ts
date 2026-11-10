@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import type { SourceService } from '../sources/source-service';
 import type { PrivateObjectStore, SignedUpload } from '../storage/private-object-store';
@@ -17,11 +17,12 @@ import {
   type ClipWithFiles,
 } from './clip';
 import type { ClipRepository } from './clip-repository';
+import { FlacError, readFlacInfo } from './flac';
 
 export class ClipLifecycleError extends Error {
   constructor(
     readonly code: 'source_not_found' | 'clip_not_found' | 'audio_not_found' | 'clip_withdrawn' | 'clip_conflict'
-      | 'upload_not_pending' | 'object_unavailable' | 'verification_failed' | 'source_changed',
+      | 'upload_not_pending' | 'object_unavailable' | 'verification_failed' | 'source_changed' | 'unsupported_audio',
     message: string,
   ) {
     super(message);
@@ -165,6 +166,49 @@ export class ClipService {
     return { clip: { ...clip, ...draftMetadata(draft), updatedAt: timestamp }, files: results };
   }
 
+  /**
+   * Accepts one FLAC file from the admin's browser: checks it, stores it, verifies it and publishes the clip.
+   * Safe to repeat for the same clip key with the same file; a different file under the same key is refused.
+   */
+  async uploadFlac(sourceId: string, input: { clipKey: string; bytes: Uint8Array; createdBy: string }): Promise<ClipWithFiles> {
+    let info;
+    try {
+      info = readFlacInfo(input.bytes);
+    } catch (error) {
+      if (error instanceof FlacError) throw new ClipLifecycleError('unsupported_audio', error.message);
+      throw error;
+    }
+    if (info.channels !== 1 || info.bitsPerSample !== 16) {
+      throw new ClipLifecycleError('unsupported_audio', 'Use mono 16-bit FLAC files, as made by the pack command.');
+    }
+    const sha256 = createHash('sha256').update(input.bytes).digest('hex');
+    const draft = clipDraftSchema.parse({
+      clipKey: input.clipKey,
+      startMs: 0,
+      endMs: info.durationMs,
+      trimmedMs: 0,
+      durationMs: info.durationMs,
+      speakerRole: 'unknown',
+      speakerName: null,
+      hasMusic: false,
+      tier: 'asr',
+      segmenter: 'browser-upload',
+      createdBy: input.createdBy,
+      audio: [{ variant: 'master', derivedFrom: 'cleaned', sizeBytes: input.bytes.length, sha256, pcmSha256: null, sampleRate: info.sampleRate, durationMs: info.durationMs }],
+    });
+    const registered = await this.register(sourceId, draft);
+    for (const { file, upload } of registered.files) {
+      if (!upload) continue;
+      await this.objectStore.putObject({
+        key: file.objectKey,
+        contentType: file.contentType,
+        checksumSha256: Buffer.from(file.sha256, 'hex').toString('base64'),
+        body: input.bytes,
+      });
+    }
+    return this.complete(registered.clip.id);
+  }
+
   /** Verifies the uploaded objects and publishes the clip once the cleaned audio is verified. */
   async complete(clipId: string): Promise<ClipWithFiles> {
     const current = await this.clips.getById(clipId);
@@ -214,7 +258,9 @@ export class ClipService {
 
   async createAudioUrl(clipId: string, variant: ClipVariant): Promise<string> {
     const current = await this.clips.getById(clipId);
-    const file = current?.files.find((candidate) => candidate.variant === variant && candidate.status === 'verified');
+    const verified = (wanted: ClipVariant) => current?.files.find((candidate) => candidate.variant === wanted && candidate.status === 'verified');
+    // Browser-uploaded clips have only the FLAC master, which is also what plays.
+    const file = verified(variant) ?? (variant === 'listening' ? verified('master') : undefined);
     if (!current || !file) throw new ClipLifecycleError('audio_not_found', 'No verified audio exists for this clip and variant.');
     await this.sources.assertUseAuthorized(current.clip.sourceId, 'internalProcessing');
     return this.objectStore.createDownloadUrl(file.objectKey, 300);

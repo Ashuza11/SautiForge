@@ -35,3 +35,7 @@ If a setting is wrong, `/health` answers `503 {"error":"server_not_configured","
 
 - The login lockout counter lives in function memory, so it slows guessing but is not a hard limit across instances.
 - The deployed site cannot be tested from this repository without your Neon, S3 and Vercel accounts.
+
+## Upload size
+
+Clips are uploaded to the API as raw FLAC (`POST /v1/admin/sources/<id>/clips/upload?clipKey=<name>`). The route accepts files up to 4 MB, under Vercel's 4.5 MB request limit; a mono 16-bit clip of a minute is about 1.5 MB. Other admin requests are capped at 64 KB.

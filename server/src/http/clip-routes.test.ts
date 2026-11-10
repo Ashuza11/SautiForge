@@ -35,6 +35,7 @@ function clipApp() {
   const clips = {
     listForSource: vi.fn().mockResolvedValue([]),
     register: vi.fn().mockResolvedValue({ clip: { id: clipId }, files: [] }),
+    uploadFlac: vi.fn().mockResolvedValue({ clip: { id: clipId, status: 'published' }, files: [] }),
     complete: vi.fn().mockResolvedValue({ clip: { id: clipId, status: 'published' }, files: [] }),
     createAudioUrl: vi.fn().mockResolvedValue('https://storage.example/signed-get'),
     withdraw: vi.fn().mockResolvedValue({ clip: { id: clipId, status: 'withdrawn' }, files: [] }),
@@ -76,7 +77,8 @@ describe('clip routes', () => {
     expect(clips.register).toHaveBeenCalledTimes(1);
 
     const bad = [
-      { ...draft, audio: [draft.audio[0]] },
+      { ...draft, audio: [draft.audio[1]] },
+      { ...draft, audio: [] },
       { ...draft, hasMusic: true },
       { ...draft, endMs: 10 },
       { ...draft, extra: 'field' },
@@ -104,5 +106,39 @@ describe('clip routes', () => {
     expect((await call(`/v1/admin/clips/${clipId}/complete`, 'POST')).status).toBe(404);
     vi.mocked(clips.complete).mockRejectedValueOnce(new ClipLifecycleError('verification_failed', 'bad'));
     expect((await call(`/v1/admin/clips/${clipId}/complete`, 'POST')).status).toBe(409);
+  });
+
+  it('accepts a raw FLAC upload with the clip key from the file name', async () => {
+    const { app, clips } = clipApp();
+    const send = (query: string, body: Uint8Array) => app.request(`/v1/admin/sources/${sourceId}/clips/upload${query}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'audio/flac' },
+      body: body as BodyInit,
+    });
+    expect((await send('?clipKey=c001', new Uint8Array([1, 2, 3]))).status).toBe(200);
+    expect((await send('?clipKey=c004', new Uint8Array(200 * 1024))).status).toBe(200); // far above the 64 KB JSON limit
+    expect(clips.uploadFlac).toHaveBeenCalledWith(sourceId, { clipKey: 'c001', bytes: new Uint8Array([1, 2, 3]), createdBy: 'ADMIN-01' });
+    expect((await send('?clipKey=bad%20name!', new Uint8Array([1]))).status).toBe(400);
+    expect((await send('', new Uint8Array([1]))).status).toBe(400);
+    expect((await send('?clipKey=c002&createdBy=x', new Uint8Array([1]))).status).toBe(400);
+    expect(clips.uploadFlac).toHaveBeenCalledTimes(2);
+    const tooBig = await send('?clipKey=c003', new Uint8Array(4 * 1024 * 1024 + 1));
+    expect(tooBig.status).toBe(413);
+    expect(await tooBig.json()).toMatchObject({ error: 'file_too_large' });
+    // other admin requests keep the small limit
+    const bigJson = await app.request('/v1/admin/projects', {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ x: 'a'.repeat(70 * 1024) }),
+    });
+    expect(bigJson.status).toBe(413);
+    expect(await bigJson.json()).toMatchObject({ error: 'request_too_large' });
+  });
+
+  it('answers 422 when the file is not usable audio', async () => {
+    const { app, clips } = clipApp();
+    vi.mocked(clips.uploadFlac).mockRejectedValueOnce(new ClipLifecycleError('unsupported_audio', 'This is not a FLAC file.'));
+    const response = await app.request(`/v1/admin/sources/${sourceId}/clips/upload?clipKey=c001`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: new Uint8Array([1]),
+    });
+    expect(response.status).toBe(422);
   });
 });

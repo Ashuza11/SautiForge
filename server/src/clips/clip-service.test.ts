@@ -6,6 +6,7 @@ import type { PrivateObjectStore } from '../storage/private-object-store';
 import { clipDraftSchema, type Clip, type ClipAudioFile, type ClipDraft, type ClipStatus, type ClipWithFiles } from './clip';
 import type { ClipRepository } from './clip-repository';
 import { ClipService } from './clip-service';
+import { fakeFlac } from './flac.test';
 
 const projectId = '00000000-0000-4000-8000-000000000001';
 const sourceId = '00000000-0000-4000-8000-000000000101';
@@ -94,6 +95,7 @@ function setup() {
   } as unknown as SourceService;
   const store = {
     reportsEncryption: true,
+    putObject: vi.fn().mockResolvedValue(undefined),
     createUploadUrl: vi.fn().mockImplementation(async (r: { key: string }) => ({ url: `https://storage.example/${r.key}`, headers: {} })),
     createDownloadUrl: vi.fn().mockResolvedValue('https://storage.example/get'),
     inspectObject: vi.fn(),
@@ -213,13 +215,50 @@ describe('ClipService', () => {
     expect((await service.complete(clip.id)).clip.status).toBe('published');
   });
 
-  it('rejects drafts without both roles, a master WAV hash, or a single source', () => {
+  it('requires the FLAC master, and allows the Opus copy to be missing', () => {
     const [master, listening] = draft.audio;
-    expect(clipDraftSchema.safeParse({ ...draft, audio: [master] }).success).toBe(false);
+    expect(clipDraftSchema.safeParse({ ...draft, audio: [master] }).success).toBe(true);
+    expect(clipDraftSchema.safeParse({ ...draft, audio: [listening] }).success).toBe(false);
     expect(clipDraftSchema.safeParse({ ...draft, audio: [master, { ...master }] }).success).toBe(false);
-    expect(clipDraftSchema.safeParse({ ...draft, audio: [{ ...master, pcmSha256: null }, listening] }).success).toBe(false);
+    expect(clipDraftSchema.safeParse({ ...draft, audio: [{ ...master, pcmSha256: null }, listening] }).success).toBe(true);
     expect(clipDraftSchema.safeParse({ ...draft, audio: [master, { ...listening, derivedFrom: 'original' }] }).success).toBe(false);
     expect(clipDraftSchema.safeParse(draft).success).toBe(true);
+  });
+
+  describe('browser FLAC upload', () => {
+    const flac = fakeFlac(24000, 72_000);
+
+    it('checks, stores, verifies and publishes one FLAC as the clip', async () => {
+      const { service, repo, store, verifyAll } = setup();
+      verifyAll();
+      const done = await service.uploadFlac(sourceId, { clipKey: 'c010', bytes: flac, createdBy: 'ADMIN-01' });
+      expect(done.clip).toMatchObject({ status: 'published', clipKey: 'c010', durationMs: 3000, endMs: 3000, speakerRole: 'unknown' });
+      expect(done.files).toHaveLength(1);
+      expect(done.files[0]).toMatchObject({ variant: 'master', contentType: 'audio/flac', sampleRate: 24000, status: 'verified', pcmSha256: null });
+      expect(store.putObject).toHaveBeenCalledWith(expect.objectContaining({ contentType: 'audio/flac', body: flac }));
+      expect(repo.files.size).toBe(1);
+      await expect(service.createAudioUrl(done.clip.id, 'listening')).resolves.toBe('https://storage.example/get');
+    });
+
+    it('is safe to repeat with the same file and refuses a different file under the same key', async () => {
+      const { service, store, verifyAll } = setup();
+      verifyAll();
+      await service.uploadFlac(sourceId, { clipKey: 'c010', bytes: flac, createdBy: 'ADMIN-01' });
+      vi.mocked(store.putObject).mockClear();
+      expect((await service.uploadFlac(sourceId, { clipKey: 'c010', bytes: flac, createdBy: 'ADMIN-01' })).clip.status).toBe('published');
+      expect(store.putObject).not.toHaveBeenCalled();
+      await expect(service.uploadFlac(sourceId, { clipKey: 'c010', bytes: fakeFlac(24000, 72_000, 1, 16, 40), createdBy: 'ADMIN-01' }))
+        .rejects.toMatchObject({ code: 'clip_conflict' });
+    });
+
+    it('refuses files that are not mono 16-bit FLAC, before anything is stored', async () => {
+      const { service, repo, store } = setup();
+      for (const bytes of [new TextEncoder().encode('RIFF'.repeat(30)), fakeFlac(24000, 72_000, 2), fakeFlac(24000, 72_000, 1, 24)]) {
+        await expect(service.uploadFlac(sourceId, { clipKey: 'c011', bytes, createdBy: 'ADMIN-01' })).rejects.toMatchObject({ code: 'unsupported_audio' });
+      }
+      expect(store.putObject).not.toHaveBeenCalled();
+      expect(repo.clips.size).toBe(0);
+    });
   });
 
   it('reports an unreadable object so the upload can be retried', async () => {

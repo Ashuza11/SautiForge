@@ -5,6 +5,7 @@ import path from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { fakeFlac } from '../clips/flac.test';
 import { createLocalServer, type LocalServer } from './local-server';
 import { seedLocalData } from './seed';
 
@@ -105,5 +106,26 @@ describe('local mode (real SQL on PGlite, audio on disk)', () => {
     const withdrawn = await (await api(`/v1/admin/clips/${id}/withdraw`, 'POST')).json() as { clip: { status: string } };
     expect(withdrawn.clip.status).toBe('withdrawn');
     expect(((await (await api(`/v1/admin/sources/${sourceId}/clips?status=published`)).json()) as { clips: unknown[] }).clips).toHaveLength(0);
+  });
+
+  it('uploads one FLAC through the API, publishes it, and serves the exact bytes back', async () => {
+    const flac = Buffer.from(fakeFlac(24000, 96_000, 1, 16, 500));
+    const send = (key: string, bytes: Buffer) => server.app.request(`${base}/v1/admin/sources/${sourceId}/clips/upload?clipKey=${key}`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'audio/flac' }, body: new Uint8Array(bytes),
+    });
+    const first = await send('u001', flac);
+    expect(first.status).toBe(200);
+    const done = await first.json() as { clip: { id: string; status: string; durationMs: number }; files: { variant: string }[] };
+    expect(done.clip).toMatchObject({ status: 'published', durationMs: 4000 });
+    expect(done.files.map((file) => file.variant)).toEqual(['master']);
+
+    const { url } = await (await api(`/v1/admin/clips/${done.clip.id}/audio/listening`)).json() as { url: string };
+    const played = await server.app.request(url);
+    expect(played.headers.get('content-type')).toBe('audio/flac');
+    expect(Buffer.from(await played.arrayBuffer()).equals(flac)).toBe(true);
+
+    expect((await send('u001', flac)).status).toBe(200);
+    expect((await send('u002', Buffer.from('not audio at all, just text that is long enough to pass the size floor.'))).status).toBe(422);
+    expect((await send('u001', Buffer.from(fakeFlac(24000, 96_000, 1, 16, 900)))).status).toBe(409);
   });
 });
