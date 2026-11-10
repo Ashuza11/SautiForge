@@ -17,6 +17,8 @@ export interface VolunteerRepository {
   /** Every answer given in the batches of one source, oldest first. For admins only. */
   listSubmissionsForSource(sourceId: string): Promise<SubmissionRecord[]>;
   createContributor(contributor: Contributor): Promise<Contributor>;
+  /** How many volunteers joined the project since the given time (a brake on link abuse). */
+  countContributorsSince(projectId: string, since: string): Promise<number>;
   getContributor(id: string): Promise<Contributor | null>;
   /**
    * The first clip of the batch, in order, that this person has not answered and that still needs

@@ -9,14 +9,17 @@ import type { BatchProgress, VolunteerRepository } from './volunteer-repository'
 
 export class VolunteerError extends Error {
   constructor(
-    readonly code: 'link_invalid' | 'contributor_invalid' | 'clip_unavailable',
+    readonly code: 'link_invalid' | 'contributor_invalid' | 'clip_unavailable' | 'too_many_joins',
     message: string,
   ) {
     super(message);
   }
 }
 
-export type VolunteerServiceOptions = { linkSecret: string; idFactory?: () => string; now?: () => Date };
+/** New volunteers allowed per project per hour. Generous for a community launch, small enough to stop abuse. */
+export const MAX_JOINS_PER_HOUR = 200;
+
+export type VolunteerServiceOptions = { linkSecret: string; idFactory?: () => string; now?: () => Date; maxJoinsPerHour?: number };
 
 export type BatchInfo = { title: string; clipCount: number; language: string };
 export type ClipOffer = { clipId: string; position: number; durationMs: number; audioUrl: string };
@@ -64,6 +67,10 @@ export class VolunteerService {
   async join(link: string, pseudonym: string): Promise<{ contributor: { id: string; pseudonym: string }; token: string }> {
     const found = await this.openBatch(link);
     await this.assertAllowed(found.batch.sourceId);
+    const since = new Date(this.now().getTime() - 60 * 60 * 1000).toISOString();
+    if (await this.repo.countContributorsSince(found.batch.projectId, since) >= (this.options.maxJoinsPerHour ?? MAX_JOINS_PER_HOUR)) {
+      throw new VolunteerError('too_many_joins', 'Many people are joining right now. Please try again in a few minutes.');
+    }
     const contributor: Contributor = {
       id: this.idFactory(),
       projectId: found.batch.projectId,

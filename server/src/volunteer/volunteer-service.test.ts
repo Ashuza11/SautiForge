@@ -21,6 +21,8 @@ class MemoryVolunteers implements VolunteerRepository {
   submissions: Submission[] = [];
   result: 'recorded' | 'unavailable' = 'recorded';
   async listSubmissionsForSource() { return []; }
+  joinsInLastHour = 0;
+  async countContributorsSince() { return this.joinsInLastHour; }
   async createContributor(c: Contributor) { this.contributors.set(c.id, c); return c; }
   async getContributor(id: string) { return this.contributors.get(id) ?? null; }
   async nextClip(_batch: string, contributorId: string, required: number): Promise<NextClip | null> {
@@ -86,6 +88,15 @@ describe('VolunteerService', () => {
     expect(joined.token.startsWith(`${joined.contributor.id}.`)).toBe(true);
     expect(sources.assertUseAuthorized).toHaveBeenCalledWith(sourceId, 'volunteerAccess');
     await expect(service.join(link, 'x')).rejects.toThrow();
+  });
+
+  it('stops new volunteers from joining when too many joined within the hour', async () => {
+    const { service, repo } = setup();
+    repo.joinsInLastHour = 199;
+    await expect(service.join(link, 'Neema')).resolves.toBeDefined();
+    repo.joinsInLastHour = 200;
+    await expect(service.join(link, 'Baraka')).rejects.toMatchObject({ code: 'too_many_joins' });
+    expect(repo.contributors.size).toBe(1);
   });
 
   it('refuses a forged, altered or foreign token', async () => {

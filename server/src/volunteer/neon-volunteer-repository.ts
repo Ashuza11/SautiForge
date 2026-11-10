@@ -40,6 +40,13 @@ export class NeonVolunteerRepository implements VolunteerRepository {
     return contributor;
   }
 
+  async countContributorsSince(projectId: string, since: string): Promise<number> {
+    const rows = await this.database.query<{ total: number | string }>(
+      'SELECT count(*) AS total FROM contributors WHERE project_id = $1 AND created_at >= $2', [projectId, since],
+    );
+    return Number(rows[0]?.total ?? 0);
+  }
+
   async getContributor(id: string): Promise<Contributor | null> {
     const rows = await this.database.query<{ id: string; project_id: string; pseudonym: string; created_at: Timestamp }>(
       'SELECT id, project_id, pseudonym, created_at FROM contributors WHERE id = $1', [id],

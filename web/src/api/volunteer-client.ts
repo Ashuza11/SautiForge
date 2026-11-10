@@ -18,6 +18,8 @@ const MESSAGES: Record<string, string> = {
   request_too_large: 'That is too long. Please write a little less.',
   use_not_authorized: 'This batch is not open for volunteers right now.',
   server_not_configured: 'The service is not ready yet. Please try again later.',
+  too_many_joins: 'Many people are joining right now. Please try again in a few minutes.',
+  rate_limited: 'Please slow down a little and try again in a moment.',
 };
 
 /** Talks to the public volunteer API. No cookies: every call carries the batch link and the personal token. */

@@ -15,7 +15,7 @@ const link = `${'0'.repeat(8)}-0000-4000-8000-000000000901.${'c'.repeat(24)}`;
 const contributor = `${'1'.repeat(8)}-0000-4000-8000-000000000701.${'d'.repeat(24)}`;
 const clipId = '00000000-0000-4000-8000-000000000401';
 
-function volunteerApp() {
+function volunteerApp(volunteerRateLimit?: { allow(key: string): boolean }) {
   const volunteer = {
     info: vi.fn().mockResolvedValue({ title: 'Batch 1', clipCount: 5, language: 'Mashi' }),
     join: vi.fn().mockResolvedValue({ contributor: { id: 'x', pseudonym: 'Neema' }, token: 't' }),
@@ -26,7 +26,7 @@ function volunteerApp() {
   const app = createServerApp({
     projects: {} as ProjectService, sources: {} as SourceService, media: {} as SourceMediaService, clips: {} as ClipService,
     batches: {} as BatchService, volunteer, results: {} as ResultsService, finals: {} as FinalService, readiness: {} as ReadinessService,
-    adminApiToken: 'test-admin-token-that-is-long-enough', webOrigin: 'https://annotation.example.org',
+    adminApiToken: 'test-admin-token-that-is-long-enough', webOrigin: 'https://annotation.example.org', volunteerRateLimit,
   });
   const post = (path: string, body: unknown) => app.request(`/v1/volunteer/${path}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -71,5 +71,25 @@ describe('volunteer routes', () => {
     vi.mocked(volunteer.submit).mockRejectedValueOnce(new VolunteerError('clip_unavailable', 'gone'));
     expect((await post('submit', { link, contributor, clipId, text: 'a' })).status).toBe(409);
     expect((await post('info', { link, filler: 'a'.repeat(9000) })).status).toBe(413);
+  });
+
+  it('slows a visitor who sends far too many requests, without affecting others', async () => {
+    const seen: string[] = [];
+    const { app } = volunteerApp({ allow: (key) => { seen.push(key); return key !== '198.51.100.9'; } });
+    const send = (ip: string) => app.request('/v1/volunteer/info', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-forwarded-for': ip }, body: JSON.stringify({ link }),
+    });
+    const blocked = await send('198.51.100.9, 10.0.0.1');
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get('Retry-After')).toBe('60');
+    expect(await blocked.json()).toEqual({ error: 'rate_limited' });
+    expect((await send('203.0.113.7')).status).toBe(200);
+    expect(seen).toEqual(['198.51.100.9', '203.0.113.7']);
+  });
+
+  it('answers 429 when too many volunteers are joining', async () => {
+    const { post, volunteer } = volunteerApp();
+    vi.mocked(volunteer.join).mockRejectedValueOnce(new VolunteerError('too_many_joins', 'busy'));
+    expect((await post('join', { link, pseudonym: 'Neema' })).status).toBe(429);
   });
 });

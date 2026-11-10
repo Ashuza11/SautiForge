@@ -62,3 +62,7 @@ It lets every later batch be run and tested in a browser without Neon, S3 or Ver
 ## Needed from the project owner
 
 Neon `DATABASE_URL`, a private S3 bucket with keys, a Vercel project, an admin password, and the Jesus Film registered as a source in the Mashi project (needed from batch 4).
+
+## Public volunteer endpoints: limits
+
+Anyone holding a batch link can call `/v1/volunteer/*`. Two brakes apply: at most 200 new volunteers per project per hour (database count, answers `429 too_many_joins`), and 240 requests per visitor per minute (best-effort, in memory per server instance, answers `429 rate_limited`). Link codes are signed and unguessable, and closing a batch stops its link.

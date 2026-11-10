@@ -15,6 +15,7 @@ import { projectDraftSchema } from '../../../src/features/projects/domain/projec
 import { finalDraftSchema } from '../finals/final';
 import { FinalError, type FinalService } from '../finals/final-service';
 import type { ResultsService } from '../results/results-service';
+import { createRateLimiter, visitorKey } from './rate-limit';
 import { infoSchema, joinSchema, sessionSchema, skipSchema, submitSchema } from '../volunteer/volunteer';
 import { VolunteerError, type VolunteerService } from '../volunteer/volunteer-service';
 import { sourceMediaUploadDraftSchema } from '../media/source-media';
@@ -41,6 +42,8 @@ export type AppDependencies = {
   webOrigin: string;
   adminSession?: AdminSessionService;
   secureCookies?: boolean;
+  /** Overridable for tests; defaults to 240 volunteer requests per visitor per minute. */
+  volunteerRateLimit?: { allow(key: string): boolean };
 };
 
 const projectIdSchema = z.string().uuid();
@@ -120,6 +123,15 @@ export function createServerApp(dependencies: AppDependencies): Hono {
     return context.json({ error: 'unauthorized' }, 401);
   });
   // Volunteer routes: public, no admin session. Each call carries a batch link and a personal token.
+  // One visitor can make plenty of requests while listening and writing, but not thousands.
+  const visitorLimiter = dependencies.volunteerRateLimit ?? createRateLimiter({ limit: 240, windowMs: 60_000 });
+  app.use('/v1/volunteer/*', async (context, next) => {
+    if (!visitorLimiter.allow(visitorKey(context.req.header('x-forwarded-for')))) {
+      context.header('Retry-After', '60');
+      return context.json({ error: 'rate_limited' }, 429);
+    }
+    await next();
+  });
   const volunteerLimit = bodyLimit({ maxSize: 8 * 1024, onError: (context) => context.json({ error: 'request_too_large' }, 413) });
   app.post('/v1/volunteer/info', volunteerLimit, async (context) => {
     const input = await parseValidatedBody(context, infoSchema);
@@ -387,7 +399,7 @@ export function createServerApp(dependencies: AppDependencies): Hono {
       return context.json({ error: error.code, message: error.message }, error.code === 'clip_not_eligible' ? 409 : 404);
     }
     if (error instanceof VolunteerError) {
-      const status = error.code === 'link_invalid' ? 404 : error.code === 'contributor_invalid' ? 401 : 409;
+      const status = error.code === 'link_invalid' ? 404 : error.code === 'contributor_invalid' ? 401 : error.code === 'too_many_joins' ? 429 : 409;
       return context.json({ error: error.code, message: error.message }, status);
     }
     if (error instanceof BatchLifecycleError) {
