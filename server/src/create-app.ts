@@ -10,6 +10,8 @@ import { NeonProjectRepository } from './projects/neon-project-repository';
 import { ProjectService } from './projects/project-service';
 import { ReadinessService } from './readiness';
 import { BatchService } from './batches/batch-service';
+import { NeonVolunteerRepository } from './volunteer/neon-volunteer-repository';
+import { VolunteerService } from './volunteer/volunteer-service';
 import { NeonBatchRepository } from './batches/neon-batch-repository';
 import { createPrivateObjectStore } from './storage/private-object-store';
 import { NeonSourceRepository } from './sources/neon-source-repository';
@@ -28,16 +30,21 @@ export function createAppFromEnvironment(environment: NodeJS.ProcessEnv) {
     credentials: config.awsCredentials,
   });
   const sourceService = new SourceService(sourceRepository, projectRepository);
+  const projectService = new ProjectService(projectRepository);
+  const clipService = new ClipService(new NeonClipRepository(database), sourceService, objectStore);
+  const linkSecret = config.adminLogin?.sessionSecret ?? config.adminApiToken;
+  const batchService = new BatchService(new NeonBatchRepository(database), sourceService, { linkSecret });
   const app = createServerApp({
-    projects: new ProjectService(projectRepository),
+    projects: projectService,
     sources: sourceService,
     media: new SourceMediaService(
       new NeonSourceMediaRepository(database),
       sourceService,
       objectStore,
     ),
-    clips: new ClipService(new NeonClipRepository(database), sourceService, objectStore),
-    batches: new BatchService(new NeonBatchRepository(database), sourceService, { linkSecret: config.adminLogin?.sessionSecret ?? config.adminApiToken }),
+    clips: clipService,
+    batches: batchService,
+    volunteer: new VolunteerService(new NeonVolunteerRepository(database), batchService, clipService, projectService, sourceService, { linkSecret }),
     readiness: new ReadinessService(projectRepository, objectStore),
     adminApiToken: config.adminApiToken,
     webOrigin: config.webOrigin,

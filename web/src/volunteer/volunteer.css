@@ -1,0 +1,32 @@
+/* Volunteer page: phone first, big targets, high contrast, one thing at a time. */
+.vo-shell { min-height: 100vh; background: #f4f7f5; color: var(--ink); font-size: 17px; line-height: 1.5; }
+.vo-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #fff; border-bottom: 1px solid var(--line); }
+.vo-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; color: #fff; background: var(--green); font-weight: 900; }
+.vo-me { margin-left: auto; display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 15px; font-weight: 650; }
+.vo-linkbutton { min-height: 36px !important; padding: 4px 8px !important; border: 0 !important; color: var(--muted) !important; background: transparent !important; font-size: 14px; font-weight: 500; text-decoration: underline; }
+.vo-main { width: min(560px, 100%); margin: 0 auto; padding: 16px 16px 48px; }
+.vo-card { display: grid; gap: 14px; padding: 22px 18px; background: #fff; border: 1px solid var(--line); border-radius: 20px; box-shadow: 0 10px 30px rgba(24, 68, 46, .07); }
+.vo-card h1 { margin: 0; font-size: 26px; line-height: 1.15; letter-spacing: -.01em; }
+.vo-muted { margin: 0; color: var(--muted); }
+.vo-hint { margin: -4px 0 0; color: var(--muted); font-size: 14px; }
+.vo-steps { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+.vo-field { display: grid; gap: 6px; }
+.vo-field > span { font-size: 16px; font-weight: 750; }
+.vo-field input, .vo-field textarea { width: 100%; padding: 14px 16px; border: 2px solid #b9c8bf; border-radius: 14px; color: var(--ink); background: #fff; font-size: 18px; line-height: 1.4; }
+.vo-field input { min-height: 56px; }
+.vo-field textarea { min-height: 130px; resize: vertical; }
+.vo-field input:focus, .vo-field textarea:focus { border-color: var(--green); outline: 3px solid #e0a629; outline-offset: 1px; }
+.vo-error { margin: 0; padding: 12px 14px; border-radius: 12px; color: var(--danger); background: #fbeaea; font-weight: 650; }
+.vo-ok { margin: 0; padding: 12px 14px; border-radius: 12px; color: var(--green-dark); background: var(--green-soft); font-weight: 700; }
+.vo-primary, .vo-listen { width: 100%; min-height: 60px !important; border-radius: 16px !important; font-size: 19px !important; }
+.vo-listen { display: flex; align-items: center; justify-content: center; gap: 14px; min-height: 84px !important; font-size: 22px !important; }
+.vo-listen[aria-pressed="true"] { background: var(--green-dark); }
+.vo-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.vo-secondary { min-height: 52px !important; padding: 8px 6px !important; border-radius: 14px !important; font-size: 16px !important; white-space: nowrap; }
+.vo-quiet { min-height: 52px !important; padding: 8px 12px !important; border-radius: 14px !important; color: #3d4f45 !important; background: #fff !important; border: 1px solid var(--line) !important; font-size: 16px; font-weight: 600; }
+.vo-progress-text { margin: 0; color: var(--muted); font-size: 15px; font-weight: 700; letter-spacing: .02em; }
+.vo-bar { height: 10px; overflow: hidden; border-radius: 999px; background: #e1eae5; }
+.vo-bar span { display: block; height: 100%; border-radius: 999px; background: var(--green); transition: width .3s; }
+.vo-count { text-align: center; font-size: 14px; }
+.vo-done { text-align: center; justify-items: center; }
+.vo-check { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; color: #fff; background: var(--green); font-size: 38px; font-weight: 900; }

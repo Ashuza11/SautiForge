@@ -6,6 +6,8 @@ import { Hono } from 'hono';
 
 import { AdminSessionService } from '../auth/admin-session';
 import { BatchService } from '../batches/batch-service';
+import { NeonVolunteerRepository } from '../volunteer/neon-volunteer-repository';
+import { VolunteerService } from '../volunteer/volunteer-service';
 import { NeonBatchRepository } from '../batches/neon-batch-repository';
 import { ClipService } from '../clips/clip-service';
 import { NeonClipRepository } from '../clips/neon-clip-repository';
@@ -59,12 +61,15 @@ export async function createLocalServer(options: LocalServerOptions): Promise<Lo
     options.publicBaseUrl,
     options.sessionSecret,
   );
+  const clipService = new ClipService(new NeonClipRepository(executor), sources, objectStore);
+  const batchService = new BatchService(new NeonBatchRepository(executor), sources, { linkSecret: options.sessionSecret });
   const api = createServerApp({
     projects,
     sources,
     media: new SourceMediaService(new NeonSourceMediaRepository(executor), sources, objectStore),
-    clips: new ClipService(new NeonClipRepository(executor), sources, objectStore),
-    batches: new BatchService(new NeonBatchRepository(executor), sources, { linkSecret: options.sessionSecret }),
+    clips: clipService,
+    batches: batchService,
+    volunteer: new VolunteerService(new NeonVolunteerRepository(executor), batchService, clipService, projects, sources, { linkSecret: options.sessionSecret }),
     readiness: new ReadinessService(projectRepository, objectStore),
     adminApiToken: options.adminApiToken,
     webOrigin: options.webOrigin,

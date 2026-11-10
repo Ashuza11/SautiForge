@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { BatchLifecycleError, type BatchService } from '../batches/batch-service';
+import type { VolunteerService } from '../volunteer/volunteer-service';
 import type { ClipService } from '../clips/clip-service';
 import type { SourceMediaService } from '../media/source-media-service';
 import type { ProjectService } from '../projects/project-service';
@@ -25,6 +26,7 @@ function batchApp() {
     media: {} as SourceMediaService,
     clips: {} as ClipService,
     batches,
+    volunteer: {} as VolunteerService,
     readiness: {} as ReadinessService,
     adminApiToken: token,
     webOrigin: 'https://annotation.example.org',

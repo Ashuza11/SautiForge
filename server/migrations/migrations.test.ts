@@ -95,4 +95,20 @@ describe('community service database migrations', () => {
     expect(sql).toContain('PRIMARY KEY (batch_id, clip_id)');
     expect(sql.toLowerCase()).not.toMatch(/transcript|submission|contributor/);
   });
+
+  it('keeps volunteer answers as one append-only record per person and clip', async () => {
+    const sql = await readFile(new URL('./0008_contributors_and_submissions.sql', import.meta.url), 'utf8');
+    expect(sql).toContain('CREATE TABLE contributors');
+    expect(sql).toContain('CREATE TABLE submissions');
+    expect(sql).toContain('UNIQUE (clip_id, contributor_id)');
+    expect(sql).toContain("kind IN ('transcript', 'skip')");
+    expect(sql).toContain('FOREIGN KEY (batch_id, clip_id) REFERENCES batch_clips(batch_id, clip_id)');
+    expect(sql).toContain('BEFORE UPDATE OR DELETE ON submissions');
+    expect(sql).toContain("RAISE EXCEPTION 'Submissions are append-only.'");
+    // the Neon migration runner splits on a semicolon at the end of a line, so the function must be one line
+    const statements = sql.split(/;\s*(?:\r?\n|$)/).map((statement) => statement.trim()).filter(Boolean);
+    expect(statements.filter((statement) => statement.includes('RAISE EXCEPTION'))).toHaveLength(1);
+    expect(statements.find((statement) => statement.includes('RAISE EXCEPTION'))).toMatch(/CREATE FUNCTION[\s\S]*END \$\$$/);
+    expect(sql.toLowerCase()).not.toMatch(/final_transcript|approved_text/);
+  });
 });

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Project } from '../../../src/features/projects/domain/project';
 import type { ClipService } from '../clips/clip-service';
 import type { BatchService } from '../batches/batch-service';
+import type { VolunteerService } from '../volunteer/volunteer-service';
 import type { SourceMediaService } from '../media/source-media-service';
 import type { ProjectRepository } from '../projects/project-repository';
 import type { ProjectService } from '../projects/project-service';
@@ -68,6 +69,7 @@ function sourceApp() {
     media: {} as SourceMediaService,
     clips: {} as ClipService,
     batches: {} as BatchService,
+    volunteer: {} as VolunteerService,
     readiness: {} as ReadinessService,
     adminApiToken: token,
     webOrigin: 'https://annotation.example.org',

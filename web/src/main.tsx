@@ -3,8 +3,11 @@ import { createRoot } from 'react-dom/client';
 
 import { App } from './App';
 import { AdminApp } from './admin/AdminApp';
+import { parseBatchHash } from './domain/volunteer-view';
+import { VolunteerApp } from './volunteer/VolunteerApp';
 import './styles.css';
 import './admin/admin.css';
+import './volunteer/volunteer.css';
 
 /** The simple admin is the front page. The older tools stay one click away at #tools. */
 function Root() {
@@ -15,7 +18,9 @@ function Root() {
     return () => window.removeEventListener('hashchange', onChange);
   }, []);
   if (hash.startsWith('#/b/')) {
-    return <main className="ad-center"><div className="ad-card"><h1>Thank you!</h1><p className="ad-muted">This link works. The page where you listen and write opens very soon.</p></div></main>;
+    const link = parseBatchHash(hash);
+    if (link) return <VolunteerApp link={link} />;
+    return <main className="ad-center"><div className="ad-card"><h1>This link does not work</h1><p className="ad-muted">It looks incomplete. Please ask for the link again.</p></div></main>;
   }
   if (hash !== '#tools') return <AdminApp />;
   return (

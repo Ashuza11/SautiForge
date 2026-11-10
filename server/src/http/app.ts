@@ -12,6 +12,8 @@ import { BatchLifecycleError, type BatchService } from '../batches/batch-service
 import { clipDraftSchema, clipStatusSchema, clipVariantSchema } from '../clips/clip';
 import { ClipLifecycleError, type ClipService } from '../clips/clip-service';
 import { projectDraftSchema } from '../../../src/features/projects/domain/project';
+import { infoSchema, joinSchema, sessionSchema, skipSchema, submitSchema } from '../volunteer/volunteer';
+import { VolunteerError, type VolunteerService } from '../volunteer/volunteer-service';
 import { sourceMediaUploadDraftSchema } from '../media/source-media';
 import { SourceMediaLifecycleError, type SourceMediaService } from '../media/source-media-service';
 import type { ProjectService } from '../projects/project-service';
@@ -28,6 +30,7 @@ export type AppDependencies = {
   media: SourceMediaService;
   clips: ClipService;
   batches: BatchService;
+  volunteer: VolunteerService;
   readiness: ReadinessService;
   adminApiToken: string;
   webOrigin: string;
@@ -111,6 +114,34 @@ export function createServerApp(dependencies: AppDependencies): Hono {
     }
     return context.json({ error: 'unauthorized' }, 401);
   });
+  // Volunteer routes: public, no admin session. Each call carries a batch link and a personal token.
+  const volunteerLimit = bodyLimit({ maxSize: 8 * 1024, onError: (context) => context.json({ error: 'request_too_large' }, 413) });
+  app.post('/v1/volunteer/info', volunteerLimit, async (context) => {
+    const input = await parseValidatedBody(context, infoSchema);
+    if (!input.success) return input.response;
+    return context.json(await dependencies.volunteer.info(input.data.link));
+  });
+  app.post('/v1/volunteer/join', volunteerLimit, async (context) => {
+    const input = await parseValidatedBody(context, joinSchema);
+    if (!input.success) return input.response;
+    return context.json(await dependencies.volunteer.join(input.data.link, input.data.pseudonym), 201);
+  });
+  app.post('/v1/volunteer/next', volunteerLimit, async (context) => {
+    const input = await parseValidatedBody(context, sessionSchema);
+    if (!input.success) return input.response;
+    return context.json(await dependencies.volunteer.next(input.data.link, input.data.contributor));
+  });
+  app.post('/v1/volunteer/submit', volunteerLimit, async (context) => {
+    const input = await parseValidatedBody(context, submitSchema);
+    if (!input.success) return input.response;
+    return context.json({ status: await dependencies.volunteer.submit(input.data.link, input.data.contributor, input.data.clipId, input.data.text) });
+  });
+  app.post('/v1/volunteer/skip', volunteerLimit, async (context) => {
+    const input = await parseValidatedBody(context, skipSchema);
+    if (!input.success) return input.response;
+    return context.json({ status: await dependencies.volunteer.skip(input.data.link, input.data.contributor, input.data.clipId) });
+  });
+
   const smallBodyLimit = bodyLimit({
     maxSize: 64 * 1024,
     onError: (context) => context.json({ error: 'request_too_large' }, 413),
@@ -319,6 +350,10 @@ export function createServerApp(dependencies: AppDependencies): Hono {
     }
     if (error instanceof SourceMediaLifecycleError) {
       const status = ['source_not_found', 'media_not_found'].includes(error.code) ? 404 : 409;
+      return context.json({ error: error.code, message: error.message }, status);
+    }
+    if (error instanceof VolunteerError) {
+      const status = error.code === 'link_invalid' ? 404 : error.code === 'contributor_invalid' ? 401 : 409;
       return context.json({ error: error.code, message: error.message }, status);
     }
     if (error instanceof BatchLifecycleError) {

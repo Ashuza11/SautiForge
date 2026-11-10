@@ -161,4 +161,59 @@ describe('local mode (real SQL on PGlite, audio on disk)', () => {
     expect(second.status).toBe(201);
     expect(((await second.json()) as { batch: { title: string } }).batch.title).toBe('Second try');
   });
+
+  it('lets volunteers answer a batch with no account, two people per clip, and never edits an answer', async () => {
+    const upload = async (key: string, extra: number) => {
+      const response = await server.app.request(`${base}/v1/admin/sources/${sourceId}/clips/upload?clipKey=${key}`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'audio/flac' }, body: new Uint8Array(fakeFlac(24000, 48_000, 1, 16, 300 + extra)),
+      });
+      return ((await response.json()) as { clip: { id: string } }).clip.id;
+    };
+    const [a, b] = [await upload('v001', 1), await upload('v002', 2)];
+    const batch = await (await api(`/v1/admin/sources/${sourceId}/batches`, 'POST', { clipIds: [a, b] })).json() as { batch: { id: string }; token: string };
+    const link = `${batch.batch.id}.${batch.token}`;
+    const call = (path: string, body: unknown) => server.app.request(`${base}/v1/volunteer/${path}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const join = async (name: string) => ((await (await call('join', { link, pseudonym: name })).json()) as { token: string }).token;
+    type Next = { clip: { clipId: string; audioUrl: string; position: number } | null; progress: { total: number; answered: number } };
+    const next = async (contributor: string) => (await (await call('next', { link, contributor })).json()) as Next;
+
+    expect(await (await call('info', { link })).json()).toMatchObject({ clipCount: 2 });
+    const [one, two, three] = [await join('Neema'), await join('Baraka'), await join('Cirhuza')];
+
+    const offered = await next(one);
+    expect(offered.clip?.clipId).toBe(a);
+    expect(offered.progress).toEqual({ total: 2, answered: 0 });
+    expect((await next(three)).progress).toEqual({ total: 2, answered: 0 });
+    const heard = await server.app.request(offered.clip!.audioUrl);
+    expect(heard.headers.get('content-type')).toBe('audio/flac');
+    expect(JSON.stringify(offered)).not.toContain('transcript');
+
+    const send = (contributor: string, clipId: string, text: string) => call('submit', { link, contributor, clipId, text });
+    expect((await send(one, a, 'first words')).status).toBe(200);
+    expect((await send(one, a, 'changed my mind')).status).toBe(200); // a retry is harmless, never an edit
+    expect((await next(two)).clip?.clipId).toBe(a); // still needs a second, independent person
+    expect((await send(two, a, 'second words')).status).toBe(200);
+    expect((await next(three)).clip?.clipId).toBe(b); // clip a already has its two transcripts
+    expect((await call('skip', { link, contributor: three, clipId: b })).status).toBe(200);
+    expect(await next(three)).toEqual({ clip: null, progress: { total: 1, answered: 1 } });
+
+    const rows = (await server.database.query('SELECT transcript_text, kind FROM submissions ORDER BY created_at, id')).rows as { transcript_text: string | null; kind: string }[];
+    expect(rows.filter((row) => row.kind === 'transcript').map((row) => row.transcript_text).sort()).toEqual(['first words', 'second words']);
+    expect(rows.filter((row) => row.kind === 'skip')).toHaveLength(1);
+
+    // the database itself refuses to change or remove an answer
+    await expect(server.database.query("UPDATE submissions SET transcript_text = 'tampered'")).rejects.toThrow('append-only');
+    await expect(server.database.query('DELETE FROM submissions')).rejects.toThrow('append-only');
+    const after = (await server.database.query('SELECT transcript_text FROM submissions WHERE kind = $1', ['transcript'])).rows as { transcript_text: string }[];
+    expect(after.map((row) => row.transcript_text).sort()).toEqual(['first words', 'second words']);
+
+    // wrong code, and a closed batch, both stop working
+    expect((await call('next', { link: `${batch.batch.id}.${'z'.repeat(24)}`, contributor: one })).status).toBe(404);
+    expect((await call('next', { link, contributor: `${one.split('.')[0]}.${'z'.repeat(24)}` })).status).toBe(401);
+    await api(`/v1/admin/batches/${batch.batch.id}/close`, 'POST');
+    expect((await call('next', { link, contributor: one })).status).toBe(404);
+    expect((await send(two, b, 'too late')).status).toBe(404);
+  });
 });

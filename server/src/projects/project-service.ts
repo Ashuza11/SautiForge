@@ -25,6 +25,10 @@ export class ProjectService {
     this.now = options.now ?? (() => new Date());
   }
 
+  getById(id: string): Promise<Project | null> {
+    return this.repository.getById(id);
+  }
+
   list(includeArchived = false): Promise<Project[]> {
     return this.repository.list(includeArchived);
   }

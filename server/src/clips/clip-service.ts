@@ -266,6 +266,19 @@ export class ClipService {
     return this.objectStore.createDownloadUrl(file.objectKey, 300);
   }
 
+  /** A short-lived link for a volunteer to listen to a published clip. Volunteer access must be authorized. */
+  async createListeningUrl(clipId: string): Promise<string> {
+    const current = await this.clips.getById(clipId);
+    // The FLAC master plays in every current browser, so it is preferred over the optional Opus copy.
+    const file = current?.files.find((f) => f.variant === 'master' && f.status === 'verified')
+      ?? current?.files.find((f) => f.variant === 'listening' && f.status === 'verified');
+    if (!current || current.clip.status !== 'published' || !file) {
+      throw new ClipLifecycleError('audio_not_found', 'No published audio exists for this clip.');
+    }
+    await this.sources.assertUseAuthorized(current.clip.sourceId, 'volunteerAccess');
+    return this.objectStore.createDownloadUrl(file.objectKey, 900);
+  }
+
   async withdraw(clipId: string): Promise<ClipWithFiles> {
     const current = await this.clips.getById(clipId);
     if (!current) throw new ClipLifecycleError('clip_not_found', 'The clip does not exist.');
