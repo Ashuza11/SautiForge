@@ -282,3 +282,8 @@ input[type="search"] { width: 100%; min-height: 44px; padding: 10px 12px; border
   .clips-row { grid-template-columns: minmax(0, 1fr); }
   .clips-actions { justify-content: flex-start; }
 }
+
+.rights-panel { display: grid; gap: 0.6rem; margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px solid var(--border, #d9ded9); }
+.source-id { overflow-wrap: anywhere; font-size: 0.85rem; }
+.uses { display: grid; gap: 0.4rem; border: 1px solid var(--border, #d9ded9); border-radius: 0.5rem; padding: 0.6rem 0.8rem; margin: 0; }
+.uses .check { display: flex; gap: 0.5rem; align-items: center; }

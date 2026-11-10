@@ -1,4 +1,5 @@
 import type { Project, ProjectDraft } from '../../../src/features/projects/domain/project';
+import type { Source, SourceMetadataDraft, SourceRightsDraft, SourceRightsRevision } from '../../../server/src/sources/source';
 
 export class ApiError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) {
@@ -8,6 +9,7 @@ export class ApiError extends Error {
 
 export type ApiProject = { id: string; title: string; languageCode: string; targetLanguage: string };
 export type ApiSource = { id: string; title: string; status: string };
+export type ApiSourceDetail = { source: Source; latestRights: SourceRightsRevision | null };
 export type ClipStatus = 'draft' | 'published' | 'withdrawn';
 export type ClipVariant = 'master' | 'listening';
 export type ApiClip = {
@@ -75,6 +77,22 @@ export class ApiClient {
 
   async sources(projectId: string): Promise<ApiSource[]> {
     return (await this.request<{ sources: ApiSource[] }>('GET', `/v1/admin/projects/${projectId}/sources`)).sources;
+  }
+
+  async sourceList(projectId: string): Promise<Source[]> {
+    return (await this.request<{ sources: Source[] }>('GET', `/v1/admin/projects/${projectId}/sources?includeInactive=true`)).sources;
+  }
+
+  async sourceDetail(sourceId: string): Promise<ApiSourceDetail> {
+    return this.request<ApiSourceDetail>('GET', `/v1/admin/sources/${sourceId}`);
+  }
+
+  async createSource(projectId: string, draft: SourceMetadataDraft): Promise<Source> {
+    return (await this.request<{ source: Source }>('POST', `/v1/admin/projects/${projectId}/sources`, draft)).source;
+  }
+
+  async addRights(sourceId: string, draft: SourceRightsDraft): Promise<void> {
+    await this.request('POST', `/v1/admin/sources/${sourceId}/rights`, draft);
   }
 
   async clips(sourceId: string): Promise<ApiClip[]> {
