@@ -59,4 +59,17 @@ describe('ApiClient', () => {
     await client.archiveProject('p1');
     expect(fetcher).toHaveBeenLastCalledWith('/v1/admin/projects/p1/archive', expect.objectContaining({ method: 'POST' }));
   });
+
+  it('uploads a clip as a raw FLAC named by the file and explains refusals', async () => {
+    const fetcher = respond(200, { clip: { id: 'c', status: 'published' }, files: [] });
+    const blob = new Blob([new Uint8Array([1, 2, 3])]);
+    await new ApiClient('', fetcher).uploadClip('s1', 'c 001', blob);
+    expect(fetcher).toHaveBeenCalledWith('/v1/admin/sources/s1/clips/upload?clipKey=c%20001', expect.objectContaining({
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'audio/flac' }, body: blob,
+    }));
+    await expect(new ApiClient('', respond(422, { error: 'unsupported_audio', message: 'This is not a FLAC file.' })).uploadClip('s', 'k', blob))
+      .rejects.toMatchObject({ status: 422, message: 'This is not a FLAC file.' });
+    await expect(new ApiClient('', respond(413, { error: 'file_too_large' })).uploadClip('s', 'k', blob))
+      .rejects.toMatchObject({ message: 'The file is larger than 4 MB.' });
+  });
 });

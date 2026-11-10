@@ -1,0 +1,103 @@
+/* Simple admin: sign-in, setup, upload. Mobile first, one column, big touch targets. */
+.ad-shell, .ad-center { --ad-radius: 16px; font-size: 16px; line-height: 1.5; color: var(--ink); }
+.ad-shell { min-height: 100vh; background: #f4f7f5; }
+.ad-center { min-height: 100vh; display: grid; place-items: center; padding: 20px 16px; background: #f4f7f5; }
+.ad-muted { color: var(--muted); margin: 0; }
+.ad-card { width: 100%; padding: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--ad-radius); box-shadow: 0 10px 30px rgba(24, 68, 46, .07); }
+.ad-card h1, .ad-page h1 { margin: 0 0 6px; font-size: clamp(24px, 6vw, 30px); line-height: 1.15; letter-spacing: -.01em; }
+.ad-page h2 { margin: 32px 0 10px; font-size: 18px; }
+
+/* brand */
+.ad-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; }
+.ad-brand strong, .ad-brand small { display: block; line-height: 1.2; }
+.ad-brand small { max-width: 200px; overflow: hidden; color: var(--muted); font-size: 12px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.ad-mark { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 10px; color: #fff; background: var(--green); font-weight: 900; }
+
+/* sign-in and setup */
+.ad-signin, .ad-setup { max-width: 440px; }
+.ad-setup { max-width: 520px; }
+.ad-signin .ad-brand, .ad-setup .ad-brand { margin-bottom: 20px; }
+.ad-signin form, .ad-setup form { display: grid; gap: 16px; }
+.ad-signin { display: grid; gap: 14px; }
+.ad-step { margin: 0 0 4px; color: var(--green); font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.ad-setup form { margin-top: 4px; }
+
+/* fields */
+.ad-field { display: grid; gap: 6px; }
+.ad-field > span { font-size: 14px; font-weight: 700; }
+.ad-field > span em { color: var(--muted); font-style: normal; font-weight: 500; }
+.ad-field input, .ad-field select { width: 100%; min-height: 48px; padding: 10px 14px; border: 1px solid #b9c8bf; border-radius: 12px; color: var(--ink); background: #fff; }
+.ad-field input:focus, .ad-field select:focus { border-color: var(--green); }
+.ad-row { display: flex; gap: 12px; }
+.ad-row .ad-field { flex: 1; min-width: 0; }
+.ad-row .ad-narrow { flex: 0 0 96px; }
+.ad-check { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #f8faf8; cursor: pointer; }
+.ad-check input { flex: none; width: 22px; height: 22px; margin-top: 2px; accent-color: var(--green); }
+.ad-hint { margin: 0; color: var(--muted); font-size: 14px; }
+.ad-error { margin: 0; padding: 12px 14px; border-radius: 10px; color: var(--danger); background: #fbeaea; font-weight: 650; }
+.ad-error-text { color: var(--danger); font-weight: 650; }
+.ad-signin button[type="submit"], .ad-setup button[type="submit"], .ad-card > button { min-height: 50px; font-size: 16px; }
+
+/* header */
+.ad-header { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px 16px; background: rgba(255, 255, 255, .96); border-bottom: 1px solid var(--line); backdrop-filter: blur(8px); }
+.ad-nav { display: flex; order: 3; width: 100%; gap: 4px; padding: 3px; border-radius: 12px; background: #eef3f0; }
+.ad-nav button { flex: 1; min-height: 40px; padding: 6px 12px; border: 0; border-radius: 9px; color: #52645a; background: transparent; font-size: 15px; font-weight: 700; }
+.ad-nav button:hover:not(:disabled) { color: var(--ink); background: #e1eae5; }
+.ad-nav button[aria-current="page"] { color: var(--green-dark); background: #fff; box-shadow: 0 1px 3px rgba(16, 40, 28, .14); }
+.ad-header-end { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.ad-link { color: var(--muted); font-size: 14px; text-decoration: none; }
+.ad-link:hover { color: var(--ink); text-decoration: underline; }
+.ad-small { min-height: 36px !important; padding: 6px 12px !important; font-size: 14px; }
+
+/* pages */
+.ad-main { width: min(760px, 100%); margin: 0 auto; padding: 20px 16px 64px; }
+.ad-page { display: block; }
+.ad-soon { margin-top: 16px; display: grid; gap: 12px; justify-items: start; }
+.ad-soon p { margin: 0; color: var(--muted); }
+.ad-pill { display: inline-block; padding: 4px 10px; border-radius: 999px; color: var(--green-dark); background: var(--green-soft); font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.ad-empty { padding: 20px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); text-align: center; }
+
+/* drop zone */
+.ad-drop { display: grid; justify-items: center; gap: 4px; margin-top: 18px; padding: 32px 16px; border: 2px dashed #8fbba4; border-radius: var(--ad-radius); background: #fff; text-align: center; cursor: pointer; transition: background-color .12s, border-color .12s; }
+.ad-drop:hover, .ad-drop-active { border-color: var(--green); background: var(--green-soft); }
+.ad-drop:focus-within { outline: 3px solid #e0a629; outline-offset: 2px; }
+.ad-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.ad-drop strong { font-size: 18px; }
+.ad-drop-icon { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 6px; border-radius: 50%; color: #fff; background: var(--green); font-size: 24px; font-weight: 900; }
+.ad-help { margin-top: 12px; color: var(--muted); font-size: 14px; }
+.ad-help summary { cursor: pointer; font-weight: 650; }
+.ad-help pre { margin: 6px 0; padding: 10px 12px; overflow-x: auto; border-radius: 10px; background: #eef3f0; color: var(--ink); font-size: 13px; }
+
+/* upload queue */
+.ad-queue { display: grid; gap: 6px; margin: 16px 0 0; padding: 0; list-style: none; }
+.ad-queue-row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.ad-queue-name, .ad-queue-state { min-width: 0; overflow-wrap: anywhere; }
+.ad-queue-name small, .ad-queue-state small { display: block; color: var(--muted); font-size: 12px; }
+.ad-queue-state { text-align: right; font-size: 14px; font-weight: 700; }
+.ad-done .ad-queue-state { color: var(--green-dark); }
+.ad-failed .ad-queue-state, .ad-refused .ad-queue-state { color: var(--danger); }
+.ad-sending .ad-queue-state { color: #8a6100; }
+
+.ad-success { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0 0; padding: 10px 14px; border-radius: 12px; color: var(--green-dark); background: var(--green-soft); font-weight: 700; }
+.ad-queue-row + .ad-queue-row { margin-top: 0; }
+
+/* clip list */
+.ad-summary { margin: 0 0 10px; color: var(--muted); }
+.ad-summary strong { color: var(--ink); }
+.ad-clips { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ad-clip { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.ad-clip-name { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.ad-clip-name small { display: block; color: var(--muted); font-size: 13px; font-weight: 500; }
+.ad-play { display: grid; place-items: center; flex: none; width: 46px; height: 46px; padding: 0 !important; border-radius: 50% !important; font-size: 15px; }
+
+/* advanced tools banner */
+.ad-tools-bar { display: flex; justify-content: space-between; gap: 12px; padding: 8px 16px; color: #3d4f45; background: #e9f1ec; border-bottom: 1px solid var(--line); font-size: 14px; }
+.ad-tools-bar a { color: var(--green-dark); font-weight: 700; }
+
+@media (min-width: 720px) {
+  .ad-header { flex-wrap: nowrap; padding: 12px 28px; }
+  .ad-nav { order: 0; width: auto; margin: 0 auto; }
+  .ad-nav button { flex: none; padding: 6px 22px; }
+  .ad-card { padding: 32px; }
+  .ad-main { padding-top: 32px; }
+}

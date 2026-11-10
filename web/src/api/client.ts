@@ -104,18 +104,23 @@ export class ApiClient {
     return url.startsWith('/') ? `${this.baseUrl}${url}` : url;
   }
 
+  /** Sends one FLAC file; the clip is named after the file. Resolves once the clip is published. */
+  async uploadClip(sourceId: string, clipKey: string, file: Blob): Promise<ApiClip> {
+    return this.request<ApiClip>('POST', `/v1/admin/sources/${sourceId}/clips/upload?clipKey=${encodeURIComponent(clipKey)}`, undefined, { body: file, contentType: 'audio/flac' });
+  }
+
   async withdraw(clipId: string): Promise<void> {
     await this.request('POST', `/v1/admin/clips/${clipId}/withdraw`);
   }
 
-  private async request<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
+  private async request<T = unknown>(method: string, path: string, body?: unknown, raw?: { body: Blob; contentType: string }): Promise<T> {
     let response: Response;
     try {
       response = await this.fetcher(`${this.baseUrl}${path}`, {
         method,
         credentials: 'include',
-        headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: raw ? { 'Content-Type': raw.contentType } : body === undefined ? undefined : { 'Content-Type': 'application/json' },
+        body: raw ? raw.body : body === undefined ? undefined : JSON.stringify(body),
       });
     } catch {
       throw new ApiError(0, 'network', 'The service could not be reached. Check the connection and try again.');
@@ -133,6 +138,10 @@ function friendlyMessage(status: number, payload: { error?: string; message?: st
   if (payload.error === 'too_many_attempts') return 'Too many attempts. Wait a minute and try again.';
   if (payload.error === 'login_not_configured') return 'Login is not set up on the service yet.';
   if (payload.error === 'server_not_configured') return 'The service is not configured yet.';
+  if (payload.error === 'file_too_large') return 'The file is larger than 4 MB.';
+  if (payload.error === 'unsupported_audio') return payload.message ?? 'This audio file cannot be used.';
+  if (payload.error === 'clip_conflict') return payload.message ?? 'A different file with this name was already uploaded.';
+  if (payload.error === 'use_not_authorized') return 'Permission for this recording has not been confirmed yet.';
   if (status === 401) return 'Please sign in.';
   return payload.message ?? `The service answered with an error (${status}).`;
 }

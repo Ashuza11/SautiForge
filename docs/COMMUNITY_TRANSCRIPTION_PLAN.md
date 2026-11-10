@@ -45,10 +45,9 @@ The admin sees three things and nothing else: **Upload · Batches · Results**.
 | 7c-7e | Neon storage, projects on the server, Sources screen | Working cloud setup | done |
 | A | `pack` command | FLAC files for upload with verified round trip | done |
 | B | Upload API and FLAC-only clips | One FLAC per clip, uploaded from the browser (`POST /v1/admin/sources/:id/clips/upload`, max 4 MB per file) | done |
-| B2 | Next | Batches C and D below, starting with the new admin shell | next |
-| C | New admin shell and first-run setup | Upload / Batches / Results; two-field project; one-tick source | |
-| D | Upload page | Drag in FLAC files, list, remove | |
-| E | Batches | Pick 5 clips, link, WhatsApp message | |
+| C | New admin shell and first-run setup | Upload / Batches / Results; two-field project; one-tick source. Older tools stay at `#tools` | done |
+| D | Upload page | Drag in FLAC files, list, play, remove | done |
+| E | Batches | Pick 5 clips, link, WhatsApp message | next |
 | F | Volunteer API and screen | Pseudonym, one clip at a time, drafts, retry | |
 | G | Results and progress | Per-batch progress, transcripts side by side, character differences | |
 | H | Final transcript and export | Approve text, hashes, FLAC converted back to WAV, hours without double counting | |

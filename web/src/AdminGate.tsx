@@ -19,7 +19,7 @@ export function AdminGate({ purpose, children }: { purpose: string; children: (c
     });
   }, [client]);
 
-  if (signedIn === null) return <main className="seg-review"><p className="seg-note">Checking your session…</p></main>;
+  if (signedIn === null) return <main className="ad-center"><p className="ad-muted">Checking your session…</p></main>;
   if (!signedIn) return <SignIn client={client} purpose={purpose} initialError={error} onSignedIn={() => setSignedIn(true)} />;
   return <>{children({ client, onSignedOut: () => setSignedIn(false) })}</>;
 }
@@ -43,14 +43,16 @@ function SignIn({ client, purpose, initialError, onSignedIn }: { client: ApiClie
   };
 
   return (
-    <main className="seg-review">
-      <form className="seg-empty" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-        <h2>Admin sign in</h2>
-        <p>Enter the admin password to {purpose}.</p>
-        <label className="clips-field">Password
+    <main className="ad-center">
+      <form className="ad-card ad-signin" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+        <div className="ad-brand"><span className="ad-mark">S</span><span>SautiForge</span></div>
+        <h1>Admin sign in</h1>
+        <p className="ad-muted">Enter the admin password to {purpose}.</p>
+        <label className="ad-field">
+          <span>Password</span>
           <input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} autoFocus />
         </label>
-        {error ? <div className="error" role="alert">{error}</div> : null}
+        {error ? <p className="ad-error" role="alert">{error}</p> : null}
         <button type="submit" disabled={busy || password.length === 0}>{busy ? 'Signing in…' : 'Sign in'}</button>
       </form>
     </main>

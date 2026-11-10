@@ -21,12 +21,13 @@ const server = await createLocalServer({
   adminPassword,
   sessionSecret: 'local-dev-session-secret-not-a-secret-0001',
 });
-const seed = await seedLocalData(server);
+// `--empty` starts with no project, so the first-run setup screen can be tried.
+const seed = process.argv.includes('--empty') ? null : await seedLocalData(server);
 
 serve({ fetch: server.app.fetch, hostname: '127.0.0.1', port }, () => {
   console.log(`SautiForge LOCAL server on http://127.0.0.1:${port}  (${dataDirectory ? `data in ${dataDirectory}` : 'in-memory'})`);
   console.log(`  web origin:      ${webOrigin}`);
   console.log(`  admin password:  ${adminPassword}`);
   console.log(`  admin API token: ${adminApiToken}`);
-  console.log(`  source id:       ${seed.sourceId}${seed.created ? '  (just created)' : ''}`);
+  console.log(seed ? `  source id:       ${seed.sourceId}${seed.created ? '  (just created)' : ''}` : '  no project yet (--empty): create one on the setup screen');
 });
