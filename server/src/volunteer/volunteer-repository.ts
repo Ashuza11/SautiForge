@@ -2,7 +2,20 @@ import type { Contributor, NextClip, Submission } from './volunteer';
 
 export type BatchProgress = { total: number; answered: number };
 
+export type SubmissionRecord = {
+  id: string;
+  clipId: string;
+  batchId: string;
+  contributorId: string;
+  pseudonym: string;
+  kind: 'transcript' | 'skip';
+  text: string | null;
+  createdAt: string;
+};
+
 export interface VolunteerRepository {
+  /** Every answer given in the batches of one source, oldest first. For admins only. */
+  listSubmissionsForSource(sourceId: string): Promise<SubmissionRecord[]>;
   createContributor(contributor: Contributor): Promise<Contributor>;
   getContributor(id: string): Promise<Contributor | null>;
   /**

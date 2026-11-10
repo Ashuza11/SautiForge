@@ -1,12 +1,36 @@
 import type { SqlExecutor } from '../database/neon';
 import type { Contributor, NextClip, Submission } from './volunteer';
-import type { BatchProgress, VolunteerRepository } from './volunteer-repository';
+import type { BatchProgress, SubmissionRecord, VolunteerRepository } from './volunteer-repository';
 
 type Timestamp = string | Date;
 const iso = (value: Timestamp) => (value instanceof Date ? value : new Date(value)).toISOString();
 
 export class NeonVolunteerRepository implements VolunteerRepository {
   constructor(private readonly database: SqlExecutor) {}
+
+  async listSubmissionsForSource(sourceId: string): Promise<SubmissionRecord[]> {
+    const rows = await this.database.query<{
+      id: string; clip_id: string; batch_id: string; contributor_id: string; pseudonym: string;
+      kind: string; transcript_text: string | null; created_at: Timestamp;
+    }>(`
+      SELECT s.id, s.clip_id, s.batch_id, s.contributor_id, k.pseudonym, s.kind, s.transcript_text, s.created_at
+      FROM submissions s
+      JOIN batches b ON b.id = s.batch_id
+      JOIN contributors k ON k.id = s.contributor_id
+      WHERE b.source_id = $1
+      ORDER BY s.created_at ASC, s.id ASC
+    `, [sourceId]);
+    return rows.map((row) => ({
+      id: row.id,
+      clipId: row.clip_id,
+      batchId: row.batch_id,
+      contributorId: row.contributor_id,
+      pseudonym: row.pseudonym,
+      kind: row.kind === 'skip' ? 'skip' : 'transcript',
+      text: row.transcript_text,
+      createdAt: iso(row.created_at),
+    }));
+  }
 
   async createContributor(contributor: Contributor): Promise<Contributor> {
     await this.database.query(

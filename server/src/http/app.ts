@@ -12,6 +12,7 @@ import { BatchLifecycleError, type BatchService } from '../batches/batch-service
 import { clipDraftSchema, clipStatusSchema, clipVariantSchema } from '../clips/clip';
 import { ClipLifecycleError, type ClipService } from '../clips/clip-service';
 import { projectDraftSchema } from '../../../src/features/projects/domain/project';
+import type { ResultsService } from '../results/results-service';
 import { infoSchema, joinSchema, sessionSchema, skipSchema, submitSchema } from '../volunteer/volunteer';
 import { VolunteerError, type VolunteerService } from '../volunteer/volunteer-service';
 import { sourceMediaUploadDraftSchema } from '../media/source-media';
@@ -31,6 +32,7 @@ export type AppDependencies = {
   clips: ClipService;
   batches: BatchService;
   volunteer: VolunteerService;
+  results: ResultsService;
   readiness: ReadinessService;
   adminApiToken: string;
   webOrigin: string;
@@ -308,6 +310,12 @@ export function createServerApp(dependencies: AppDependencies): Hono {
     const id = sourceIdSchema.safeParse(context.req.param('sourceId'));
     if (!id.success) return context.json({ error: 'invalid_source_id' }, 400);
     return context.json({ batches: await dependencies.batches.listForSource(id.data) });
+  });
+
+  app.get('/v1/admin/sources/:sourceId/results', async (context) => {
+    const id = sourceIdSchema.safeParse(context.req.param('sourceId'));
+    if (!id.success) return context.json({ error: 'invalid_source_id' }, 400);
+    return context.json(await dependencies.results.forSource(id.data));
   });
 
   app.post('/v1/admin/sources/:sourceId/batches', async (context) => {

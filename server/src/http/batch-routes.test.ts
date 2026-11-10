@@ -7,6 +7,7 @@ import type { SourceMediaService } from '../media/source-media-service';
 import type { ProjectService } from '../projects/project-service';
 import type { ReadinessService } from '../readiness';
 import type { SourceService } from '../sources/source-service';
+import type { ResultsService } from '../results/results-service';
 import { createServerApp } from './app';
 
 const token = 'test-admin-token-that-is-long-enough';
@@ -27,6 +28,7 @@ function batchApp() {
     clips: {} as ClipService,
     batches,
     volunteer: {} as VolunteerService,
+    results: {} as ResultsService,
     readiness: {} as ReadinessService,
     adminApiToken: token,
     webOrigin: 'https://annotation.example.org',
@@ -44,6 +46,7 @@ describe('batch routes', () => {
     const { app } = batchApp();
     expect((await app.request(`/v1/admin/sources/${sourceId}/batches`)).status).toBe(401);
     expect((await app.request(`/v1/admin/batches/${batchId}/close`, { method: 'POST' })).status).toBe(401);
+    expect((await app.request(`/v1/admin/sources/${sourceId}/results`)).status).toBe(401);
   });
 
   it('lists and creates batches, validating the body before the service is called', async () => {

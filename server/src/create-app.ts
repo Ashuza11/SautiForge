@@ -10,6 +10,7 @@ import { NeonProjectRepository } from './projects/neon-project-repository';
 import { ProjectService } from './projects/project-service';
 import { ReadinessService } from './readiness';
 import { BatchService } from './batches/batch-service';
+import { ResultsService } from './results/results-service';
 import { NeonVolunteerRepository } from './volunteer/neon-volunteer-repository';
 import { VolunteerService } from './volunteer/volunteer-service';
 import { NeonBatchRepository } from './batches/neon-batch-repository';
@@ -31,9 +32,12 @@ export function createAppFromEnvironment(environment: NodeJS.ProcessEnv) {
   });
   const sourceService = new SourceService(sourceRepository, projectRepository);
   const projectService = new ProjectService(projectRepository);
-  const clipService = new ClipService(new NeonClipRepository(database), sourceService, objectStore);
+  const batchRepository = new NeonBatchRepository(database);
+  const clipRepository = new NeonClipRepository(database);
+  const volunteerRepository = new NeonVolunteerRepository(database);
+  const clipService = new ClipService(clipRepository, sourceService, objectStore);
   const linkSecret = config.adminLogin?.sessionSecret ?? config.adminApiToken;
-  const batchService = new BatchService(new NeonBatchRepository(database), sourceService, { linkSecret });
+  const batchService = new BatchService(batchRepository, sourceService, { linkSecret });
   const app = createServerApp({
     projects: projectService,
     sources: sourceService,
@@ -44,7 +48,8 @@ export function createAppFromEnvironment(environment: NodeJS.ProcessEnv) {
     ),
     clips: clipService,
     batches: batchService,
-    volunteer: new VolunteerService(new NeonVolunteerRepository(database), batchService, clipService, projectService, sourceService, { linkSecret }),
+    results: new ResultsService(batchRepository, clipRepository, volunteerRepository),
+    volunteer: new VolunteerService(volunteerRepository, batchService, clipService, projectService, sourceService, { linkSecret }),
     readiness: new ReadinessService(projectRepository, objectStore),
     adminApiToken: config.adminApiToken,
     webOrigin: config.webOrigin,

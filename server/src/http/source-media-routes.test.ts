@@ -8,6 +8,7 @@ import { SourceMediaLifecycleError, type SourceMediaService } from '../media/sou
 import type { ProjectService } from '../projects/project-service';
 import type { ReadinessService } from '../readiness';
 import type { SourceService } from '../sources/source-service';
+import type { ResultsService } from '../results/results-service';
 import { createServerApp } from './app';
 
 const token = 'media-admin-token-that-is-long-enough';
@@ -47,6 +48,7 @@ function mediaApp() {
       clips: {} as ClipService,
       batches: {} as BatchService,
       volunteer: {} as VolunteerService,
+      results: {} as ResultsService,
       readiness: {} as ReadinessService,
       adminApiToken: token,
       webOrigin: 'https://annotation.example.org',

@@ -16,6 +16,7 @@ export type ApiBatch = {
   /** The code at the end of the shared link. */
   token: string;
 };
+export type { SourceResults } from '../domain/results-view';
 export type ClipStatus = 'draft' | 'published' | 'withdrawn';
 export type ClipVariant = 'master' | 'listening';
 export type ApiClip = {
@@ -108,6 +109,10 @@ export class ApiClient {
   async audioUrl(clipId: string, variant: ClipVariant): Promise<string> {
     const url = (await this.request<{ url: string }>('GET', `/v1/admin/clips/${clipId}/audio/${variant}`)).url;
     return url.startsWith('/') ? `${this.baseUrl}${url}` : url;
+  }
+
+  async results(sourceId: string): Promise<import('../domain/results-view').SourceResults> {
+    return this.request('GET', `/v1/admin/sources/${sourceId}/results`);
   }
 
   async batches(sourceId: string): Promise<ApiBatch[]> {

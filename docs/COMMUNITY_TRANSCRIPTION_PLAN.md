@@ -49,8 +49,8 @@ The admin sees three things and nothing else: **Upload · Batches · Results**.
 | D | Upload page | Drag in FLAC files, list, play, remove | done |
 | E | Batches | Pick 5 clips, signed link (`/#/b/<batch id>.<code>`), editable WhatsApp message, close | done |
 | F | Volunteer API and screen | Nickname, no account; one clip at a time; two independent transcripts per clip; append-only submissions; drafts and retry on the phone | done |
-| G | Results and progress (next) | Per-batch progress, transcripts side by side, character differences | |
-| H | Final transcript and export | Approve text, hashes, FLAC converted back to WAV, hours without double counting | |
+| G | Results and progress | Per-batch progress, transcripts side by side, character differences, copyable WhatsApp text (versions A/B, no nicknames) | done |
+| H | Final transcript and export (next) | Approve text, hashes, FLAC converted back to WAV, hours without double counting | |
 
 ## Local sandbox
 

@@ -203,6 +203,19 @@ describe('local mode (real SQL on PGlite, audio on disk)', () => {
     expect(rows.filter((row) => row.kind === 'transcript').map((row) => row.transcript_text).sort()).toEqual(['first words', 'second words']);
     expect(rows.filter((row) => row.kind === 'skip')).toHaveLength(1);
 
+    // the admin sees every answer, grouped by batch and clip, with the nicknames
+    const results = await (await api(`/v1/admin/sources/${sourceId}/results`)).json() as {
+      required: number; volunteers: number;
+      batches: { batch: { id: string }; volunteers: number; clips: { clipId: string; clipKey: string; position: number; skips: number; transcripts: { pseudonym: string; text: string }[] }[] }[];
+    };
+    expect(results.required).toBe(2);
+    const mine = results.batches.find((item) => item.batch.id === batch.batch.id)!;
+    expect(mine.volunteers).toBe(3);
+    expect(mine.clips.map((item) => item.clipKey)).toEqual(['v001', 'v002']);
+    expect(mine.clips[0]?.transcripts.map((item) => `${item.pseudonym}: ${item.text}`).sort()).toEqual(['Baraka: second words', 'Neema: first words']);
+    expect(mine.clips[1]).toMatchObject({ skips: 1, transcripts: [] });
+    expect((await server.app.request(`${base}/v1/admin/sources/${sourceId}/results`)).status).toBe(401);
+
     // the database itself refuses to change or remove an answer
     await expect(server.database.query("UPDATE submissions SET transcript_text = 'tampered'")).rejects.toThrow('append-only');
     await expect(server.database.query('DELETE FROM submissions')).rejects.toThrow('append-only');

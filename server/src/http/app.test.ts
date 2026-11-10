@@ -10,6 +10,7 @@ import { ProjectService } from '../projects/project-service';
 import type { ReadinessService } from '../readiness';
 import type { SourceService } from '../sources/source-service';
 import { AdminSessionService } from '../auth/admin-session';
+import type { ResultsService } from '../results/results-service';
 import { createServerApp } from './app';
 
 const adminToken = 'test-admin-token-that-is-long-enough';
@@ -60,6 +61,7 @@ function testApp(ready = true) {
       clips: {} as ClipService,
       batches: {} as BatchService,
       volunteer: {} as VolunteerService,
+      results: {} as ResultsService,
       readiness,
       adminApiToken: adminToken,
       webOrigin: 'https://annotation.example.org',
@@ -166,6 +168,7 @@ describe('admin login', () => {
       clips: {} as ClipService,
       batches: {} as BatchService,
       volunteer: {} as VolunteerService,
+      results: {} as ResultsService,
       readiness: { check: async () => ({ ready: true }) } as ReadinessService,
       adminApiToken: adminToken,
       webOrigin: origin,

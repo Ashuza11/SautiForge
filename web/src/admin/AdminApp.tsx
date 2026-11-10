@@ -5,8 +5,8 @@ import type { Source } from '../../../server/src/sources/source';
 import { AdminGate } from '../AdminGate';
 import { ApiClient, ApiError } from '../api/client';
 import { BatchesPage } from './BatchesPage';
+import { ResultsPage } from './ResultsPage';
 import { Setup } from './Setup';
-import { Soon } from './Soon';
 import { UploadPage } from './UploadPage';
 
 type Tab = 'upload' | 'batches' | 'results';
@@ -69,7 +69,7 @@ function Workspace({ client, onSignedOut }: { client: ApiClient; onSignedOut: ()
       <main className="ad-main">
         {tab === 'upload' ? <UploadPage client={client} project={project} source={source} onSignedOut={onSignedOut} /> : null}
         {tab === 'batches' ? <BatchesPage client={client} project={project} source={source} onSignedOut={onSignedOut} onGoUpload={() => setTab('upload')} /> : null}
-        {tab === 'results' ? <Soon title="Results">See what the community wrote for each clip, how far each batch has come, and choose the final text.</Soon> : null}
+        {tab === 'results' ? <ResultsPage client={client} project={project} source={source} onSignedOut={onSignedOut} onGoBatches={() => setTab('batches')} /> : null}
       </main>
     </div>
   );

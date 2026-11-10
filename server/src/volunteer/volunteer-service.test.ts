@@ -20,6 +20,7 @@ class MemoryVolunteers implements VolunteerRepository {
   contributors = new Map<string, Contributor>();
   submissions: Submission[] = [];
   result: 'recorded' | 'unavailable' = 'recorded';
+  async listSubmissionsForSource() { return []; }
   async createContributor(c: Contributor) { this.contributors.set(c.id, c); return c; }
   async getContributor(id: string) { return this.contributors.get(id) ?? null; }
   async nextClip(_batch: string, contributorId: string, required: number): Promise<NextClip | null> {

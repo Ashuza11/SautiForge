@@ -15,6 +15,7 @@ import {
 } from '../sources/source';
 import type { SourceRepository } from '../sources/source-repository';
 import { SourceService } from '../sources/source-service';
+import type { ResultsService } from '../results/results-service';
 import { createServerApp } from './app';
 
 const token = 'source-admin-token-that-is-long-enough';
@@ -70,6 +71,7 @@ function sourceApp() {
     clips: {} as ClipService,
     batches: {} as BatchService,
     volunteer: {} as VolunteerService,
+    results: {} as ResultsService,
     readiness: {} as ReadinessService,
     adminApiToken: token,
     webOrigin: 'https://annotation.example.org',
