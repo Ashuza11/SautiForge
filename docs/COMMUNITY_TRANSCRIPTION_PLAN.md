@@ -51,7 +51,7 @@ The admin sees three things and nothing else: **Upload · Batches · Results**.
 | F | Volunteer API and screen | Nickname, no account; one clip at a time; two independent transcripts per clip; append-only submissions; drafts and retry on the phone | done |
 | G | Results and progress | Per-batch progress, transcripts side by side, character differences, copyable WhatsApp text (versions A/B, no nicknames) | done |
 | H1 | Final transcript and export list | Approve or write the final text (versioned, append-only, with a note) or leave a clip out; export list with hours, permission statement and signed FLAC links; transcripts CSV | done |
-| H2 | `export-dataset` command | Downloads approved FLAC, converts back to WAV, verifies hashes, joins music copies by clip key and hash, split column, writes the dataset folder | next |
+| H2 | `export-dataset` command | Downloads approved FLAC, converts back to WAV, verifies hashes, joins music copies by clip key and hash, split column, writes the dataset folder | done |
 
 ## Local sandbox
 

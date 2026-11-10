@@ -19,6 +19,11 @@ def encode_flac(wav: Path, target: Path) -> None:
     run(["ffmpeg", "-y", "-v", "error", "-i", str(wav), *_BITEXACT, "-map_metadata", "-1", "-c:a", "flac", "-compression_level", "8", str(target)])
 
 
+def decode_flac_to_wav(flac: Path, wav: Path) -> None:
+    """FLAC -> 16-bit PCM WAV. The audio samples are exactly those that were encoded."""
+    run(["ffmpeg", "-y", "-v", "error", "-i", str(flac), *_BITEXACT, "-map_metadata", "-1", "-c:a", "pcm_s16le", str(wav)])
+
+
 def pcm_sha256(wav: Path) -> str:
     """SHA-256 of the 16-bit samples only. WAV headers carry tool versions, so the file hash is not portable."""
     with wave.open(str(wav), "rb") as handle:

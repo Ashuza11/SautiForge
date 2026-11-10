@@ -81,6 +81,22 @@ python -m sautiseg pack --export segmentation-output/<name>/export              
 - Each FLAC is decoded again and must match the WAV's audio samples exactly, or the command stops.
 - Your WAV files are never changed.
 
+## Build the dataset from approved clips
+
+After approving final texts on the admin site's Results page:
+
+```bash
+export SAUTIFORGE_ADMIN_TOKEN=...   # the service's ADMIN_API_TOKEN
+python -m sautiseg export-dataset --api https://your-site.vercel.app --source-id <source UUID> --out dataset --dry-run
+python -m sautiseg export-dataset --api https://your-site.vercel.app --source-id <source UUID> --out dataset \
+  --pack segmentation-output/<name>/upload/pack.json --export segmentation-output/<name>/export
+```
+
+- Each approved FLAC is downloaded, checked against its recorded size and hash, and turned back into a 16-bit WAV. With `--pack`, the WAV must have exactly the same audio samples as the original recording, or the clip fails.
+- `--export` (needs `--pack`) adds the music-background copy of each clip to `wavs_music/`, matched by clip key and start/end times and checked against its recorded hash.
+- It writes `wavs/`, `metadata.csv` (transcript, split, hashes), `dataset.json` and a `README.md` that states whether public sharing is permitted. Hours count each clip once; music copies are not added. The split is 80/10/10 from a hash of the source id and clip key, so it never changes between exports.
+- If any clip fails, no dataset files are finished. Fix the cause and run it again (`--overwrite` replaces an existing build).
+
 ## Publish to the SautiForge service
 
 After `cut`, upload the `export/` folder so the audio goes to private S3 and the clip records to Neon:

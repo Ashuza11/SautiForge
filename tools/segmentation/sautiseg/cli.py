@@ -14,6 +14,7 @@ from .audio import (WORKING_SAMPLE_RATE, clip_metrics, extract_working_wav, ffmp
 from .clips import ClipParams, build_clips
 from .manifest import build_clip_record, build_manifest, write_manifest
 from .cutting import DEFAULT_MAX_PAUSE_MS, cut_accepted
+from .dataset import build_dataset
 from .pack import pack
 from .publish import publish
 from .separate import MODEL_NAME, ensure_separation
@@ -124,6 +125,25 @@ def cmd_pack(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_export_dataset(args: argparse.Namespace) -> int:
+    token = os.environ.get(args.token_env, "")
+    if len(token) < 32:
+        print(f"Set {args.token_env} to the service's admin API token (kept out of the command line).", file=sys.stderr)
+        return 2
+    result = build_dataset(
+        args.api, token, args.source_id, Path(args.out),
+        pack_json=Path(args.pack) if args.pack else None,
+        export_dir=Path(args.export) if args.export else None,
+        overwrite=args.overwrite, dry_run=args.dry_run,
+    )
+    if result["failed"]:
+        print(f"{len(result['failed'])} clip(s) failed, so no dataset files were finished. Fix the cause and run the same command again.", file=sys.stderr)
+        return 1
+    if not result["dryRun"]:
+        print(f"Dataset written to {result['dir']} ({result['built']} clips). Read README.md there before sharing it.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sautiseg", description="Propose, review and export speech clips.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -161,6 +181,17 @@ def build_parser() -> argparse.ArgumentParser:
     k.add_argument("--only", default=None, help="Comma-separated clip keys to pack, for example c001,c002,c003.")
     k.add_argument("--first", type=int, default=None, help="Pack only the first N clips (handy for a small test).")
     k.set_defaults(func=cmd_pack)
+
+    d = sub.add_parser("export-dataset", help="Build the dataset folder (WAV audio, metadata, splits) from the approved clips.")
+    d.add_argument("--api", required=True, help="Service base URL, for example https://your-site.vercel.app")
+    d.add_argument("--source-id", required=True, help="UUID of the source in the SautiForge service.")
+    d.add_argument("--out", default="dataset", help="Folder to write (default: dataset).")
+    d.add_argument("--pack", default=None, help="pack.json from `pack`; lets every WAV be checked against the original audio samples.")
+    d.add_argument("--export", default=None, help="The export/ folder from `cut`, to add the music-background copies (needs --pack).")
+    d.add_argument("--token-env", default="SAUTIFORGE_ADMIN_TOKEN", help="Environment variable holding the admin API token.")
+    d.add_argument("--overwrite", action="store_true", help="Build again even if the folder already has a dataset.")
+    d.add_argument("--dry-run", action="store_true", help="List what would be built; download nothing.")
+    d.set_defaults(func=cmd_export_dataset)
 
     u = sub.add_parser("publish", help="Upload an export folder to the SautiForge service (safe to run again).")
     u.add_argument("--export", required=True, help="The export/ folder written by `cut`.")
