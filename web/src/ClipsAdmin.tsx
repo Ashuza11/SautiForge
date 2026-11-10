@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { AdminGate } from './AdminGate';
 import { ApiClient, ApiError, type ApiClip, type ApiProject, type ApiSource, type ClipVariant } from './api/client';
 import { filterClips, formatClock, formatSeconds, formatTotal, isMusicRemoved, speakerLabel, summarizeClips, type StatusFilter } from './domain/clips-view';
 
@@ -11,53 +12,7 @@ const filters: { value: StatusFilter; label: string }[] = [
 ];
 
 export function ClipsAdmin() {
-  const client = useMemo(() => new ApiClient(import.meta.env.VITE_API_URL ?? ''), []);
-  const [signedIn, setSignedIn] = useState<boolean | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    client.isSignedIn().then(setSignedIn, (cause: unknown) => {
-      setError(cause instanceof ApiError ? cause.message : 'The service could not be reached.');
-      setSignedIn(false);
-    });
-  }, [client]);
-
-  if (signedIn === null) return <main className="seg-review"><p className="seg-note">Checking your session…</p></main>;
-  if (!signedIn) return <SignIn client={client} initialError={error} onSignedIn={() => setSignedIn(true)} />;
-  return <ClipsList client={client} onSignedOut={() => setSignedIn(false)} />;
-}
-
-function SignIn({ client, initialError, onSignedIn }: { client: ApiClient; initialError: string | null; onSignedIn: () => void }) {
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(initialError);
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await client.login(password);
-      onSignedIn();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Sign-in failed.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <main className="seg-review">
-      <form className="seg-empty" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-        <h2>Admin sign in</h2>
-        <p>Enter the admin password to manage clips.</p>
-        <label className="clips-field">Password
-          <input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} autoFocus />
-        </label>
-        {error ? <div className="error" role="alert">{error}</div> : null}
-        <button type="submit" disabled={busy || password.length === 0}>{busy ? 'Signing in…' : 'Sign in'}</button>
-      </form>
-    </main>
-  );
+  return <AdminGate purpose="manage clips">{({ client, onSignedOut }) => <ClipsList client={client} onSignedOut={onSignedOut} />}</AdminGate>;
 }
 
 function ClipsList({ client, onSignedOut }: { client: ApiClient; onSignedOut: () => void }) {

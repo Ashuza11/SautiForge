@@ -44,4 +44,19 @@ describe('ApiClient', () => {
     const signed = new ApiClient('', respond(200, { url: 'https://bucket.s3.amazonaws.com/a' }));
     expect(await signed.audioUrl('id', 'master')).toBe('https://bucket.s3.amazonaws.com/a');
   });
+
+  it('creates, updates and archives projects on the service', async () => {
+    const draft = {
+      title: 'Mashi', description: '', targetLanguage: 'Shi', languageCode: 'shr', languageVariety: 'Mashi', researchDomain: 'Speech',
+      collectionLocation: 'South Kivu', protocolVersion: '0.1', annotationProfile: 'verbatim_transcription', status: 'active',
+    } as const;
+    const fetcher = respond(201, { project: { id: 'p1', ...draft } });
+    const client = new ApiClient('', fetcher);
+    expect((await client.createProject(draft)).id).toBe('p1');
+    expect(fetcher).toHaveBeenLastCalledWith('/v1/admin/projects', expect.objectContaining({ method: 'POST', body: JSON.stringify(draft) }));
+    await client.updateProject('p1', draft);
+    expect(fetcher).toHaveBeenLastCalledWith('/v1/admin/projects/p1', expect.objectContaining({ method: 'PUT' }));
+    await client.archiveProject('p1');
+    expect(fetcher).toHaveBeenLastCalledWith('/v1/admin/projects/p1/archive', expect.objectContaining({ method: 'POST' }));
+  });
 });

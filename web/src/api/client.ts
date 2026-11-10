@@ -1,3 +1,5 @@
+import type { Project, ProjectDraft } from '../../../src/features/projects/domain/project';
+
 export class ApiError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) {
     super(message);
@@ -53,6 +55,22 @@ export class ApiClient {
 
   async projects(): Promise<ApiProject[]> {
     return (await this.request<{ projects: ApiProject[] }>('GET', '/v1/admin/projects')).projects;
+  }
+
+  async projectList(): Promise<Project[]> {
+    return (await this.request<{ projects: Project[] }>('GET', '/v1/admin/projects')).projects;
+  }
+
+  async createProject(draft: ProjectDraft): Promise<Project> {
+    return (await this.request<{ project: Project }>('POST', '/v1/admin/projects', draft)).project;
+  }
+
+  async updateProject(id: string, draft: ProjectDraft): Promise<Project> {
+    return (await this.request<{ project: Project }>('PUT', `/v1/admin/projects/${id}`, draft)).project;
+  }
+
+  async archiveProject(id: string): Promise<Project> {
+    return (await this.request<{ project: Project }>('POST', `/v1/admin/projects/${id}/archive`)).project;
   }
 
   async sources(projectId: string): Promise<ApiSource[]> {
