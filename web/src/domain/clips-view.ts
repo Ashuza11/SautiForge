@@ -31,8 +31,13 @@ export function summarizeClips(clips: ApiClip[]) {
     draft: clips.filter((item) => item.clip.status === 'draft').length,
     withdrawn: clips.filter((item) => item.clip.status === 'withdrawn').length,
     publishedMs: published.reduce((sum, item) => sum + item.clip.durationMs, 0),
-    withOriginal: published.filter((item) => item.files.some((file) => file.variant === 'original')).length,
+    musicRemoved: published.filter((item) => isMusicRemoved(item)).length,
   };
+}
+
+/** True when the stored audio was cleaned of background music. */
+export function isMusicRemoved(item: ApiClip): boolean {
+  return item.files.some((file) => file.derivedFrom === 'cleaned');
 }
 
 export function formatTotal(ms: number): string {

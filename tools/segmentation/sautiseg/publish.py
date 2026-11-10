@@ -8,11 +8,13 @@ import re
 import urllib.error
 import urllib.request
 import wave
-from dataclasses import dataclass
+import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
 from .audio import sha256_file
+from .encode import OPUS_RATE, duration_ms, encode_flac, encode_opus, verify_flac_round_trip
 
 CLEANED = "vocals_htdemucs"
 ORIGINAL = "original"
@@ -22,10 +24,12 @@ ADMIN_CODE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]+$")
 
 @dataclass
 class AudioFile:
-    variant: str
+    variant: str  # "master" (FLAC) or "listening" (Opus)
+    derived_from: str  # "cleaned" or "original"
     path: Path
     size_bytes: int
     sha256: str
+    pcm_sha256: str | None
     sample_rate: int
     duration_ms: int
 
@@ -41,7 +45,24 @@ class PublishClip:
     speaker_name: str | None
     has_music: bool
     tier: str
-    audio: list[AudioFile]
+    wav_path: Path
+    derived_from: str
+    sample_rate: int
+    audio: list[AudioFile] = field(default_factory=list)
+
+    def encode(self, scratch: Path) -> None:
+        """Builds the FLAC master and the Opus listening copy; refuses a master that does not round-trip."""
+        master = scratch / f"{self.clip_key}.flac"
+        listening = scratch / f"{self.clip_key}.opus"
+        encode_flac(self.wav_path, master)
+        samples_sha = verify_flac_round_trip(self.wav_path, master)
+        encode_opus(self.wav_path, listening)
+        self.audio = [
+            AudioFile("master", self.derived_from, master, master.stat().st_size, sha256_file(master), samples_sha,
+                      self.sample_rate, self.duration_ms),
+            AudioFile("listening", self.derived_from, listening, listening.stat().st_size, sha256_file(listening), None,
+                      OPUS_RATE, min(duration_ms(listening), self.duration_ms)),
+        ]
 
     def draft(self, created_by: str, segmenter: str | None) -> dict:
         return {
@@ -56,8 +77,8 @@ class PublishClip:
             "tier": self.tier,
             "segmenter": segmenter,
             "createdBy": created_by,
-            "audio": [{"variant": a.variant, "sizeBytes": a.size_bytes, "sha256": a.sha256,
-                       "sampleRate": a.sample_rate, "durationMs": a.duration_ms} for a in self.audio],
+            "audio": [{"variant": a.variant, "derivedFrom": a.derived_from, "sizeBytes": a.size_bytes, "sha256": a.sha256,
+                       "pcmSha256": a.pcm_sha256, "sampleRate": a.sample_rate, "durationMs": a.duration_ms} for a in self.audio],
         }
 
 
@@ -77,12 +98,16 @@ def _read_rows(path: Path) -> list[dict]:
 
 
 def load_export(export_dir: Path) -> tuple[list[PublishClip], str | None]:
-    """Read and verify an export folder. Raises RuntimeError on any mismatch."""
+    """Read and verify an export folder. Raises RuntimeError on any mismatch.
+
+    One audio file is published per clip: the cleaned (music-removed) copy when the export has one,
+    otherwise the original. The other copy stays on this machine.
+    """
     export_dir = export_dir.resolve()
     cleaned_rows = _read_rows(export_dir / "metadata_tts.csv")
     original_rows = _read_rows(export_dir / "metadata.csv")
-    if not cleaned_rows:
-        raise RuntimeError("metadata_tts.csv (the cleaned audio) is missing or empty. Volunteers hear the cleaned copy.")
+    if not cleaned_rows and not original_rows:
+        raise RuntimeError("metadata.csv and metadata_tts.csv are missing or empty. There is nothing to publish.")
     by_variant = {CLEANED: {r["clip_id"]: r for r in cleaned_rows}, ORIGINAL: {r["clip_id"]: r for r in original_rows}}
     for variant, rows in by_variant.items():
         for row in rows.values():
@@ -96,40 +121,37 @@ def load_export(export_dir: Path) -> tuple[list[PublishClip], str | None]:
         if tool.get("tool") and tool.get("toolVersion"):
             segmenter = f"{tool['tool']} {tool['toolVersion']}"
 
+    clip_ids = list(dict.fromkeys([*by_variant[ORIGINAL], *by_variant[CLEANED]]))
     clips: list[PublishClip] = []
-    for clip_id, cleaned in by_variant[CLEANED].items():
-        audio: list[AudioFile] = []
-        for variant, row in ((ORIGINAL, by_variant[ORIGINAL].get(clip_id)), (CLEANED, cleaned)):
-            if row is None:
-                continue
-            path = (export_dir / row["file"]).resolve()
-            if export_dir not in path.parents or not path.is_file():
-                raise RuntimeError(f"{clip_id}: audio file {row['file']} is missing or outside the export folder.")
-            sha = sha256_file(path)
-            if sha != row["sha256"]:
-                raise RuntimeError(f"{clip_id}: {row['file']} does not match the hash in the CSV. Re-export before publishing.")
-            rate, duration = wav_info(path)
-            audio.append(AudioFile(variant, path, path.stat().st_size, sha, rate, duration))
-        if len(audio) == 2:
+    for clip_id in clip_ids:
+        cleaned = by_variant[CLEANED].get(clip_id)
+        original = by_variant[ORIGINAL].get(clip_id)
+        if cleaned and original:
             for key in ("start_ms", "end_ms", "speaker_role", "speaker", "has_music", "tier"):
-                if by_variant[ORIGINAL][clip_id][key] != cleaned[key]:
+                if original[key] != cleaned[key]:
                     raise RuntimeError(f"{clip_id}: the two audio copies disagree on {key}.")
-        has_music = cleaned["has_music"].strip().lower() == "true"
+        derived_from, row = ("cleaned", cleaned) if cleaned else ("original", original)
+        path = (export_dir / row["file"]).resolve()
+        if export_dir not in path.parents or not path.is_file():
+            raise RuntimeError(f"{clip_id}: audio file {row['file']} is missing or outside the export folder.")
+        sha = sha256_file(path)
+        if sha != row["sha256"]:
+            raise RuntimeError(f"{clip_id}: {row['file']} does not match the hash in the CSV. Re-export before publishing.")
+        rate, duration = wav_info(path)
         clips.append(PublishClip(
             clip_key=clip_id,
-            start_ms=int(cleaned["start_ms"]),
-            end_ms=int(cleaned["end_ms"]),
-            trimmed_ms=int(cleaned["trimmed_ms"] or 0),
-            duration_ms=max(a.duration_ms for a in audio),
-            speaker_role=cleaned["speaker_role"] or "unknown",
-            speaker_name=cleaned["speaker"].strip() or None,
-            has_music=has_music,
-            tier=cleaned["tier"],
-            audio=audio,
+            start_ms=int(row["start_ms"]),
+            end_ms=int(row["end_ms"]),
+            trimmed_ms=int(row["trimmed_ms"] or 0),
+            duration_ms=duration,
+            speaker_role=row["speaker_role"] or "unknown",
+            speaker_name=row["speaker"].strip() or None,
+            has_music=row["has_music"].strip().lower() == "true",
+            tier=row["tier"],
+            wav_path=path,
+            derived_from=derived_from,
+            sample_rate=rate,
         ))
-    orphans = set(by_variant[ORIGINAL]) - set(by_variant[CLEANED])
-    if orphans:
-        raise RuntimeError(f"Original copies without a cleaned copy: {', '.join(sorted(orphans))}.")
     return clips, segmenter
 
 
@@ -171,15 +193,23 @@ def publish(export_dir: Path, api_url: str, token: str, source_id: str, created_
         raise ValueError("--created-by must be a pseudonymous code such as ADMIN-01.")
     base = api_url.rstrip("/")
     clips, segmenter = load_export(export_dir)
-    log(f"Verified {len(clips)} clips ({sum(len(c.audio) for c in clips)} audio files) against their hashes.")
-    if dry_run:
-        for clip in clips:
-            log(f"  would publish {clip.clip_key}: {clip.duration_ms / 1000:.2f}s, {clip.speaker_role}, {len(clip.audio)} audio files")
-        return {"dryRun": True, "clips": len(clips), "published": 0, "failed": []}
+    log(f"Verified {len(clips)} clips against their hashes ({sum(c.derived_from == 'cleaned' for c in clips)} cleaned, "
+        f"{sum(c.derived_from == 'original' for c in clips)} original).")
+    with tempfile.TemporaryDirectory(prefix="sautiseg-publish-") as scratch_name:
+        scratch = Path(scratch_name)
+        return _publish_clips(clips, segmenter, scratch, base, token, source_id, created_by, dry_run, http, log)
 
+
+def _publish_clips(clips, segmenter, scratch, base, token, source_id, created_by, dry_run, http, log) -> dict:
     published, failed = 0, []
     for index, clip in enumerate(clips, start=1):
         try:
+            clip.encode(scratch)
+            if dry_run:
+                master, listening = clip.audio
+                log(f"  would publish {clip.clip_key}: {clip.duration_ms / 1000:.2f}s, {clip.speaker_role}, {clip.derived_from}, "
+                    f"master {master.size_bytes // 1024} KB, listening {listening.size_bytes // 1024} KB")
+                continue
             registered = _api(http, base, token, "POST", f"/v1/admin/sources/{source_id}/clips", clip.draft(created_by, segmenter))
             by_variant = {a.variant: a for a in clip.audio}
             for item in registered["files"]:
@@ -198,4 +228,9 @@ def publish(export_dir: Path, api_url: str, token: str, source_id: str, created_
         except RuntimeError as error:
             failed.append({"clip": clip.clip_key, "error": str(error)})
             log(f"[{index}/{len(clips)}] {clip.clip_key} FAILED: {error}")
+        finally:
+            for audio in clip.audio:
+                audio.path.unlink(missing_ok=True)
+    if dry_run:
+        return {"dryRun": True, "clips": len(clips), "published": 0, "failed": failed}
     return {"dryRun": False, "clips": len(clips), "published": published, "failed": failed}

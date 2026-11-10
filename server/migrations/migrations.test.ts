@@ -68,4 +68,14 @@ describe('community service database migrations', () => {
     const sql = (await readFile(new URL('./0004_clips.sql', import.meta.url), 'utf8')).toLowerCase();
     expect(sql).not.toMatch(/transcript|create table (batches|submissions|contributors)/);
   });
+
+  it('stores a FLAC master and an Opus listening copy per clip and keeps the WAV hash for export', async () => {
+    const sql = await readFile(new URL('./0005_clip_audio_formats.sql', import.meta.url), 'utf8');
+    expect(sql).toContain("derived_from varchar(16) NOT NULL DEFAULT 'cleaned'");
+    expect(sql).toContain('pcm_sha256_hex char(64)');
+    expect(sql).toContain("variant IN ('master', 'listening')");
+    expect(sql).toContain("content_type = 'audio/flac' AND pcm_sha256_hex IS NOT NULL");
+    expect(sql).toContain("content_type = 'audio/ogg'");
+    expect(sql.match(/\) NOT VALID;/g)).toHaveLength(2);
+  });
 });

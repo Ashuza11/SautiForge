@@ -2,7 +2,7 @@ import { GetObjectCommand, HeadBucketCommand, HeadObjectCommand, PutObjectComman
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { S3PrivateObjectStore, validatePrivateObjectKey } from './private-object-store';
+import { createPrivateObjectStore, isNeonEndpoint, S3PrivateObjectStore, validatePrivateObjectKey } from './private-object-store';
 
 vi.mock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: vi.fn() }));
 
@@ -81,5 +81,18 @@ describe('private object storage', () => {
   it('refuses to verify objects whose storage metadata omits the checksum', async () => {
     send.mockResolvedValue({ ContentLength: 4096, ContentType: 'audio/ogg' });
     await expect(store.inspectObject('safe/audio.opus')).rejects.toThrow(/checksum/i);
+  });
+});
+
+describe('storage provider detection', () => {
+  it('treats only Neon hosts as Neon, so encryption is still enforced everywhere else', () => {
+    expect(isNeonEndpoint('https://br-x.storage.c-8.eu-central-1.aws.neon.tech')).toBe(true);
+    expect(isNeonEndpoint('https://s3.eu-west-1.amazonaws.com')).toBe(false);
+    expect(isNeonEndpoint('https://evil-neon.tech.example.com')).toBe(false);
+    expect(isNeonEndpoint('not a url')).toBe(false);
+    expect(isNeonEndpoint(undefined)).toBe(false);
+    const options = { region: 'eu-central-1', bucket: 'b' };
+    expect(createPrivateObjectStore({ ...options, endpoint: 'https://br-x.storage.aws.neon.tech' }).reportsEncryption).toBe(false);
+    expect(createPrivateObjectStore(options).reportsEncryption).toBe(true);
   });
 });

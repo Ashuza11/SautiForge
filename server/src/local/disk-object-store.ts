@@ -19,6 +19,8 @@ type StoredMeta = { contentType: string; checksumSha256: string; sizeBytes: numb
  * declared SHA-256 and size must match the bytes, and verification reads real metadata.
  */
 export class DiskObjectStore implements PrivateObjectStore {
+  readonly reportsEncryption = true;
+
   constructor(
     private readonly directory: string,
     private readonly publicBaseUrl: string,

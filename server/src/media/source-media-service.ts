@@ -102,7 +102,7 @@ export class SourceMediaService {
     }
 
     const expectedChecksum = Buffer.from(current.sha256, 'hex').toString('base64');
-    const failure = verificationFailure(current, observed, expectedChecksum);
+    const failure = verificationFailure(current, observed, expectedChecksum, this.objectStore.reportsEncryption);
     const timestamp = this.now().toISOString();
     const saved = await this.media.updateVerification({
       id: current.id,
@@ -126,10 +126,11 @@ function verificationFailure(
   expected: Pick<SourceMedia, 'sizeBytes' | 'contentType'>,
   observed: Awaited<ReturnType<PrivateObjectStore['inspectObject']>>,
   expectedChecksum: string,
+  reportsEncryption: boolean,
 ): string | null {
   if (observed.contentLengthBytes !== expected.sizeBytes) return 'size_mismatch';
   if (observed.contentType.toLowerCase() !== expected.contentType) return 'content_type_mismatch';
   if (observed.checksumSha256 !== expectedChecksum) return 'checksum_mismatch';
-  if (!['AES256', 'aws:kms'].includes(observed.serverSideEncryption ?? '')) return 'encryption_missing';
+  if (reportsEncryption && !['AES256', 'aws:kms'].includes(observed.serverSideEncryption ?? '')) return 'encryption_missing';
   return null;
 }

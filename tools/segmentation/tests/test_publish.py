@@ -7,6 +7,7 @@ import wave
 from pathlib import Path
 
 from sautiseg.cutting import COLUMNS
+from sautiseg.encode import pcm_sha256
 from sautiseg.publish import load_export, publish
 
 SOURCE = "00000000-0000-4000-8000-000000000101"
@@ -32,8 +33,11 @@ def row(clip_id, variant, folder, sha, start=1000, end=4000, **extra):
     return base
 
 
-def make_export(root: Path, clips=("c001", "c002")) -> Path:
+def make_export(root: Path, clips=("c001", "c002"), original_only=("c003",)) -> Path:
     original, cleaned = [], []
+    for offset, clip_id in enumerate(original_only):
+        start = 30000 + offset * 5000
+        original.append(row(clip_id, "original", "clips", write_wav(root / "clips" / f"{clip_id}.wav", 2000), start, start + 2000, tier="asr", has_music="true"))
     for index, clip_id in enumerate(clips):
         start = 1000 + index * 5000
         original.append(row(clip_id, "original", "clips", write_wav(root / "clips" / f"{clip_id}.wav", 3000), start, start + 3000))
@@ -72,7 +76,7 @@ class FakeService:
             files = []
             for audio in draft["audio"]:
                 variant = audio["variant"]
-                key = f"{clip['id']}/{variant}.wav"
+                key = f"{clip['id']}/{variant}.{'flac' if variant == 'master' else 'opus'}"
                 files.append({"file": {"variant": variant},
                               "upload": None if variant in clip["verified"] else {"url": f"https://storage.example/{key}", "headers": {"x-amz-checksum-sha256": "x"}}})
             return 200, json.dumps({"clip": {"id": clip["id"], "status": clip["status"]}, "files": files}).encode()
@@ -81,7 +85,7 @@ class FakeService:
             for audio in clip["draft"]["audio"]:
                 if audio["variant"] in clip["verified"]:
                     continue
-                if f"{clip['id']}/{audio['variant']}.wav" not in self.uploaded:
+                if f"{clip['id']}/{audio['variant']}.{'flac' if audio['variant'] == 'master' else 'opus'}" not in self.uploaded:
                     return 409, json.dumps({"error": "object_unavailable", "message": "not readable yet"}).encode()
                 clip["verified"].add(audio["variant"])
             clip["status"] = "published"
@@ -101,16 +105,32 @@ class PublishTests(unittest.TestCase):
     def run_publish(self, service, **kwargs):
         return publish(self.root, "https://api.example.org/", TOKEN, SOURCE, "ADMIN-01", http=service, log=self.logs.append, **kwargs)
 
-    def test_loads_pairs_and_metadata(self):
+    def test_loads_one_audio_choice_per_clip_and_metadata(self):
         clips, segmenter = load_export(self.root)
-        self.assertEqual([c.clip_key for c in clips], ["c001", "c002"])
-        first = clips[0]
-        self.assertEqual({a.variant for a in first.audio}, {"original", "vocals_htdemucs"})
-        self.assertEqual(first.duration_ms, 3000)
+        self.assertEqual([c.clip_key for c in clips], ["c003", "c001", "c002"])
+        by_key = {c.clip_key: c for c in clips}
+        self.assertEqual(by_key["c001"].derived_from, "cleaned")
+        self.assertEqual(by_key["c003"].derived_from, "original")
+        first = by_key["c001"]
+        self.assertEqual(first.duration_ms, 2500)  # the cleaned copy is what is published
         self.assertEqual(first.speaker_name, "Voice A")
         self.assertEqual(segmenter, "sautiseg 0.1.0")
-        draft = first.draft("ADMIN-01", segmenter)
-        self.assertEqual(draft["audio"][1]["durationMs"], 2500)
+
+    def test_encodes_a_flac_master_that_round_trips_and_an_opus_listening_copy(self):
+        clips, segmenter = load_export(self.root)
+        clip = clips[1]
+        with tempfile.TemporaryDirectory() as scratch:
+            clip.encode(Path(scratch))
+            draft = clip.draft("ADMIN-01", segmenter)
+            master, listening = draft["audio"]
+            self.assertEqual((master["variant"], listening["variant"]), ("master", "listening"))
+            self.assertEqual(master["derivedFrom"], "cleaned")
+            self.assertEqual(master["pcmSha256"], pcm_sha256(clip.wav_path))
+            self.assertIsNone(listening["pcmSha256"])
+            self.assertEqual(clip.audio[0].path.read_bytes()[:4], b"fLaC")
+            self.assertEqual(clip.audio[1].path.read_bytes()[:4], b"OggS")
+            self.assertLess(listening["durationMs"], 2600)
+            self.assertEqual(listening["sampleRate"], 48000)
 
     def test_dry_run_contacts_nothing(self):
         service = FakeService()
@@ -118,12 +138,15 @@ class PublishTests(unittest.TestCase):
         self.assertEqual(result["published"], 0)
         self.assertEqual(service.calls, [])
 
-    def test_publishes_every_clip_with_both_files(self):
+    def test_publishes_every_clip_with_a_master_and_a_listening_copy(self):
         service = FakeService()
         result = self.run_publish(service)
-        self.assertEqual((result["published"], result["failed"]), (2, []))
-        self.assertEqual(len(service.uploaded), 4)
-        self.assertEqual(service.uploaded["id-c001/original.wav"], (self.root / "clips" / "c001.wav").read_bytes())
+        self.assertEqual((result["published"], result["failed"]), (3, []))
+        self.assertEqual(len(service.uploaded), 6)
+        self.assertEqual(service.uploaded["id-c001/master.flac"][:4], b"fLaC")
+        self.assertEqual(service.uploaded["id-c001/listening.opus"][:4], b"OggS")
+        self.assertEqual(service.clips["c003"]["draft"]["audio"][0]["derivedFrom"], "original")
+        self.assertEqual(service.clips["c001"]["draft"]["audio"][0]["derivedFrom"], "cleaned")
 
     def test_rerun_uploads_nothing_again(self):
         service = FakeService()
@@ -131,7 +154,7 @@ class PublishTests(unittest.TestCase):
         service.uploaded.clear()
         service.calls.clear()
         result = self.run_publish(service)
-        self.assertEqual(result["published"], 2)
+        self.assertEqual(result["published"], 3)
         self.assertEqual(service.uploaded, {})
         self.assertFalse([c for c in service.calls if c[0] == "PUT"])
 
@@ -139,20 +162,25 @@ class PublishTests(unittest.TestCase):
         service = FakeService()
         service.fail_put_for = "id-c001"
         result = self.run_publish(service)
-        self.assertEqual(result["published"], 1)
+        self.assertEqual(result["published"], 2)
         self.assertEqual(result["failed"][0]["clip"], "c001")
         service.fail_put_for = None
-        self.assertEqual(self.run_publish(service)["published"], 2)
+        self.assertEqual(self.run_publish(service)["published"], 3)
 
     def test_refuses_a_changed_audio_file(self):
         (self.root / "tts_clips" / "c001.wav").write_bytes((self.root / "tts_clips" / "c001.wav").read_bytes() + b"\0\0")
         with self.assertRaisesRegex(RuntimeError, "does not match the hash"):
             self.run_publish(FakeService())
 
-    def test_refuses_missing_cleaned_metadata_and_orphan_originals(self):
+    def test_refuses_an_export_with_no_metadata(self):
         (self.root / "metadata_tts.csv").unlink()
-        with self.assertRaisesRegex(RuntimeError, "cleaned audio"):
+        (self.root / "metadata.csv").unlink()
+        with self.assertRaisesRegex(RuntimeError, "nothing to publish"):
             load_export(self.root)
+
+    def test_dry_run_still_encodes_and_reports_sizes(self):
+        self.run_publish(FakeService(), dry_run=True)
+        self.assertTrue(any("master" in line and "listening" in line for line in self.logs))
 
     def test_refuses_bad_arguments(self):
         with self.assertRaises(ValueError):

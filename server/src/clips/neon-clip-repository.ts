@@ -38,10 +38,12 @@ type FileRow = {
   id: string;
   clip_id: string;
   variant: string;
+  derived_from: string;
   object_key: string;
   content_type: string;
   size_bytes: number;
   sha256_hex: string;
+  pcm_sha256_hex: string | null;
   sample_rate: number;
   duration_ms: number;
   status: string;
@@ -59,13 +61,13 @@ const CLIP_COLUMNS = `
 `;
 
 const FILE_COLUMNS = `
-  id, clip_id, variant, object_key, content_type, size_bytes, sha256_hex, sample_rate,
+  id, clip_id, variant, derived_from, object_key, content_type, size_bytes, sha256_hex, pcm_sha256_hex, sample_rate,
   duration_ms, status, verification_error, upload_expires_at, verified_at, created_at, updated_at
 `;
 
 const FILE_RECORD = `
-  id uuid, clip_id uuid, variant text, object_key text, content_type text, size_bytes integer,
-  sha256_hex text, sample_rate integer, duration_ms integer, status text,
+  id uuid, clip_id uuid, variant text, derived_from text, object_key text, content_type text, size_bytes integer,
+  sha256_hex text, pcm_sha256_hex text, sample_rate integer, duration_ms integer, status text,
   upload_expires_at timestamptz, created_at timestamptz, updated_at timestamptz
 `;
 
@@ -116,11 +118,11 @@ export class NeonClipRepository implements ClipRepository {
         RETURNING id
       )
       INSERT INTO clip_audio_files (
-        id, clip_id, variant, object_key, content_type, size_bytes, sha256_hex, sample_rate,
-        duration_ms, status, verification_error, upload_expires_at, verified_at, created_at, updated_at
+        id, clip_id, variant, derived_from, object_key, content_type, size_bytes, sha256_hex, pcm_sha256_hex,
+        sample_rate, duration_ms, status, verification_error, upload_expires_at, verified_at, created_at, updated_at
       )
-      SELECT f.id, f.clip_id, f.variant, f.object_key, f.content_type, f.size_bytes, f.sha256_hex,
-             f.sample_rate, f.duration_ms, f.status, NULL, f.upload_expires_at, NULL, f.created_at, f.updated_at
+      SELECT f.id, f.clip_id, f.variant, f.derived_from, f.object_key, f.content_type, f.size_bytes, f.sha256_hex,
+             f.pcm_sha256_hex, f.sample_rate, f.duration_ms, f.status, NULL, f.upload_expires_at, NULL, f.created_at, f.updated_at
       FROM new_clip, jsonb_to_recordset($21::jsonb) AS f(${FILE_RECORD})
       WHERE f.clip_id = new_clip.id
       RETURNING id
@@ -147,11 +149,11 @@ export class NeonClipRepository implements ClipRepository {
   async insertFile(file: ClipAudioFile): Promise<boolean> {
     const rows = await this.database.query(`
       INSERT INTO clip_audio_files (
-        id, clip_id, variant, object_key, content_type, size_bytes, sha256_hex, sample_rate,
-        duration_ms, status, verification_error, upload_expires_at, verified_at, created_at, updated_at
+        id, clip_id, variant, derived_from, object_key, content_type, size_bytes, sha256_hex, pcm_sha256_hex,
+        sample_rate, duration_ms, status, verification_error, upload_expires_at, verified_at, created_at, updated_at
       )
-      SELECT f.id, f.clip_id, f.variant, f.object_key, f.content_type, f.size_bytes, f.sha256_hex,
-             f.sample_rate, f.duration_ms, f.status, NULL, f.upload_expires_at, NULL, f.created_at, f.updated_at
+      SELECT f.id, f.clip_id, f.variant, f.derived_from, f.object_key, f.content_type, f.size_bytes, f.sha256_hex,
+             f.pcm_sha256_hex, f.sample_rate, f.duration_ms, f.status, NULL, f.upload_expires_at, NULL, f.created_at, f.updated_at
       FROM clips c, jsonb_to_recordset($1::jsonb) AS f(${FILE_RECORD})
       WHERE c.id = f.clip_id AND c.status <> 'withdrawn' AND ${authorized('c', 'allow_internal_processing')}
       RETURNING id
@@ -164,12 +166,12 @@ export class NeonClipRepository implements ClipRepository {
       UPDATE clip_audio_files f
       SET size_bytes = $2, sha256_hex = $3, sample_rate = $4, duration_ms = $5,
           status = 'upload_pending', verification_error = NULL, verified_at = NULL,
-          upload_expires_at = $6, updated_at = $7
+          upload_expires_at = $6, updated_at = $7, derived_from = $8, pcm_sha256_hex = $9
       FROM clips c
       WHERE f.id = $1 AND f.status <> 'verified' AND c.id = f.clip_id
         AND c.status <> 'withdrawn' AND ${authorized('c', 'allow_internal_processing')}
       RETURNING f.id
-    `, [file.id, file.sizeBytes, file.sha256, file.sampleRate, file.durationMs, file.uploadExpiresAt, file.updatedAt]);
+    `, [file.id, file.sizeBytes, file.sha256, file.sampleRate, file.durationMs, file.uploadExpiresAt, file.updatedAt, file.derivedFrom, file.pcmSha256]);
     return rows.length === 1;
   }
 
@@ -194,7 +196,7 @@ export class NeonClipRepository implements ClipRepository {
         AND ${authorized('c', 'allow_transcription')}
         AND EXISTS (
           SELECT 1 FROM clip_audio_files f
-          WHERE f.clip_id = c.id AND f.variant = 'vocals_htdemucs' AND f.status = 'verified'
+          WHERE f.clip_id = c.id AND f.variant = 'listening' AND f.status = 'verified'
         )
         AND NOT EXISTS (
           SELECT 1 FROM clip_audio_files f WHERE f.clip_id = c.id AND f.status <> 'verified'
@@ -240,10 +242,12 @@ function fileJson(file: ClipAudioFile) {
     id: file.id,
     clip_id: file.clipId,
     variant: file.variant,
+    derived_from: file.derivedFrom,
     object_key: file.objectKey,
     content_type: file.contentType,
     size_bytes: file.sizeBytes,
     sha256_hex: file.sha256,
+    pcm_sha256_hex: file.pcmSha256,
     sample_rate: file.sampleRate,
     duration_ms: file.durationMs,
     status: file.status,
@@ -287,10 +291,12 @@ function mapFile(row: FileRow): ClipAudioFile {
     id: row.id,
     clipId: row.clip_id,
     variant: row.variant,
+    derivedFrom: row.derived_from,
     objectKey: row.object_key,
     contentType: row.content_type,
     sizeBytes: row.size_bytes,
     sha256: row.sha256_hex,
+    pcmSha256: row.pcm_sha256_hex,
     sampleRate: row.sample_rate,
     durationMs: row.duration_ms,
     status: row.status,

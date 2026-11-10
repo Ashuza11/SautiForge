@@ -71,6 +71,7 @@ function dependencies() {
         'x-amz-server-side-encryption': 'AES256',
       },
     }),
+    reportsEncryption: true,
     inspectObject: vi.fn().mockResolvedValue(metadata),
   } as unknown as PrivateObjectStore;
   const service = new SourceMediaService(media, sources, objectStore, {

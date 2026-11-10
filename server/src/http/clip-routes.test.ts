@@ -26,8 +26,8 @@ const draft: ClipDraft = {
   segmenter: 'sautiseg 0.1.0',
   createdBy: 'ADMIN-01',
   audio: [
-    { variant: 'original', sizeBytes: 144_000, sha256: sha, sampleRate: 24000, durationMs: 3020 },
-    { variant: 'vocals_htdemucs', sizeBytes: 144_000, sha256: sha, sampleRate: 24000, durationMs: 3020 },
+    { variant: 'master', derivedFrom: 'cleaned', sizeBytes: 90_000, sha256: sha, pcmSha256: sha, sampleRate: 24000, durationMs: 3020 },
+    { variant: 'listening', derivedFrom: 'cleaned', sizeBytes: 9_000, sha256: sha, pcmSha256: null, sampleRate: 48000, durationMs: 3020 },
   ],
 };
 
@@ -91,7 +91,7 @@ describe('clip routes', () => {
   it('completes, signs playback and withdraws', async () => {
     const { call, clips } = clipApp();
     expect((await call(`/v1/admin/clips/${clipId}/complete`, 'POST')).status).toBe(200);
-    const audio = await call(`/v1/admin/clips/${clipId}/audio/vocals_htdemucs`);
+    const audio = await call(`/v1/admin/clips/${clipId}/audio/listening`);
     expect(await audio.json()).toEqual({ url: 'https://storage.example/signed-get' });
     expect((await call(`/v1/admin/clips/${clipId}/audio/other`)).status).toBe(400);
     expect((await call(`/v1/admin/clips/${clipId}/withdraw`, 'POST')).status).toBe(200);

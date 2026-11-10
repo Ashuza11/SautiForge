@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import type { SourceService } from '../sources/source-service';
 import type { PrivateObjectStore, SignedUpload } from '../storage/private-object-store';
 import {
+  CONTENT_TYPE_BY_VARIANT,
+  FILE_EXTENSION_BY_VARIANT,
   clipAudioFileSchema,
   clipDraftSchema,
   clipSchema,
@@ -102,7 +104,8 @@ export class ClipService {
     if (!saved) {
       throw new ClipLifecycleError('source_changed', 'The source permission changed before the clip was created. Reload and try again.');
     }
-    return { clip: saved.clip, files: saved.files.map((file, index) => ({ file, upload: uploads[index] ?? null })) };
+    const uploadByFile = new Map(files.map((file, index) => [file.id, uploads[index] ?? null]));
+    return { clip: saved.clip, files: saved.files.map((file) => ({ file, upload: uploadByFile.get(file.id) ?? null })) };
   }
 
   private async registerAgain(existing: ClipWithFiles, draft: ClipDraft): Promise<RegisteredClip> {
@@ -138,8 +141,11 @@ export class ClipService {
           throw new ClipLifecycleError('source_changed', 'The source permission changed. Reload and try again.');
         }
         results.push({ file, upload });
+      } else if (current.status === 'verified' && audio.variant === 'listening') {
+        // The listening copy is derived and may be re-encoded differently on another machine; keep the stored one.
+        results.push({ file: current, upload: null });
       } else if (current.status === 'verified') {
-        if (current.sha256 !== audio.sha256 || current.sizeBytes !== audio.sizeBytes) {
+        if (current.sha256 !== audio.sha256 || current.sizeBytes !== audio.sizeBytes || current.derivedFrom !== audio.derivedFrom) {
           throw new ClipLifecycleError('clip_conflict', `The ${audio.variant} audio is already verified with different content. Withdraw the clip and use a new clip key.`);
         }
         results.push({ file: current, upload: null });
@@ -178,7 +184,7 @@ export class ClipService {
       } catch {
         throw new ClipLifecycleError('object_unavailable', 'An uploaded file is not readable yet. Confirm the upload completed and retry.');
       }
-      const failure = verificationFailure(file, observed);
+      const failure = verificationFailure(file, observed, this.objectStore.reportsEncryption);
       const timestamp = this.now().toISOString();
       const saved = await this.clips.updateFileVerification({
         id: file.id,
@@ -228,10 +234,12 @@ export class ClipService {
       id: this.idFactory(),
       clipId: clip.id,
       variant: audio.variant,
-      objectKey: `projects/${clip.projectId}/sources/${clip.sourceId}/clips/${clip.id}/${audio.variant}.wav`,
-      contentType: 'audio/wav',
+      derivedFrom: audio.derivedFrom,
+      objectKey: `projects/${clip.projectId}/sources/${clip.sourceId}/clips/${clip.id}/${audio.variant}.${FILE_EXTENSION_BY_VARIANT[audio.variant]}`,
+      contentType: CONTENT_TYPE_BY_VARIANT[audio.variant],
       sizeBytes: audio.sizeBytes,
       sha256: audio.sha256,
+      pcmSha256: audio.pcmSha256,
       sampleRate: audio.sampleRate,
       durationMs: audio.durationMs,
       status: 'upload_pending',
@@ -267,11 +275,12 @@ function draftMetadata(draft: ClipDraft) {
 function verificationFailure(
   expected: Pick<ClipAudioFile, 'sizeBytes' | 'contentType' | 'sha256'>,
   observed: Awaited<ReturnType<PrivateObjectStore['inspectObject']>>,
+  reportsEncryption: boolean,
 ): string | null {
   const expectedChecksum = Buffer.from(expected.sha256, 'hex').toString('base64');
   if (observed.contentLengthBytes !== expected.sizeBytes) return 'size_mismatch';
   if (observed.contentType.toLowerCase() !== expected.contentType) return 'content_type_mismatch';
   if (observed.checksumSha256 !== expectedChecksum) return 'checksum_mismatch';
-  if (!['AES256', 'aws:kms'].includes(observed.serverSideEncryption ?? '')) return 'encryption_missing';
+  if (reportsEncryption && !['AES256', 'aws:kms'].includes(observed.serverSideEncryption ?? '')) return 'encryption_missing';
   return null;
 }

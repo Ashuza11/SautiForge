@@ -15,12 +15,15 @@ Set these in the Vercel project (Production and Preview). Never commit them.
 | `NODE_ENV` | `production` (marks the session cookie `Secure`) |
 | `WEB_ORIGIN` | The exact site origin, for example `https://sautiforge.vercel.app`, no trailing slash |
 | `DATABASE_URL` | Neon pooled connection string with `sslmode=require` |
-| `AWS_REGION`, `S3_BUCKET` | Private bucket |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Keys limited to that bucket |
+| `AWS_REGION`, `S3_BUCKET` | Private bucket (Neon Object Storage: the region Neon shows, for example `eu-central-1`) |
+| `S3_ENDPOINT`, `S3_FORCE_PATH_STYLE` | Neon's storage endpoint (`AWS_ENDPOINT_URL_S3`) and `true`; Neon requires path-style addressing. Leave both out for AWS S3 |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | Neon storage credential (`neon env pull --service object-storage` writes them) or keys limited to the bucket |
 | `ADMIN_API_TOKEN` | 32+ random characters, for scripts such as `publish` |
 | `ADMIN_PASSWORD`, `SESSION_SECRET` | Admin login; 12+ and 32+ characters |
 
-The bucket needs a CORS rule that allows `PUT` and `GET` from `WEB_ORIGIN`.
+Neon endpoints (host ending `.neon.tech`) are detected automatically: Neon accepts the checksum and encryption headers but does not report encryption back, so only that one check is skipped. On AWS S3 the bucket needs a CORS rule that allows `PUT` and `GET` from `WEB_ORIGIN` if browsers upload directly.
+
+If a setting is wrong, `/health` answers `503 {"error":"server_not_configured","invalid_settings":["WEB_ORIGIN"]}` with the names only, never the values.
 
 ## Steps
 

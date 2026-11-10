@@ -2,7 +2,10 @@ import { z } from 'zod';
 
 export const MAX_CLIP_AUDIO_BYTES = 20 * 1024 * 1024;
 
-export const clipVariantSchema = z.enum(['original', 'vocals_htdemucs']);
+/** `master` is the lossless FLAC kept for the dataset; `listening` is the small Opus copy volunteers play. */
+export const clipVariantSchema = z.enum(['master', 'listening']);
+/** Which processed audio the stored files were encoded from. */
+export const clipDerivedFromSchema = z.enum(['original', 'cleaned']);
 export const clipSpeakerRoleSchema = z.enum(['narrator', 'character', 'multiple', 'unknown']);
 export const clipTierSchema = z.enum(['asr', 'asr_tts']);
 export const clipStatusSchema = z.enum(['draft', 'published', 'withdrawn']);
@@ -16,16 +19,25 @@ const adminCodeSchema = z.string()
   .max(80)
   .regex(/^[A-Za-z0-9][A-Za-z0-9_-]+$/, 'Use a pseudonymous administrator code.');
 
+/** The media type each stored role must have. */
+export const CONTENT_TYPE_BY_VARIANT = { master: 'audio/flac', listening: 'audio/ogg' } as const;
+export const FILE_EXTENSION_BY_VARIANT = { master: 'flac', listening: 'opus' } as const;
+
 export const clipAudioDraftSchema = z.object({
   variant: clipVariantSchema,
+  derivedFrom: clipDerivedFromSchema,
   sizeBytes: z.number().int().positive().max(MAX_CLIP_AUDIO_BYTES),
+  /** SHA-256 of the stored file itself (what the upload is checked against). */
   sha256: sha256Schema,
+  /** SHA-256 of the 16-bit PCM samples the master was encoded from; the export decodes back and checks it. */
+  pcmSha256: sha256Schema.nullish().transform((value) => value ?? null),
   sampleRate: z.number().int().min(8000).max(96000),
   durationMs: z.number().int().positive().max(60_000),
-}).strict();
-
-/** The cleaned (music-removed) copy is what volunteers hear, so it is required. */
-export const CLEANED_VARIANT = 'vocals_htdemucs' as const;
+}).strict().superRefine((value, context) => {
+  if (value.variant === 'master' && !value.pcmSha256) {
+    context.addIssue({ code: 'custom', path: ['pcmSha256'], message: 'The master needs the SHA-256 of the audio samples it came from.' });
+  }
+});
 
 export const clipDraftSchema = z.object({
   clipKey: z.string().trim().regex(/^[A-Za-z0-9_-]{1,40}$/, 'Use letters, digits, dash or underscore (max 40).'),
@@ -39,7 +51,7 @@ export const clipDraftSchema = z.object({
   tier: clipTierSchema,
   segmenter: z.string().trim().max(80).nullish().transform((value) => value || null),
   createdBy: adminCodeSchema,
-  audio: z.array(clipAudioDraftSchema).min(1).max(2),
+  audio: z.array(clipAudioDraftSchema).length(2),
 }).strict().superRefine((value, context) => {
   if (value.endMs <= value.startMs) {
     context.addIssue({ code: 'custom', path: ['endMs'], message: 'The clip must end after it starts.' });
@@ -51,8 +63,11 @@ export const clipDraftSchema = z.object({
   if (new Set(variants).size !== variants.length) {
     context.addIssue({ code: 'custom', path: ['audio'], message: 'Each audio variant can appear only once.' });
   }
-  if (!variants.includes(CLEANED_VARIANT)) {
-    context.addIssue({ code: 'custom', path: ['audio'], message: 'The cleaned audio variant is required.' });
+  if (!variants.includes('master') || !variants.includes('listening')) {
+    context.addIssue({ code: 'custom', path: ['audio'], message: 'Provide both the master and the listening copy.' });
+  }
+  if (new Set(value.audio.map((file) => file.derivedFrom)).size > 1) {
+    context.addIssue({ code: 'custom', path: ['audio'], message: 'Both files must come from the same audio.' });
   }
   for (const [index, file] of value.audio.entries()) {
     if (file.durationMs > value.durationMs + 100) {
@@ -89,9 +104,11 @@ export const clipAudioFileSchema = z.object({
   clipId: z.string().uuid(),
   variant: clipVariantSchema,
   objectKey: z.string().min(1).max(1024),
-  contentType: z.literal('audio/wav'),
+  derivedFrom: clipDerivedFromSchema,
+  contentType: z.enum(['audio/flac', 'audio/ogg']),
   sizeBytes: z.number().int().positive(),
   sha256: sha256Schema,
+  pcmSha256: sha256Schema.nullable(),
   sampleRate: z.number().int(),
   durationMs: z.number().int(),
   status: clipAudioStatusSchema,

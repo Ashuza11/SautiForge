@@ -16,8 +16,10 @@ Everything is online: Neon for records, private S3 for audio, Vercel for the sit
 
 ## Decisions
 
-- Volunteers hear the cleaned (music-removed) audio.
-- The music-background copy of each clip stays in the dataset for ASR. One clip has one transcript and two audio variants (`audio_variant`). Hours are never counted twice, and both variants of a clip stay in the same train/dev/test split.
+- One audio file is stored online per clip: the cleaned (music-removed) copy when the video had music, otherwise the original. Volunteers hear that audio. The music-background copy stays on the admin's machine for ASR and is joined to the clip by clip key and hash when the dataset is exported. Hours are never counted twice, and both copies of a clip stay in the same train/dev/test split.
+- Each stored clip has a lossless FLAC master (kept for the dataset) and a small Opus listening copy (what volunteers play, about 24 kbps). The master's audio samples are hashed before encoding; the export decodes the FLAC back to WAV and checks that hash. A WAV file's own hash is not used because WAV headers differ between tool versions.
+- Audio lives in Neon Object Storage (S3-compatible, Frankfurt, private bucket). Neon accepts the checksum and encryption headers but does not report encryption back, so the encryption check is skipped for Neon endpoints only; size, media type and SHA-256 are still verified.
+- Measured on the 53 real clips: about 99 MB per hour of speech for both stored copies (10 hours is about 1 GB, 15 hours about 1.5 GB), well inside the 5 GB free allowance.
 - Two independent transcriptions per clip.
 - Raw submissions are append-only. The final transcript is a separate, versioned record. No majority vote.
 - Differences are shared as copyable text. A read-only link for community votes is a possible later step.
@@ -36,6 +38,8 @@ Everything is online: Neon for records, private S3 for audio, Vercel for the sit
 | 6 | `publish` command | Uploads an `export/` folder, safe to re-run, dry-run mode |
 | 7 | Local sandbox | Real API on PGlite and disk audio, for testing without the cloud |
 | 7b | Admin Clips screen | List, play, withdraw |
+| 7c | Neon storage and audio formats | FLAC master and Opus listening copy per clip, one audio source per clip, Neon encryption rule |
+| 7d | Projects on the server | The Projects tab saves to Neon instead of the browser |
 | 8 | Task tables | Batches, contributors, submissions (append-only) |
 | 9 | Batches | Create a batch, link and WhatsApp message |
 | 10 | Volunteer API | Pseudonym, own tasks only, signed audio, submit or skip |

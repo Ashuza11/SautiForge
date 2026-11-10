@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Source } from '../sources/source';
 import { SourceLifecycleError, type SourceService } from '../sources/source-service';
 import type { PrivateObjectStore } from '../storage/private-object-store';
-import type { Clip, ClipAudioFile, ClipDraft, ClipStatus, ClipWithFiles } from './clip';
+import { clipDraftSchema, type Clip, type ClipAudioFile, type ClipDraft, type ClipStatus, type ClipWithFiles } from './clip';
 import type { ClipRepository } from './clip-repository';
 import { ClipService } from './clip-service';
 
@@ -25,8 +25,8 @@ const draft: ClipDraft = {
   segmenter: null,
   createdBy: 'ADMIN-01',
   audio: [
-    { variant: 'original', sizeBytes: 144_000, sha256: sha, sampleRate: 24000, durationMs: 3020 },
-    { variant: 'vocals_htdemucs', sizeBytes: 100_000, sha256: 'cd'.repeat(32), sampleRate: 24000, durationMs: 2500 },
+    { variant: 'master', derivedFrom: 'cleaned', sizeBytes: 90_000, sha256: sha, pcmSha256: 'ef'.repeat(32), sampleRate: 24000, durationMs: 3020 },
+    { variant: 'listening', derivedFrom: 'cleaned', sizeBytes: 9_000, sha256: 'cd'.repeat(32), pcmSha256: null, sampleRate: 48000, durationMs: 3020 },
   ],
 };
 
@@ -93,6 +93,7 @@ function setup() {
     assertUseAuthorized: vi.fn().mockResolvedValue(undefined),
   } as unknown as SourceService;
   const store = {
+    reportsEncryption: true,
     createUploadUrl: vi.fn().mockImplementation(async (r: { key: string }) => ({ url: `https://storage.example/${r.key}`, headers: {} })),
     createDownloadUrl: vi.fn().mockResolvedValue('https://storage.example/get'),
     inspectObject: vi.fn(),
@@ -103,7 +104,7 @@ function setup() {
   });
   const observe = (file: ClipAudioFile, overrides = {}) => ({
     contentLengthBytes: file.sizeBytes,
-    contentType: 'audio/wav',
+    contentType: file.contentType,
     checksumSha256: Buffer.from(file.sha256, 'hex').toString('base64'),
     serverSideEncryption: 'AES256',
     ...overrides,
@@ -122,13 +123,24 @@ describe('ClipService', () => {
     expect(sources.assertUseAuthorized).toHaveBeenCalledWith(sourceId, 'internalProcessing');
     expect(result.clip).toMatchObject({ status: 'draft', rightsRevision: 2, clipKey: 'c001', projectId, sourceId });
     expect(result.files).toHaveLength(2);
-    expect(result.files[0].upload?.url).toContain(`/clips/${result.clip.id}/original.wav`);
+    expect(result.files[0].upload?.url).toContain(`/clips/${result.clip.id}/master.flac`);
+    expect(result.files[1].upload?.url).toContain(`/clips/${result.clip.id}/listening.opus`);
     expect(store.createUploadUrl).toHaveBeenCalledWith(expect.objectContaining({
-      contentType: 'audio/wav',
+      contentType: 'audio/flac',
       checksumSha256: checksum,
-      contentLengthBytes: 144_000,
+      contentLengthBytes: 90_000,
     }));
+    expect(store.createUploadUrl).toHaveBeenCalledWith(expect.objectContaining({ contentType: 'audio/ogg', contentLengthBytes: 9_000 }));
+    expect([...repo.files.values()].find((f) => f.variant === 'master')).toMatchObject({ pcmSha256: 'ef'.repeat(32), derivedFrom: 'cleaned' });
     expect(repo.files.size).toBe(2);
+  });
+
+  it('pairs each signed upload with its own file even when the store returns them in another order', async () => {
+    const { service, repo } = setup();
+    const original = repo.createWhenAuthorized.bind(repo);
+    repo.createWhenAuthorized = async (clip, files) => original(clip, [...files].reverse());
+    const result = await service.register(sourceId, draft);
+    for (const { file, upload } of result.files) expect(upload?.url).toContain(`/${file.variant}.`);
   });
 
   it('signs nothing for a missing source or an unauthorized use', async () => {
@@ -148,7 +160,7 @@ describe('ClipService', () => {
     expect(repo.clips.size).toBe(0);
   });
 
-  it('verifies uploads and publishes only after the cleaned audio checks out', async () => {
+  it('verifies uploads and publishes only after the listening copy checks out', async () => {
     const { service, repo, verifyAll, sources } = setup();
     const { clip } = await service.register(sourceId, draft);
     verifyAll();
@@ -171,7 +183,7 @@ describe('ClipService', () => {
     const { clip } = await service.register(sourceId, draft);
     vi.mocked(store.inspectObject).mockImplementation(async (key: string) => {
       const file = [...repo.files.values()].find((f) => f.objectKey === key)!;
-      return { contentLengthBytes: file.sizeBytes, contentType: 'audio/wav', checksumSha256: Buffer.from(file.sha256, 'hex').toString('base64'), serverSideEncryption: 'AES256', ...override };
+      return { contentLengthBytes: file.sizeBytes, contentType: file.contentType, checksumSha256: Buffer.from(file.sha256, 'hex').toString('base64'), serverSideEncryption: 'AES256', ...override };
     });
     await expect(service.complete(clip.id)).rejects.toMatchObject({ code: 'verification_failed', message: expect.stringContaining(reason) });
     expect(repo.clips.get(clip.id)?.status).toBe('draft');
@@ -188,6 +200,26 @@ describe('ClipService', () => {
     expect(repo.clips.get(clip.id)?.status).toBe('draft');
     vi.mocked(sources.assertUseAuthorized).mockResolvedValue(undefined);
     expect((await service.complete(clip.id)).clip.status).toBe('published');
+  });
+
+  it('skips the encryption check only for storage that cannot report it', async () => {
+    const { service, repo, store } = setup();
+    (store as { reportsEncryption: boolean }).reportsEncryption = false;
+    const { clip } = await service.register(sourceId, draft);
+    vi.mocked(store.inspectObject).mockImplementation(async (key: string) => {
+      const file = [...repo.files.values()].find((f) => f.objectKey === key)!;
+      return { contentLengthBytes: file.sizeBytes, contentType: file.contentType, checksumSha256: Buffer.from(file.sha256, 'hex').toString('base64'), serverSideEncryption: null };
+    });
+    expect((await service.complete(clip.id)).clip.status).toBe('published');
+  });
+
+  it('rejects drafts without both roles, a master WAV hash, or a single source', () => {
+    const [master, listening] = draft.audio;
+    expect(clipDraftSchema.safeParse({ ...draft, audio: [master] }).success).toBe(false);
+    expect(clipDraftSchema.safeParse({ ...draft, audio: [master, { ...master }] }).success).toBe(false);
+    expect(clipDraftSchema.safeParse({ ...draft, audio: [{ ...master, pcmSha256: null }, listening] }).success).toBe(false);
+    expect(clipDraftSchema.safeParse({ ...draft, audio: [master, { ...listening, derivedFrom: 'original' }] }).success).toBe(false);
+    expect(clipDraftSchema.safeParse(draft).success).toBe(true);
   });
 
   it('reports an unreadable object so the upload can be retried', async () => {
@@ -217,8 +249,10 @@ describe('ClipService', () => {
     expect(retried.files.every((f) => f.upload !== null)).toBe(true);
     verifyAll();
     await service.complete(clip.id);
-    const changedAudio = { ...draft, audio: [draft.audio[0], { ...draft.audio[1], sha256: 'ee'.repeat(32) }] };
-    await expect(service.register(sourceId, changedAudio)).rejects.toMatchObject({ code: 'clip_conflict' });
+    const changedMaster = { ...draft, audio: [{ ...draft.audio[0], sha256: 'ee'.repeat(32) }, draft.audio[1]] };
+    await expect(service.register(sourceId, changedMaster)).rejects.toMatchObject({ code: 'clip_conflict' });
+    const reEncoded = { ...draft, audio: [draft.audio[0], { ...draft.audio[1], sha256: 'ee'.repeat(32) }] };
+    expect((await service.register(sourceId, reEncoded)).files.every((f) => f.upload === null)).toBe(true);
     await expect(service.register(sourceId, { ...draft, endMs: 7000 })).rejects.toMatchObject({ code: 'clip_conflict' });
     expect(store.createUploadUrl).toHaveBeenCalledTimes(4);
   });
@@ -226,10 +260,10 @@ describe('ClipService', () => {
   it('signs playback only for verified audio and refuses a withdrawn clip', async () => {
     const { service, verifyAll } = setup();
     const { clip } = await service.register(sourceId, draft);
-    await expect(service.createAudioUrl(clip.id, 'vocals_htdemucs')).rejects.toMatchObject({ code: 'audio_not_found' });
+    await expect(service.createAudioUrl(clip.id, 'listening')).rejects.toMatchObject({ code: 'audio_not_found' });
     verifyAll();
     await service.complete(clip.id);
-    await expect(service.createAudioUrl(clip.id, 'vocals_htdemucs')).resolves.toBe('https://storage.example/get');
+    await expect(service.createAudioUrl(clip.id, 'listening')).resolves.toBe('https://storage.example/get');
     expect((await service.withdraw(clip.id)).clip.status).toBe('withdrawn');
     expect((await service.withdraw(clip.id)).clip.status).toBe('withdrawn');
     await expect(service.complete(clip.id)).rejects.toMatchObject({ code: 'clip_withdrawn' });

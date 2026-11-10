@@ -40,8 +40,8 @@ describe('ApiClient', () => {
 
   it('makes relative audio links absolute against the service base', async () => {
     const client = new ApiClient('https://api.example.org', respond(200, { url: '/local-storage/a?x=1' }));
-    expect(await client.audioUrl('id', 'vocals_htdemucs')).toBe('https://api.example.org/local-storage/a?x=1');
+    expect(await client.audioUrl('id', 'listening')).toBe('https://api.example.org/local-storage/a?x=1');
     const signed = new ApiClient('', respond(200, { url: 'https://bucket.s3.amazonaws.com/a' }));
-    expect(await signed.audioUrl('id', 'original')).toBe('https://bucket.s3.amazonaws.com/a');
+    expect(await signed.audioUrl('id', 'master')).toBe('https://bucket.s3.amazonaws.com/a');
   });
 });

@@ -7,7 +7,7 @@ export class ApiError extends Error {
 export type ApiProject = { id: string; title: string; languageCode: string; targetLanguage: string };
 export type ApiSource = { id: string; title: string; status: string };
 export type ClipStatus = 'draft' | 'published' | 'withdrawn';
-export type ClipVariant = 'original' | 'vocals_htdemucs';
+export type ClipVariant = 'master' | 'listening';
 export type ApiClip = {
   clip: {
     id: string;
@@ -21,7 +21,7 @@ export type ApiClip = {
     tier: 'asr' | 'asr_tts';
     status: ClipStatus;
   };
-  files: { variant: ClipVariant; status: string; sizeBytes: number }[];
+  files: { variant: ClipVariant; derivedFrom: 'original' | 'cleaned'; status: string; sizeBytes: number }[];
 };
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;

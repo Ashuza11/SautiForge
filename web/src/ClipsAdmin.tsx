@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ApiClient, ApiError, type ApiClip, type ApiProject, type ApiSource, type ClipVariant } from './api/client';
-import { filterClips, formatClock, formatSeconds, formatTotal, speakerLabel, summarizeClips, type StatusFilter } from './domain/clips-view';
+import { filterClips, formatClock, formatSeconds, formatTotal, isMusicRemoved, speakerLabel, summarizeClips, type StatusFilter } from './domain/clips-view';
 
 const filters: { value: StatusFilter; label: string }[] = [
   { value: 'published', label: 'Published' },
@@ -179,7 +179,6 @@ function ClipsList({ client, onSignedOut }: { client: ApiClient; onSignedOut: ()
       ) : (
         <ul className="clips-list">
           {visible.map((item) => {
-            const hasOriginal = item.files.some((file) => file.variant === 'original');
             const isPlaying = (variant: ClipVariant) => playing?.clipId === item.clip.id && playing.variant === variant;
             const playable = item.clip.status !== 'withdrawn';
             return (
@@ -190,18 +189,13 @@ function ClipsList({ client, onSignedOut }: { client: ApiClient; onSignedOut: ()
                   <span className="clips-muted">at {formatClock(item.clip.startMs)} in the film</span>
                 </div>
                 <div className="clips-meta">
-                  <span>{speakerLabel(item.clip)}</span>
+                  <span>{speakerLabel(item.clip)}{isMusicRemoved(item) ? ' · music removed' : ''}</span>
                   <span className={`clips-status clips-status-${item.clip.status}`}>{filters.find((f) => f.value === item.clip.status)?.label ?? item.clip.status}</span>
                 </div>
                 <div className="clips-actions">
-                  <button className="secondary" disabled={!playable} aria-pressed={isPlaying('vocals_htdemucs')} onClick={() => void play(item, 'vocals_htdemucs')}>
-                    {isPlaying('vocals_htdemucs') ? 'Pause' : 'Play'}
+                  <button className="secondary" disabled={!playable} aria-pressed={isPlaying('listening')} onClick={() => void play(item, 'listening')}>
+                    {isPlaying('listening') ? 'Pause' : 'Play'}
                   </button>
-                  {hasOriginal ? (
-                    <button className="secondary" disabled={!playable} aria-pressed={isPlaying('original')} onClick={() => void play(item, 'original')}>
-                      {isPlaying('original') ? 'Pause' : 'With music'}
-                    </button>
-                  ) : null}
                   {item.clip.status !== 'withdrawn' ? <button className="quiet" onClick={() => void withdraw(item)}>Withdraw</button> : null}
                 </div>
               </li>

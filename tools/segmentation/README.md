@@ -79,7 +79,8 @@ python -m sautiseg publish --export segmentation-output/<name>/export \
 ```
 
 - Every file is re-hashed against the CSV first; a changed file stops the run.
-- The cleaned copy (`vocals_htdemucs`) is required, because volunteers hear it. The music copy (`original`) is uploaded too and kept for ASR.
-- It is safe to run again: verified audio is not uploaded twice, and speaker or tier fixes are applied in place. Changed cut points or changed audio need a new clip key (withdraw the old clip first).
+- One audio file is published per clip: the cleaned copy (`vocals_htdemucs`) when the export has one, otherwise the original. The other copy stays on your machine.
+- Each clip is stored twice online: a lossless FLAC master (about 57% of the WAV) and a small Opus copy (about 24 kbps) that volunteers play. The FLAC is decoded again before upload and must give exactly the same audio samples as the WAV; the samples' SHA-256 is stored so the dataset export can repeat the check. This needs `ffmpeg` with the FLAC and Opus encoders; `--dry-run` encodes too, so it tests this.
+- It is safe to run again: verified audio is not uploaded twice, and speaker or tier fixes are applied in place. Changed cut points or a changed master need a new clip key (withdraw the old clip first). A listening copy that was encoded differently on another machine is kept as stored.
 - A failed clip is reported at the end and does not stop the others.
 - The source must already be registered in the Mashi project with approved rights (internal processing, volunteer access and transcription).

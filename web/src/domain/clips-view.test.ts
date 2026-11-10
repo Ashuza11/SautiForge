@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { ApiClip } from '../api/client';
 import { filterClips, formatClock, formatSeconds, formatTotal, speakerLabel, summarizeClips } from './clips-view';
 
-const make = (key: string, status: ApiClip['clip']['status'], durationMs: number, variants: ('original' | 'vocals_htdemucs')[] = ['original', 'vocals_htdemucs']): ApiClip => ({
+const make = (key: string, status: ApiClip['clip']['status'], durationMs: number, derivedFrom: 'original' | 'cleaned' = 'cleaned'): ApiClip => ({
   clip: { id: key, clipKey: key, startMs: 0, endMs: durationMs, durationMs, speakerRole: 'narrator', speakerName: null, hasMusic: false, tier: 'asr_tts', status },
-  files: variants.map((variant) => ({ variant, status: 'verified', sizeBytes: 1 })),
+  files: (['master', 'listening'] as const).map((variant) => ({ variant, derivedFrom, status: 'verified', sizeBytes: 1 })),
 });
 
 describe('clips view helpers', () => {
@@ -26,9 +26,9 @@ describe('clips view helpers', () => {
   });
 
   it('filters by status and summarizes only published clips for hours', () => {
-    const clips = [make('a', 'published', 3000), make('b', 'published', 2000, ['vocals_htdemucs']), make('c', 'withdrawn', 9000), make('d', 'draft', 1000)];
+    const clips = [make('a', 'published', 3000), make('b', 'published', 2000, 'original'), make('c', 'withdrawn', 9000), make('d', 'draft', 1000)];
     expect(filterClips(clips, 'all')).toHaveLength(4);
     expect(filterClips(clips, 'withdrawn').map((c) => c.clip.clipKey)).toEqual(['c']);
-    expect(summarizeClips(clips)).toEqual({ total: 4, published: 2, draft: 1, withdrawn: 1, publishedMs: 5000, withOriginal: 1 });
+    expect(summarizeClips(clips)).toEqual({ total: 4, published: 2, draft: 1, withdrawn: 1, publishedMs: 5000, musicRemoved: 1 });
   });
 });

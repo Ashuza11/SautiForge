@@ -45,6 +45,11 @@ export type PrivateObjectMetadata = {
 };
 
 export interface PrivateObjectStore {
+  /**
+   * Whether inspectObject reports server-side encryption. Neon Object Storage accepts the
+   * header but does not report it back, so the encryption check is skipped for Neon only.
+   */
+  readonly reportsEncryption: boolean;
   assertReady(): Promise<void>;
   createUploadUrl(request: UploadUrlRequest): Promise<SignedUpload>;
   createDownloadUrl(key: string, expiresInSeconds?: number): Promise<string>;
@@ -66,6 +71,7 @@ export class S3PrivateObjectStore implements PrivateObjectStore {
   constructor(
     private readonly client: S3Client,
     private readonly bucket: string,
+    readonly reportsEncryption = true,
   ) {}
 
   async assertReady(): Promise<void> {
@@ -135,7 +141,16 @@ export function createPrivateObjectStore(config: PrivateObjectStoreConfig): Priv
     forcePathStyle: config.forcePathStyle,
     credentials: config.credentials,
   });
-  return new S3PrivateObjectStore(client, config.bucket);
+  return new S3PrivateObjectStore(client, config.bucket, !isNeonEndpoint(config.endpoint));
+}
+
+export function isNeonEndpoint(endpoint: string | undefined): boolean {
+  if (!endpoint) return false;
+  try {
+    return new URL(endpoint).hostname.endsWith('.neon.tech');
+  } catch {
+    return false;
+  }
 }
 
 export function validatePrivateObjectKey(key: string): string {

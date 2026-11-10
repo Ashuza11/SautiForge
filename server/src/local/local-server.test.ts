@@ -42,12 +42,15 @@ const api = (path: string, method = 'GET', body?: unknown) => server.app.request
   body: body ? JSON.stringify(body) : undefined,
 });
 
-function draft(key: string, original: Buffer, cleaned: Buffer) {
-  const audio = (variant: string, bytes: Buffer) => ({ variant, sizeBytes: bytes.length, sha256: sha(bytes), sampleRate: 24000, durationMs: 3000 });
+function draft(key: string, master: Buffer, listening: Buffer) {
+  const audio = (variant: string, bytes: Buffer) => ({
+    variant, derivedFrom: 'cleaned', sizeBytes: bytes.length, sha256: sha(bytes),
+    pcmSha256: variant === 'master' ? sha(Buffer.from(`wav-${key}`)) : null, sampleRate: 48000, durationMs: 3000,
+  });
   return {
     clipKey: key, startMs: 0, endMs: 3000, trimmedMs: 0, durationMs: 3000, speakerRole: 'narrator',
     speakerName: 'Voice A', hasMusic: false, tier: 'asr_tts', segmenter: null, createdBy: 'ADMIN-01',
-    audio: [audio('original', original), audio('vocals_htdemucs', cleaned)],
+    audio: [audio('master', master), audio('listening', listening)],
   };
 }
 
@@ -61,35 +64,33 @@ describe('local mode (real SQL on PGlite, audio on disk)', () => {
   });
 
   it('publishes a clip end to end and serves the exact bytes back', async () => {
-    const original = wav(1);
-    const cleaned = wav(2);
-    const registered = await (await api(`/v1/admin/sources/${sourceId}/clips`, 'POST', draft('c001', original, cleaned))).json() as {
+    const master = wav(1);
+    const listening = wav(2);
+    const registered = await (await api(`/v1/admin/sources/${sourceId}/clips`, 'POST', draft('c001', master, listening))).json() as {
       clip: { id: string };
       files: { file: { variant: string }; upload: { url: string; headers: Record<string, string> } }[];
     };
     for (const item of registered.files) {
-      const bytes = item.file.variant === 'original' ? original : cleaned;
+      const bytes = item.file.variant === 'master' ? master : listening;
       expect((await put(item.upload, bytes)).status).toBe(200);
     }
     const done = await (await api(`/v1/admin/clips/${registered.clip.id}/complete`, 'POST')).json() as { clip: { status: string } };
     expect(done.clip.status).toBe('published');
 
-    const { url } = await (await api(`/v1/admin/clips/${registered.clip.id}/audio/vocals_htdemucs`)).json() as { url: string };
+    const { url } = await (await api(`/v1/admin/clips/${registered.clip.id}/audio/listening`)).json() as { url: string };
     const played = await server.app.request(url);
-    expect(played.headers.get('content-type')).toBe('audio/wav');
-    expect(Buffer.from(await played.arrayBuffer()).equals(cleaned)).toBe(true);
+    expect(played.headers.get('content-type')).toBe('audio/ogg');
+    expect(Buffer.from(await played.arrayBuffer()).equals(listening)).toBe(true);
     expect((await server.app.request(`${url}x`)).status).toBe(403);
 
-    const again = await (await api(`/v1/admin/sources/${sourceId}/clips`, 'POST', draft('c001', original, cleaned))).json() as { files: { upload: unknown }[] };
+    const again = await (await api(`/v1/admin/sources/${sourceId}/clips`, 'POST', draft('c001', master, listening))).json() as { files: { upload: unknown }[] };
     expect(again.files.every((file) => file.upload === null)).toBe(true);
   });
 
   it('refuses wrong bytes, then refuses to publish without the upload', async () => {
     const good = wav(3);
-    const registered = await (await api(`/v1/admin/sources/${sourceId}/clips`, 'POST', {
-      ...draft('c002', good, good),
-      audio: [draft('c002', good, good).audio[1]],
-    })).json() as { clip: { id: string }; files: { upload: { url: string; headers: Record<string, string> } }[] };
+    const registered = await (await api(`/v1/admin/sources/${sourceId}/clips`, 'POST', draft('c002', good, good)))
+      .json() as { clip: { id: string }; files: { upload: { url: string; headers: Record<string, string> } }[] };
     const response = await put(registered.files[0].upload, wav(9));
     expect(response.status).toBe(400);
     const complete = await api(`/v1/admin/clips/${registered.clip.id}/complete`, 'POST');

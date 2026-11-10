@@ -38,11 +38,13 @@ describe('NeonClipRepository', () => {
     const { database, query } = executor([[clipRow], [{
       id: '00000000-0000-4000-8000-000000000501',
       clip_id: clipRow.id,
-      variant: 'original',
+      variant: 'master',
+      derived_from: 'cleaned',
       object_key: 'k',
-      content_type: 'audio/wav',
+      content_type: 'audio/flac',
       size_bytes: 10,
       sha256_hex: 'a'.repeat(64),
+      pcm_sha256_hex: 'b'.repeat(64),
       sample_rate: 24000,
       duration_ms: 3000,
       status: 'verified',
@@ -55,6 +57,7 @@ describe('NeonClipRepository', () => {
     const [item] = await new NeonClipRepository(database).listForSource(clipRow.source_id, 'published');
     expect(item.clip).toMatchObject({ clipKey: 'c001', publishedAt: '2026-11-07T10:00:00.000Z', speakerName: null });
     expect(item.files).toHaveLength(1);
+    expect(item.files[0]).toMatchObject({ variant: 'master', derivedFrom: 'cleaned', contentType: 'audio/flac', pcmSha256: 'b'.repeat(64) });
     expect(query).toHaveBeenCalledTimes(2);
   });
 
@@ -63,7 +66,7 @@ describe('NeonClipRepository', () => {
     const repo = new NeonClipRepository(database);
     const id = clipRow.id;
     await repo.updateMetadata(id, { speakerRole: 'narrator', speakerName: null, hasMusic: false, tier: 'asr', segmenter: null }, 'x');
-    await repo.resetFile({ id, sizeBytes: 1, sha256: 'a'.repeat(64), sampleRate: 24000, durationMs: 1, uploadExpiresAt: 'x', updatedAt: 'x' } as never);
+    await repo.resetFile({ id, sizeBytes: 1, sha256: 'a'.repeat(64), sampleRate: 24000, durationMs: 1, uploadExpiresAt: 'x', updatedAt: 'x', derivedFrom: 'cleaned', pcmSha256: null } as never);
     await repo.updateFileVerification({ id, status: 'verified', verificationError: null, verifiedAt: 'x', updatedAt: 'x' });
     await repo.publish(id, 'x');
     const sql = query.mock.calls.map(([text]) => text as string);
@@ -74,6 +77,6 @@ describe('NeonClipRepository', () => {
     expect(sql[1]).toContain("f.status <> 'verified'");
     expect(sql[3]).toContain('allow_volunteer_access');
     expect(sql[3]).toContain('allow_transcription');
-    expect(sql[3]).toContain("f.variant = 'vocals_htdemucs' AND f.status = 'verified'");
+    expect(sql[3]).toContain("f.variant = 'listening' AND f.status = 'verified'");
   });
 });
