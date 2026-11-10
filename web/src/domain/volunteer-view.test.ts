@@ -53,9 +53,9 @@ describe('volunteer helpers', () => {
     expect(nextSpeed(0.75)).toBe(0.5);
     expect(nextSpeed(0.5)).toBe(1);
     expect(nextSpeed(3)).toBe(1); // an unknown speed falls back to normal
-    expect(speedLabel(1)).toBe('Normal');
-    expect(speedLabel(0.75)).toBe('Slower');
-    expect(speedLabel(0.5)).toBe('Slowest');
+    expect(speedLabel(1)).toBe('normale');
+    expect(speedLabel(0.75)).toBe('lente');
+    expect(speedLabel(0.5)).toBe('très lente');
   });
 
   it('computes progress and guards against a nickname that is really personal data', () => {
@@ -63,9 +63,9 @@ describe('volunteer helpers', () => {
     expect(progressPercent(0, 0)).toBe(0);
     expect(progressPercent(9, 5)).toBe(100);
     expect(nicknameProblem('Neema')).toBeNull();
-    expect(nicknameProblem('N')).toMatch(/2 letters/);
-    expect(nicknameProblem('+243 970 123 456')).toMatch(/phone/);
-    expect(nicknameProblem('me@mail.com')).toMatch(/email/);
-    expect(nicknameProblem('x'.repeat(41))).toMatch(/shorter/);
+    expect(nicknameProblem('N')).toMatch(/2 lettres/);
+    expect(nicknameProblem('+243 970 123 456')).toMatch(/téléphone/);
+    expect(nicknameProblem('me@mail.com')).toMatch(/e-mail/);
+    expect(nicknameProblem('x'.repeat(41))).toMatch(/plus court/);
   });
 });

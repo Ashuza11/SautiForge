@@ -25,7 +25,7 @@ export function VolunteerApp({ link }: { link: string }) {
       setPhase(me ? { kind: 'working', info, me } : { kind: 'welcome', info });
     } catch (cause) {
       if (cause instanceof VolunteerApiError && cause.status === 0) setPhase({ kind: 'offline', message: cause.message });
-      else setPhase({ kind: 'invalid', message: cause instanceof Error ? cause.message : 'This link is not valid.' });
+      else setPhase({ kind: 'invalid', message: cause instanceof Error ? cause.message : 'Ce lien n’est pas valide.' });
     }
   }, [client]);
   useEffect(() => { void start(); }, [start]);
@@ -38,14 +38,14 @@ export function VolunteerApp({ link }: { link: string }) {
         {phase.kind === 'working' ? (
           <span className="vo-me">
             {phase.me.pseudonym}
-            <button className="vo-linkbutton" onClick={() => { clearContributor(); void start(); }}>Not you?</button>
+            <button className="vo-linkbutton" onClick={() => { clearContributor(); void start(); }}>Ce n’est pas vous ?</button>
           </span>
         ) : null}
       </header>
       <main className="vo-main">
-        {phase.kind === 'loading' ? <p className="vo-muted" role="status">One moment…</p> : null}
-        {phase.kind === 'invalid' ? <Notice title="This link does not work" message={phase.message} /> : null}
-        {phase.kind === 'offline' ? <Notice title="No connection" message={phase.message} action={{ label: 'Try again', run: () => void start() }} /> : null}
+        {phase.kind === 'loading' ? <p className="vo-muted" role="status">Un instant…</p> : null}
+        {phase.kind === 'invalid' ? <Notice title="Ce lien ne fonctionne pas" message={phase.message} /> : null}
+        {phase.kind === 'offline' ? <Notice title="Pas de connexion" message={phase.message} action={{ label: 'Réessayer', run: () => void start() }} /> : null}
         {phase.kind === 'welcome' ? (
           <Welcome
             info={phase.info}
@@ -85,7 +85,7 @@ function Welcome({ info, client, onJoined }: { info: BatchInfo; client: Voluntee
       const joined = await client.join(name);
       onJoined({ token: joined.token, pseudonym: joined.contributor.pseudonym });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Something went wrong.');
+      setError(cause instanceof Error ? cause.message : 'Une erreur est survenue.');
     } finally {
       setBusy(false);
     }
@@ -93,19 +93,20 @@ function Welcome({ info, client, onJoined }: { info: BatchInfo; client: Voluntee
 
   return (
     <form className="vo-card" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-      <h1>Help write down {info.language || 'our language'}</h1>
+      <h1>Musingo !</h1>
+      <p className="vo-lead">Construisons ensemble : faisons parler l’IA dans notre langue{info.language ? `, le ${info.language}` : ''}.</p>
       <ol className="vo-steps">
-        <li>Listen to a short clip.</li>
-        <li>Type what you hear.</li>
-        <li>Send it. There are {info.clipCount} clips, and you can stop at any time.</li>
+        <li>Écoutez un court extrait.</li>
+        <li>Écrivez ce que vous entendez.</li>
+        <li>Envoyez. Il y a {info.clipCount} extraits, et vous pouvez vous arrêter à tout moment.</li>
       </ol>
       <label className="vo-field">
-        <span>Choose a nickname</span>
+        <span>Choisissez un pseudo</span>
         <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="off" autoCapitalize="words" maxLength={40} aria-describedby="nick-hint" />
       </label>
-      <p id="nick-hint" className="vo-hint">Use a nickname, not your real name or phone number. No account is needed.</p>
+      <p id="nick-hint" className="vo-hint">Utilisez un pseudo, pas votre vrai nom ni votre numéro de téléphone. Aucun compte n’est nécessaire.</p>
       {error ? <p className="vo-error" role="alert">{error}</p> : null}
-      <button className="vo-primary" type="submit" disabled={busy || name.trim().length < 2}>{busy ? 'One moment…' : 'Start'}</button>
+      <button className="vo-primary" type="submit" disabled={busy || name.trim().length < 2}>{busy ? 'Un instant…' : 'Commencer'}</button>
     </form>
   );
 }
@@ -123,7 +124,7 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
 
   const fail = useCallback((cause: unknown) => {
     if (cause instanceof VolunteerApiError && cause.status === 401) { onSignedOut(); return; }
-    setMessage({ kind: 'error', text: cause instanceof Error ? cause.message : 'Something went wrong.' });
+    setMessage({ kind: 'error', text: cause instanceof Error ? cause.message : 'Une erreur est survenue.' });
   }, [onSignedOut]);
 
   const load = useCallback(async () => {
@@ -152,7 +153,7 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
     if (!element || !clip) return;
     if (!element.paused) { element.pause(); return; }
     try { element.playbackRate = speed; await element.play(); setMessage(null); } catch {
-      setMessage({ kind: 'error', text: 'The sound could not be played. Check your connection and tap Listen again.' });
+      setMessage({ kind: 'error', text: 'Le son n’a pas pu être lu. Vérifiez votre connexion et touchez Écouter de nouveau.' });
     }
   };
 
@@ -165,7 +166,7 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
 
   const onAudioError = () => {
     // The listening link lasts 15 minutes; ask for a fresh one once.
-    if (refetched.current) { setMessage({ kind: 'error', text: 'This sound could not be loaded. Please try again in a moment.' }); return; }
+    if (refetched.current) { setMessage({ kind: 'error', text: 'Ce son n’a pas pu être chargé. Réessayez dans un instant.' }); return; }
     refetched.current = true;
     void load();
   };
@@ -183,7 +184,7 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
       await client.submit(me.token, clip.clipId, text);
       clearDraft(clip.clipId);
       setSentCount((count) => count + 1);
-      setMessage({ kind: 'ok', text: 'Sent. Thank you!' });
+      setMessage({ kind: 'ok', text: 'Envoyé. Merci !' });
       await load();
     } catch (cause) {
       fail(cause);
@@ -207,16 +208,16 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
     }
   };
 
-  if (!state) return <p className="vo-muted" role="status">{message ? '' : 'Finding your clip…'}{message ? <span className="vo-error" role="alert">{message.text}</span> : null}</p>;
+  if (!state) return <p className="vo-muted" role="status">{message ? '' : 'Recherche de votre extrait…'}{message ? <span className="vo-error" role="alert">{message.text}</span> : null}</p>;
 
   if (!clip) {
     return (
       <section className="vo-card vo-done">
         <div className="vo-check" aria-hidden="true">✓</div>
-        <h1>Thank you, {me.pseudonym}!</h1>
+        <h1>Merci, {me.pseudonym} !</h1>
         <p className="vo-muted">
-          {state.progress.answered > 0 ? `You have answered ${state.progress.answered} of ${state.progress.total} clips. ` : ''}
-          There are no more clips for you in this batch. More will come soon. Please share the link with someone who speaks the language.
+          {state.progress.answered > 0 ? `Vous avez répondu à ${state.progress.answered} extrait${state.progress.answered > 1 ? 's' : ''} sur ${state.progress.total}. ` : ''}
+          Il n’y a plus d’extraits pour vous dans ce lot. D’autres arriveront bientôt. Partagez le lien avec quelqu’un qui parle la langue.
         </p>
       </section>
     );
@@ -226,8 +227,8 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
 
   return (
     <section className="vo-card" aria-labelledby="clip-title">
-      <p className="vo-progress-text" id="clip-title">Clip {Math.min(state.progress.answered + 1, state.progress.total)} of {state.progress.total}</p>
-      <div className="vo-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label="Your progress"><span style={{ width: `${percent}%` }} /></div>
+      <p className="vo-progress-text" id="clip-title">Extrait {Math.min(state.progress.answered + 1, state.progress.total)} sur {state.progress.total}</p>
+      <div className="vo-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label="Votre progression"><span style={{ width: `${percent}%` }} /></div>
 
       <audio
         ref={audio}
@@ -240,15 +241,15 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
       />
       <button className="vo-listen" onClick={() => void toggle()} aria-pressed={playing}>
         <span aria-hidden="true">{playing ? '❚❚' : '▶'}</span>
-        {playing ? 'Pause' : 'Listen'}
+        {playing ? 'Pause' : 'Écouter'}
       </button>
       <div className="vo-tools">
-        <button className="secondary vo-secondary" onClick={() => void again()}>↺ Again</button>
-        <button className="secondary vo-secondary" onClick={() => setSpeed(nextSpeed(speed))}>Speed: {speedLabel(speed)}</button>
+        <button className="secondary vo-secondary" onClick={() => void again()}>↺ Encore</button>
+        <button className="secondary vo-secondary" onClick={() => setSpeed(nextSpeed(speed))}>Vitesse : {speedLabel(speed)}</button>
       </div>
 
       <label className="vo-field">
-        <span>Write what you hear</span>
+        <span>Écrivez ce que vous entendez</span>
         <textarea
           rows={4}
           value={text}
@@ -257,17 +258,17 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
           autoCorrect="off"
           autoCapitalize="off"
           autoComplete="off"
-          placeholder="Type here…"
+          placeholder="Écrivez ici…"
         />
       </label>
-      <p className="vo-hint">Write the words exactly as you hear them. Your writing is saved on this phone while you type.</p>
+      <p className="vo-hint">Écrivez les mots exactement comme vous les entendez. Votre texte est gardé sur ce téléphone pendant que vous écrivez.</p>
 
       <div aria-live="polite">
         {message ? <p className={message.kind === 'error' ? 'vo-error' : 'vo-ok'} role={message.kind === 'error' ? 'alert' : 'status'}>{message.text}</p> : null}
       </div>
-      <button className="vo-primary" onClick={() => void send()} disabled={sending || text.trim() === ''}>{sending ? 'Sending…' : message?.kind === 'error' ? 'Try sending again' : 'Send'}</button>
-      <button className="vo-quiet" onClick={() => void skip()} disabled={sending}>I cannot understand this clip. Skip it</button>
-      {sentCount > 0 ? <p className="vo-muted vo-count">You have sent {sentCount} {sentCount === 1 ? 'answer' : 'answers'} today. Thank you!</p> : null}
+      <button className="vo-primary" onClick={() => void send()} disabled={sending || text.trim() === ''}>{sending ? 'Envoi…' : message?.kind === 'error' ? 'Réessayer l’envoi' : 'Envoyer'}</button>
+      <button className="vo-quiet" onClick={() => void skip()} disabled={sending}>Je ne comprends pas cet extrait. Passer</button>
+      {sentCount > 0 ? <p className="vo-muted vo-count">Vous avez envoyé {sentCount} réponse{sentCount > 1 ? 's' : ''}. Merci !</p> : null}
     </section>
   );
 }

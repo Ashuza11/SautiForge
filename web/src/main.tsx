@@ -20,7 +20,7 @@ function Root() {
   if (hash.startsWith('#/b/')) {
     const link = parseBatchHash(hash);
     if (link) return <VolunteerApp link={link} />;
-    return <main className="ad-center"><div className="ad-card"><h1>This link does not work</h1><p className="ad-muted">It looks incomplete. Please ask for the link again.</p></div></main>;
+    return <main className="ad-center"><div className="ad-card"><h1>Ce lien ne fonctionne pas</h1><p className="ad-muted">Il semble incomplet. Demandez de nouveau le lien.</p></div></main>;
   }
   if (hash !== '#tools') return <AdminApp />;
   return (

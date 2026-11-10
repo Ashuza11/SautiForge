@@ -56,7 +56,7 @@ export function nextSpeed(current: number): Speed {
 }
 
 export function speedLabel(speed: number): string {
-  return speed === 1 ? 'Normal' : speed === 0.75 ? 'Slower' : 'Slowest';
+  return speed === 1 ? 'normale' : speed === 0.75 ? 'lente' : 'très lente';
 }
 
 export function progressPercent(answered: number, total: number): number {
@@ -66,9 +66,9 @@ export function progressPercent(answered: number, total: number): number {
 /** A nickname only: warn against what looks like a full real name or a phone number. */
 export function nicknameProblem(value: string): string | null {
   const text = value.replace(/\s+/g, ' ').trim();
-  if (text.length < 2) return 'Choose a nickname of at least 2 letters.';
-  if (text.length > 40) return 'Choose a shorter nickname.';
-  if (/\d{6,}/.test(text.replace(/[\s-]/g, ''))) return 'Please do not use a phone number. Choose a nickname.';
-  if (/@/.test(text)) return 'Please do not use an email address. Choose a nickname.';
+  if (text.length < 2) return 'Choisissez un pseudo d’au moins 2 lettres.';
+  if (text.length > 40) return 'Choisissez un pseudo plus court.';
+  if (/\d{6,}/.test(text.replace(/[\s-]/g, ''))) return 'N’utilisez pas de numéro de téléphone. Choisissez un pseudo.';
+  if (/@/.test(text)) return 'N’utilisez pas d’adresse e-mail. Choisissez un pseudo.';
   return null;
 }

@@ -18,16 +18,19 @@ export function batchLink(origin: string, item: Pick<ApiBatch, 'batch' | 'token'
   return `${origin.replace(/\/$/, '')}/#/b/${item.batch.id}.${item.token}`;
 }
 
-/** A friendly message for WhatsApp. The admin can edit it, for example to translate it. */
+/** The message sent with each batch, in French. The admin can edit it before sending. */
 export function shareMessage(input: { language: string; count: number; link: string }): string {
-  const clips = input.count === 1 ? '1 short clip' : `${input.count} short clips`;
+  const clips = input.count === 1 ? '1 court extrait' : `${input.count} courts extraits`;
   return [
-    `Hello! 🙏 Help us write down our language, ${input.language}.`,
-    `Listen to ${clips} and type what you hear. It takes about ten minutes, and you do not need an account.`,
+    'Musingo ! 🙏',
+    'Voici le challenge pour aujourd’hui.',
+    '',
+    `Écoutez ${clips} en ${input.language} et écrivez ce que vous entendez. Environ dix minutes, sans compte, depuis votre téléphone.`,
     '',
     `👉 ${input.link}`,
     '',
-    'Thank you for helping our language live on.',
+    'Si vous n’êtes pas d’accord avec une écriture ou une variante, dites-le ici : on en discute et on se corrige ensemble.',
+    'Merci ! Faisons parler l’IA dans notre langue. 💪',
   ].join('\n');
 }
 

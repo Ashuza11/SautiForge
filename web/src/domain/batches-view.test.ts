@@ -28,12 +28,12 @@ describe('batch helpers', () => {
     expect(batchLink('https://site.vercel.app/', batch('abc', 'open', []))).toBe('https://site.vercel.app/#/b/abc.tok');
   });
 
-  it('writes a short message with the link and the number of clips', () => {
+  it('writes a short French message with the link and the number of clips', () => {
     const text = shareMessage({ language: 'Mashi', count: 5, link: 'https://x/#/b/1.t' });
     expect(text).toContain('Mashi');
-    expect(text).toContain('5 short clips');
+    expect(text).toContain('5 courts extraits');
     expect(text).toContain('https://x/#/b/1.t');
-    expect(shareMessage({ language: 'Mashi', count: 1, link: 'l' })).toContain('1 short clip ');
+    expect(shareMessage({ language: 'Mashi', count: 1, link: 'l' })).toContain('1 court extrait ');
   });
 
   it('lists the newest batch first', () => {

@@ -11,15 +11,15 @@ export type NextResult = { clip: ClipOffer | null; progress: { total: number; an
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 const MESSAGES: Record<string, string> = {
-  link_invalid: 'This link is not valid, or the batch has closed. Ask for a new link.',
-  contributor_invalid: 'Please enter your nickname again.',
-  clip_unavailable: 'This clip is no longer available. We will find you another one.',
-  validation_error: 'Please check what you typed and try again.',
-  request_too_large: 'That is too long. Please write a little less.',
-  use_not_authorized: 'This batch is not open for volunteers right now.',
-  server_not_configured: 'The service is not ready yet. Please try again later.',
-  too_many_joins: 'Many people are joining right now. Please try again in a few minutes.',
-  rate_limited: 'Please slow down a little and try again in a moment.',
+  link_invalid: 'Ce lien n’est pas valide, ou le lot est fermé. Demandez un nouveau lien.',
+  contributor_invalid: 'Veuillez saisir de nouveau votre pseudo.',
+  clip_unavailable: 'Cet extrait n’est plus disponible. Nous allons vous en trouver un autre.',
+  validation_error: 'Vérifiez votre texte et réessayez.',
+  request_too_large: 'C’est trop long. Écrivez un peu moins.',
+  use_not_authorized: 'Ce lot n’est pas ouvert aux volontaires pour le moment.',
+  server_not_configured: 'Le service n’est pas encore prêt. Réessayez plus tard.',
+  too_many_joins: 'Beaucoup de personnes se connectent en ce moment. Réessayez dans quelques minutes.',
+  rate_limited: 'Doucement, réessayez dans un instant.',
 };
 
 /** Talks to the public volunteer API. No cookies: every call carries the batch link and the personal token. */
@@ -59,12 +59,12 @@ export class VolunteerClient {
         body: JSON.stringify(body),
       });
     } catch {
-      throw new VolunteerApiError(0, 'network', 'No connection. Your text is saved. Check the network and try again.');
+      throw new VolunteerApiError(0, 'network', 'Pas de connexion. Votre texte est gardé. Vérifiez le réseau et réessayez.');
     }
     const payload = await response.json().catch(() => ({})) as { error?: string; message?: string };
     if (!response.ok) {
       const code = payload.error ?? 'error';
-      throw new VolunteerApiError(response.status, code, MESSAGES[code] ?? 'Something went wrong. Please try again.');
+      throw new VolunteerApiError(response.status, code, MESSAGES[code] ?? 'Une erreur est survenue. Réessayez.');
     }
     return payload as T;
   }

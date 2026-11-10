@@ -22,10 +22,10 @@ describe('VolunteerClient', () => {
   });
 
   it('explains problems in plain words a volunteer can act on', async () => {
-    await expect(new VolunteerClient(link, '', reply(404, { error: 'link_invalid' })).info()).rejects.toMatchObject({ status: 404, code: 'link_invalid', message: expect.stringContaining('closed') });
-    await expect(new VolunteerClient(link, '', reply(401, { error: 'contributor_invalid' })).next('t')).rejects.toMatchObject({ status: 401, message: expect.stringContaining('nickname') });
+    await expect(new VolunteerClient(link, '', reply(404, { error: 'link_invalid' })).info()).rejects.toMatchObject({ status: 404, code: 'link_invalid', message: expect.stringContaining('fermé') });
+    await expect(new VolunteerClient(link, '', reply(401, { error: 'contributor_invalid' })).next('t')).rejects.toMatchObject({ status: 401, message: expect.stringContaining('pseudo') });
     await expect(new VolunteerClient(link, '', reply(500, {})).next('t')).rejects.toBeInstanceOf(VolunteerApiError);
     const offline = new VolunteerClient(link, '', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
-    await expect(offline.submit('t', 'c', 'x')).rejects.toMatchObject({ status: 0, code: 'network', message: expect.stringContaining('saved') });
+    await expect(offline.submit('t', 'c', 'x')).rejects.toMatchObject({ status: 0, code: 'network', message: expect.stringContaining('gardé') });
   });
 });
