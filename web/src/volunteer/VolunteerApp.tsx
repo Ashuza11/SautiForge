@@ -94,7 +94,7 @@ function Welcome({ info, client, onJoined }: { info: BatchInfo; client: Voluntee
   return (
     <form className="vo-card" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
       <h1>Musingo !</h1>
-      <p className="vo-lead">Construisons ensemble : faisons parler l’IA dans notre langue{info.language ? `, le ${info.language}` : ''}.</p>
+      <p className="vo-lead">Construisons ensemble : faisons parler l’IA dans notre langue.</p>
       <ol className="vo-steps">
         <li>Écoutez un court extrait.</li>
         <li>Écrivez ce que vous entendez.</li>
