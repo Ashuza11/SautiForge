@@ -4,6 +4,7 @@ import type { Project } from '../../../src/features/projects/domain/project';
 import type { Source } from '../../../server/src/sources/source';
 import { AdminGate } from '../AdminGate';
 import { ApiClient, ApiError } from '../api/client';
+import { BatchesPage } from './BatchesPage';
 import { Setup } from './Setup';
 import { Soon } from './Soon';
 import { UploadPage } from './UploadPage';
@@ -67,7 +68,7 @@ function Workspace({ client, onSignedOut }: { client: ApiClient; onSignedOut: ()
       </header>
       <main className="ad-main">
         {tab === 'upload' ? <UploadPage client={client} project={project} source={source} onSignedOut={onSignedOut} /> : null}
-        {tab === 'batches' ? <Soon title="Batches">Choose 5 clips, press one button, and get a link plus a ready-to-send WhatsApp message for your community.</Soon> : null}
+        {tab === 'batches' ? <BatchesPage client={client} project={project} source={source} onSignedOut={onSignedOut} onGoUpload={() => setTab('upload')} /> : null}
         {tab === 'results' ? <Soon title="Results">See what the community wrote for each clip, how far each batch has come, and choose the final text.</Soon> : null}
       </main>
     </div>

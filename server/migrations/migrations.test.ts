@@ -85,4 +85,14 @@ describe('community service database migrations', () => {
     expect(sql).not.toContain('pcm_sha256_hex IS NOT NULL');
     expect(sql).toContain(') NOT VALID;');
   });
+
+  it('adds batches of at most ten clips and keeps transcripts out of them', async () => {
+    const sql = await readFile(new URL('./0007_batches.sql', import.meta.url), 'utf8');
+    expect(sql).toContain('CREATE TABLE batches');
+    expect(sql).toContain('CREATE TABLE batch_clips');
+    expect(sql).toContain("status IN ('open', 'closed')");
+    expect(sql).toContain('position BETWEEN 1 AND 10');
+    expect(sql).toContain('PRIMARY KEY (batch_id, clip_id)');
+    expect(sql.toLowerCase()).not.toMatch(/transcript|submission|contributor/);
+  });
 });

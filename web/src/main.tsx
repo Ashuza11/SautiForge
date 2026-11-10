@@ -8,13 +8,16 @@ import './admin/admin.css';
 
 /** The simple admin is the front page. The older tools stay one click away at #tools. */
 function Root() {
-  const [tools, setTools] = useState(window.location.hash === '#tools');
+  const [hash, setHash] = useState(window.location.hash);
   useEffect(() => {
-    const onChange = () => setTools(window.location.hash === '#tools');
+    const onChange = () => setHash(window.location.hash);
     window.addEventListener('hashchange', onChange);
     return () => window.removeEventListener('hashchange', onChange);
   }, []);
-  if (!tools) return <AdminApp />;
+  if (hash.startsWith('#/b/')) {
+    return <main className="ad-center"><div className="ad-card"><h1>Thank you!</h1><p className="ad-muted">This link works. The page where you listen and write opens very soon.</p></div></main>;
+  }
+  if (hash !== '#tools') return <AdminApp />;
   return (
     <>
       <div className="ad-tools-bar"><span>Advanced tools</span><a href="#">Back to the simple view</a></div>

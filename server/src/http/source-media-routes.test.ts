@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ClipService } from '../clips/clip-service';
+import type { BatchService } from '../batches/batch-service';
 import type { SourceMedia } from '../media/source-media';
 import { SourceMediaLifecycleError, type SourceMediaService } from '../media/source-media-service';
 import type { ProjectService } from '../projects/project-service';
@@ -43,6 +44,7 @@ function mediaApp() {
       sources,
       media,
       clips: {} as ClipService,
+      batches: {} as BatchService,
       readiness: {} as ReadinessService,
       adminApiToken: token,
       webOrigin: 'https://annotation.example.org',

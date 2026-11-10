@@ -47,8 +47,8 @@ The admin sees three things and nothing else: **Upload · Batches · Results**.
 | B | Upload API and FLAC-only clips | One FLAC per clip, uploaded from the browser (`POST /v1/admin/sources/:id/clips/upload`, max 4 MB per file) | done |
 | C | New admin shell and first-run setup | Upload / Batches / Results; two-field project; one-tick source. Older tools stay at `#tools` | done |
 | D | Upload page | Drag in FLAC files, list, play, remove | done |
-| E | Batches | Pick 5 clips, link, WhatsApp message | next |
-| F | Volunteer API and screen | Pseudonym, one clip at a time, drafts, retry | |
+| E | Batches | Pick 5 clips, signed link (`/#/b/<batch id>.<code>`), editable WhatsApp message, close | done |
+| F | Volunteer API and screen | Pseudonym, one clip at a time, drafts, retry | next |
 | G | Results and progress | Per-batch progress, transcripts side by side, character differences | |
 | H | Final transcript and export | Approve text, hashes, FLAC converted back to WAV, hours without double counting | |
 

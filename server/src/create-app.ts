@@ -9,6 +9,8 @@ import { SourceMediaService } from './media/source-media-service';
 import { NeonProjectRepository } from './projects/neon-project-repository';
 import { ProjectService } from './projects/project-service';
 import { ReadinessService } from './readiness';
+import { BatchService } from './batches/batch-service';
+import { NeonBatchRepository } from './batches/neon-batch-repository';
 import { createPrivateObjectStore } from './storage/private-object-store';
 import { NeonSourceRepository } from './sources/neon-source-repository';
 import { SourceService } from './sources/source-service';
@@ -35,6 +37,7 @@ export function createAppFromEnvironment(environment: NodeJS.ProcessEnv) {
       objectStore,
     ),
     clips: new ClipService(new NeonClipRepository(database), sourceService, objectStore),
+    batches: new BatchService(new NeonBatchRepository(database), sourceService, { linkSecret: config.adminLogin?.sessionSecret ?? config.adminApiToken }),
     readiness: new ReadinessService(projectRepository, objectStore),
     adminApiToken: config.adminApiToken,
     webOrigin: config.webOrigin,

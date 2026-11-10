@@ -5,6 +5,8 @@ import { PGlite } from '@electric-sql/pglite';
 import { Hono } from 'hono';
 
 import { AdminSessionService } from '../auth/admin-session';
+import { BatchService } from '../batches/batch-service';
+import { NeonBatchRepository } from '../batches/neon-batch-repository';
 import { ClipService } from '../clips/clip-service';
 import { NeonClipRepository } from '../clips/neon-clip-repository';
 import { createServerApp } from '../http/app';
@@ -62,6 +64,7 @@ export async function createLocalServer(options: LocalServerOptions): Promise<Lo
     sources,
     media: new SourceMediaService(new NeonSourceMediaRepository(executor), sources, objectStore),
     clips: new ClipService(new NeonClipRepository(executor), sources, objectStore),
+    batches: new BatchService(new NeonBatchRepository(executor), sources, { linkSecret: options.sessionSecret }),
     readiness: new ReadinessService(projectRepository, objectStore),
     adminApiToken: options.adminApiToken,
     webOrigin: options.webOrigin,

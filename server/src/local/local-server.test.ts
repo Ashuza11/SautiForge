@@ -128,4 +128,37 @@ describe('local mode (real SQL on PGlite, audio on disk)', () => {
     expect((await send('u002', Buffer.from('not audio at all, just text that is long enough to pass the size floor.'))).status).toBe(422);
     expect((await send('u001', Buffer.from(fakeFlac(24000, 96_000, 1, 16, 900)))).status).toBe(409);
   });
+
+  it('shares published clips in batches, never twice at once, with signed links', async () => {
+    const upload = async (key: string, extra: number) => {
+      const response = await server.app.request(`${base}/v1/admin/sources/${sourceId}/clips/upload?clipKey=${key}`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'audio/flac' }, body: new Uint8Array(fakeFlac(24000, 48_000, 1, 16, 200 + extra)),
+      });
+      expect(response.status).toBe(200);
+      return ((await response.json()) as { clip: { id: string } }).clip.id;
+    };
+    const [a, b, c, d] = [await upload('b001', 1), await upload('b002', 2), await upload('b003', 3), await upload('b004', 4)];
+    const createBatch = (clipIds: string[], title?: string) => api(`/v1/admin/sources/${sourceId}/batches`, 'POST', { clipIds, ...(title ? { title } : {}) });
+
+    const first = await createBatch([a, b, c]);
+    expect(first.status).toBe(201);
+    const created = await first.json() as { batch: { id: string; title: string; status: string }; clipIds: string[]; token: string };
+    expect(created.clipIds).toEqual([a, b, c]);
+    expect(created.batch.status).toBe('open');
+    expect(created.token).toHaveLength(24);
+
+    // clips already in an open batch, withdrawn clips and unknown clips are refused, and nothing is half-created
+    expect((await createBatch([c, d])).status).toBe(409);
+    await api(`/v1/admin/clips/${d}/withdraw`, 'POST');
+    expect((await createBatch([d])).status).toBe(409);
+    expect((await createBatch([a, '00000000-0000-4000-8000-0000000fffff'])).status).toBe(409);
+    const listed = await (await api(`/v1/admin/sources/${sourceId}/batches`)).json() as { batches: { batch: { id: string }; clipIds: string[] }[] };
+    expect(listed.batches.filter((item) => item.clipIds.includes(c))).toHaveLength(1);
+
+    // closing frees the clips for a new batch
+    expect(((await (await api(`/v1/admin/batches/${created.batch.id}/close`, 'POST')).json()) as { batch: { status: string } }).batch.status).toBe('closed');
+    const second = await createBatch([a, b], 'Second try');
+    expect(second.status).toBe(201);
+    expect(((await second.json()) as { batch: { title: string } }).batch.title).toBe('Second try');
+  });
 });

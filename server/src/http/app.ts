@@ -7,6 +7,8 @@ import { cors } from 'hono/cors';
 import { z } from 'zod';
 
 import { AdminSessionService, adminSessionCookieName } from '../auth/admin-session';
+import { batchDraftSchema } from '../batches/batch';
+import { BatchLifecycleError, type BatchService } from '../batches/batch-service';
 import { clipDraftSchema, clipStatusSchema, clipVariantSchema } from '../clips/clip';
 import { ClipLifecycleError, type ClipService } from '../clips/clip-service';
 import { projectDraftSchema } from '../../../src/features/projects/domain/project';
@@ -25,6 +27,7 @@ export type AppDependencies = {
   sources: SourceService;
   media: SourceMediaService;
   clips: ClipService;
+  batches: BatchService;
   readiness: ReadinessService;
   adminApiToken: string;
   webOrigin: string;
@@ -270,6 +273,26 @@ export function createServerApp(dependencies: AppDependencies): Hono {
     return context.json(await dependencies.clips.uploadFlac(id.data, { clipKey: clipKey.data, bytes, createdBy: createdBy.data }));
   });
 
+  app.get('/v1/admin/sources/:sourceId/batches', async (context) => {
+    const id = sourceIdSchema.safeParse(context.req.param('sourceId'));
+    if (!id.success) return context.json({ error: 'invalid_source_id' }, 400);
+    return context.json({ batches: await dependencies.batches.listForSource(id.data) });
+  });
+
+  app.post('/v1/admin/sources/:sourceId/batches', async (context) => {
+    const id = sourceIdSchema.safeParse(context.req.param('sourceId'));
+    if (!id.success) return context.json({ error: 'invalid_source_id' }, 400);
+    const input = await parseValidatedBody(context, batchDraftSchema);
+    if (!input.success) return input.response;
+    return context.json(await dependencies.batches.create(id.data, input.data, 'ADMIN-01'), 201);
+  });
+
+  app.post('/v1/admin/batches/:batchId/close', async (context) => {
+    const id = z.string().uuid().safeParse(context.req.param('batchId'));
+    if (!id.success) return context.json({ error: 'invalid_batch_id' }, 400);
+    return context.json(await dependencies.batches.close(id.data));
+  });
+
   app.post('/v1/admin/clips/:clipId/complete', async (context) => {
     const id = clipIdSchema.safeParse(context.req.param('clipId'));
     if (!id.success) return context.json({ error: 'invalid_clip_id' }, 400);
@@ -296,6 +319,10 @@ export function createServerApp(dependencies: AppDependencies): Hono {
     }
     if (error instanceof SourceMediaLifecycleError) {
       const status = ['source_not_found', 'media_not_found'].includes(error.code) ? 404 : 409;
+      return context.json({ error: error.code, message: error.message }, status);
+    }
+    if (error instanceof BatchLifecycleError) {
+      const status = ['source_not_found', 'batch_not_found'].includes(error.code) ? 404 : 409;
       return context.json({ error: error.code, message: error.message }, status);
     }
     if (error instanceof ClipLifecycleError) {

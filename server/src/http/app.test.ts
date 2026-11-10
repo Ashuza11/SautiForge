@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Project, ProjectDraft } from '../../../src/features/projects/domain/project';
 import type { ClipService } from '../clips/clip-service';
+import type { BatchService } from '../batches/batch-service';
 import type { SourceMediaService } from '../media/source-media-service';
 import type { ProjectRepository } from '../projects/project-repository';
 import { ProjectService } from '../projects/project-service';
@@ -56,6 +57,7 @@ function testApp(ready = true) {
       sources: {} as SourceService,
       media: {} as SourceMediaService,
       clips: {} as ClipService,
+      batches: {} as BatchService,
       readiness,
       adminApiToken: adminToken,
       webOrigin: 'https://annotation.example.org',
@@ -160,6 +162,7 @@ describe('admin login', () => {
       sources: {} as SourceService,
       media: {} as SourceMediaService,
       clips: {} as ClipService,
+      batches: {} as BatchService,
       readiness: { check: async () => ({ ready: true }) } as ReadinessService,
       adminApiToken: adminToken,
       webOrigin: origin,

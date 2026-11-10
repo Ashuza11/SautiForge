@@ -10,6 +10,12 @@ export class ApiError extends Error {
 export type ApiProject = { id: string; title: string; languageCode: string; targetLanguage: string };
 export type ApiSource = { id: string; title: string; status: string };
 export type ApiSourceDetail = { source: Source; latestRights: SourceRightsRevision | null };
+export type ApiBatch = {
+  batch: { id: string; title: string; status: 'open' | 'closed'; createdAt: string; closedAt: string | null };
+  clipIds: string[];
+  /** The code at the end of the shared link. */
+  token: string;
+};
 export type ClipStatus = 'draft' | 'published' | 'withdrawn';
 export type ClipVariant = 'master' | 'listening';
 export type ApiClip = {
@@ -104,6 +110,18 @@ export class ApiClient {
     return url.startsWith('/') ? `${this.baseUrl}${url}` : url;
   }
 
+  async batches(sourceId: string): Promise<ApiBatch[]> {
+    return (await this.request<{ batches: ApiBatch[] }>('GET', `/v1/admin/sources/${sourceId}/batches`)).batches;
+  }
+
+  async createBatch(sourceId: string, clipIds: string[], title?: string): Promise<ApiBatch> {
+    return this.request<ApiBatch>('POST', `/v1/admin/sources/${sourceId}/batches`, title ? { clipIds, title } : { clipIds });
+  }
+
+  async closeBatch(batchId: string): Promise<ApiBatch> {
+    return this.request<ApiBatch>('POST', `/v1/admin/batches/${batchId}/close`);
+  }
+
   /** Sends one FLAC file; the clip is named after the file. Resolves once the clip is published. */
   async uploadClip(sourceId: string, clipKey: string, file: Blob): Promise<ApiClip> {
     return this.request<ApiClip>('POST', `/v1/admin/sources/${sourceId}/clips/upload?clipKey=${encodeURIComponent(clipKey)}`, undefined, { body: file, contentType: 'audio/flac' });
@@ -141,6 +159,7 @@ function friendlyMessage(status: number, payload: { error?: string; message?: st
   if (payload.error === 'file_too_large') return 'The file is larger than 4 MB.';
   if (payload.error === 'unsupported_audio') return payload.message ?? 'This audio file cannot be used.';
   if (payload.error === 'clip_conflict') return payload.message ?? 'A different file with this name was already uploaded.';
+  if (payload.error === 'clips_unavailable') return payload.message ?? 'Some clips are no longer available.';
   if (payload.error === 'use_not_authorized') return 'Permission for this recording has not been confirmed yet.';
   if (status === 401) return 'Please sign in.';
   return payload.message ?? `The service answered with an error (${status}).`;
