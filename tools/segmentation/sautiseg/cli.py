@@ -14,6 +14,7 @@ from .audio import (WORKING_SAMPLE_RATE, clip_metrics, extract_working_wav, ffmp
 from .clips import ClipParams, build_clips
 from .manifest import build_clip_record, build_manifest, write_manifest
 from .cutting import DEFAULT_MAX_PAUSE_MS, cut_accepted
+from .pack import pack
 from .publish import publish
 from .separate import MODEL_NAME, ensure_separation
 from .vad import VadParams, detect, speech_stats
@@ -115,6 +116,14 @@ def cmd_publish(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_pack(args: argparse.Namespace) -> int:
+    only = [key for key in (args.only or "").split(",") if key.strip()] or None
+    result = pack(Path(args.export), Path(args.out) if args.out else None, only=only, first=args.first)
+    print(f"Packed {result['count']} clips ({result['bytes'] // 1024} KB) into {result['dir']}")
+    print("Upload the .flac files on the Upload page of the admin site. Keep pack.json: it links each clip back to its WAV.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sautiseg", description="Propose, review and export speech clips.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -145,6 +154,13 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--sample-rate", type=int, default=24000, help="Output rate; clips are cut from the original, not the 16 kHz copy.")
     c.add_argument("--max-pause-ms", type=int, default=DEFAULT_MAX_PAUSE_MS, help="Cap silences between speech in the TTS copies (0 disables). ASR copies are never changed.")
     c.set_defaults(func=cmd_cut)
+
+    k = sub.add_parser("pack", help="Convert an export folder to FLAC files you can upload on the admin site.")
+    k.add_argument("--export", required=True, help="The export/ folder written by `cut`.")
+    k.add_argument("--out", default=None, help="Where to write the FLAC files (default: an upload/ folder next to export/).")
+    k.add_argument("--only", default=None, help="Comma-separated clip keys to pack, for example c001,c002,c003.")
+    k.add_argument("--first", type=int, default=None, help="Pack only the first N clips (handy for a small test).")
+    k.set_defaults(func=cmd_pack)
 
     u = sub.add_parser("publish", help="Upload an export folder to the SautiForge service (safe to run again).")
     u.add_argument("--export", required=True, help="The export/ folder written by `cut`.")

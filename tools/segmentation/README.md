@@ -66,6 +66,21 @@ Source media, working audio, and outputs live under `Data/` and `segmentation-ou
 
 Nothing is uploaded; the two files are read in the browser and progress is saved to browser storage after every change (each save is read back to confirm it). Per clip you can play and loop it, click the waveform to place a marker, nudge either edge or trim it straight to the marker, split at a detected pause or at the marker, merge with the next clip, write the verbatim transcript, record speaker and music, choose the tier, then accept or reject (with a reason). Every change can be undone and redone (buttons or Ctrl+Z / Ctrl+Shift+Z) until the page is reloaded; the saved review itself survives a reload. Splitting, merging or moving an edge sends the clip back to review. The downloaded manifest is validated by the same rules `cut` enforces.
 
+## Pack clips as FLAC for upload
+
+After `cut`, make the files you will upload on the admin site's Upload page:
+
+```bash
+python -m sautiseg pack --export segmentation-output/<name>/export --first 10      # a small test
+python -m sautiseg pack --export segmentation-output/<name>/export --only c001,c002,c003
+python -m sautiseg pack --export segmentation-output/<name>/export                 # everything
+```
+
+- It writes `upload/<clip key>.flac` next to `export/`, plus `pack.json` (hashes and the link back to each WAV). Keep `pack.json`; the final dataset uses it to turn the FLAC back into the same WAV audio.
+- One file per clip: the cleaned (music-removed) copy when the export has one, otherwise the original.
+- Each FLAC is decoded again and must match the WAV's audio samples exactly, or the command stops.
+- Your WAV files are never changed.
+
 ## Publish to the SautiForge service
 
 After `cut`, upload the `export/` folder so the audio goes to private S3 and the clip records to Neon:
