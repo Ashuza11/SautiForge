@@ -6,7 +6,7 @@ import { ApiClient, ApiError } from '../api/client';
 import { formatSeconds } from '../domain/clips-view';
 import { exportCommand, formatDuration, transcriptsCsv } from '../domain/export-view';
 import {
-  approvedCount, batchProgress, clipBadge, clipDifferenceBlock, differencesMessage, firstDifference, percent, summarize, versions,
+  approvedCount, batchProgress, clipBadge, clipDifferencesMessage, differencesMessage, firstDifference, percent, summarize, versions,
   type BatchResult, type ClipResult, type SourceResults,
 } from '../domain/results-view';
 import type { DiffPart } from '../domain/text-diff';
@@ -218,7 +218,7 @@ function ClipRow({ client, onSaved, clip, required, open, playing, copied, onTog
               <p className="ad-diff-title">Differences <small>{difference.diff.similarity}% alike</small></p>
               <p className="ad-diff-line"><span className="ad-who">{difference.first.pseudonym}</span><Marked parts={difference.diff.left} /></p>
               <p className="ad-diff-line"><span className="ad-who">{difference.other.pseudonym}</span><Marked parts={difference.diff.right} /></p>
-              <button className="secondary ad-small" onClick={() => onCopy(`clip-${clip.clipId}`, ['Which words are right? 🤔', '', clipDifferenceBlock(clip), '', 'Reply with the letter that is right, or write the correct words. Thank you!'].join('\n'))}>
+              <button className="secondary ad-small" onClick={() => onCopy(`clip-${clip.clipId}`, clipDifferencesMessage(clip))}>
                 {copied === `clip-${clip.clipId}` ? 'Copied ✓' : `Copy for WhatsApp (${versions(clip).length} versions)`}
               </button>
             </div>

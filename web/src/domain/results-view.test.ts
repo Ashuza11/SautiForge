@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { approvedCount, batchProgress, clipBadge, clipState, differencesMessage, firstDifference, needsDecision, percent, stateLabel, summarize, versions, type BatchResult, type ClipResult } from './results-view';
+import { approvedCount, batchProgress, clipBadge, clipDifferenceBlock, clipDifferencesMessage, clipState, differencesMessage, firstDifference, needsDecision, percent, stateLabel, summarize, versions, type BatchResult, type ClipResult } from './results-view';
 
 const t = (who: string, text: string) => ({ id: who + text, contributorId: who, pseudonym: who, text, createdAt: '2026-11-10T10:00:00.000Z' });
 const clip = (key: string, texts: [string, string][], status = 'published'): ClipResult => ({
@@ -46,12 +46,21 @@ describe('results helpers', () => {
   it('labels distinct versions A, B, C and leaves nicknames out of the shared message', () => {
     expect(versions(clip('a', [['N', 'x'], ['B', 'y'], ['C', 'x']]))).toEqual([{ label: 'A', text: 'x' }, { label: 'B', text: 'y' }]);
     const message = differencesMessage([clip('c001', [['Neema', 'mwana'], ['Baraka', 'mwana wa']]), clip('c002', [['Neema', 'ok'], ['Baraka', 'ok']])], 2);
-    expect(message).toContain('Clip c001');
-    expect(message).toContain('A) mwana\nB) mwana wa');
+    expect(message).toContain('Extrait c001');
+    expect(message).toContain('A) mwana\nB) mwana *wa*');
     expect(message).not.toContain('c002');
     expect(message).not.toMatch(/Neema|Baraka/);
     expect(differencesMessage([clip('a', [['N', 'x'], ['B', 'x']])], 2)).toBeNull();
-    expect(differencesMessage([clip('a', [['N', 'x'], ['B', 'y']]), clip('b', [['N', 'p'], ['B', 'q']])], 2)).toContain('2 clips');
+    expect(differencesMessage([clip('a', [['N', 'x'], ['B', 'y']]), clip('b', [['N', 'p'], ['B', 'q']])], 2)).toContain('2 extraits');
+  });
+
+  it('puts the words that differ in bold for WhatsApp, in French', () => {
+    const block = clipDifferenceBlock(clip('c005', [['N', 'bantu ba mashi'], ['B', 'bantu ba mashe']]));
+    expect(block).toBe('Extrait c005\nA) bantu ba *mashi*\nB) bantu ba *mashe*');
+    const message = clipDifferencesMessage(clip('c005', [['N', 'a b'], ['B', 'a c']]));
+    expect(message).toContain('Quels mots sont justes ?');
+    expect(message).toContain('en *gras*');
+    expect(message).toContain('Répondez avec la lettre');
   });
 
   it('shows the final decision before the volunteer state', () => {
@@ -73,7 +82,7 @@ describe('results helpers', () => {
     expect(summarize({ required: 2, volunteers: 2, batches: [batch([differing, decided])] }).needLook).toBe(1);
     expect(differencesMessage([decided], 2)).toBeNull();
     const message = differencesMessage([differing, decided], 2) ?? '';
-    expect(message).toContain('Clip a');
-    expect(message).not.toContain('Clip z');
+    expect(message).toContain('Extrait a');
+    expect(message).not.toContain('Extrait z');
   });
 });

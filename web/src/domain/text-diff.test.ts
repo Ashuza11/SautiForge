@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { diffText } from './text-diff';
+import { boldDifferences, diffText } from './text-diff';
 
 const marked = (parts: { kind: string; text: string }[]) => parts.map((part) => (part.kind === 'changed' ? `[${part.text}]` : part.text)).join('');
 
@@ -40,5 +40,19 @@ describe('diffText', () => {
     const start = performance.now();
     diffText(long, long.replace(/a/g, 'c'));
     expect(performance.now() - start).toBeLessThan(500);
+  });
+});
+
+describe('boldDifferences', () => {
+  it('bolds whole words that differ and leaves the rest', () => {
+    expect(boldDifferences('bantu ba mashi', 'bantu ba mashe')).toBe('bantu ba *mashi*');
+    expect(boldDifferences('mwana', 'mwana wa')).toBe('mwana');
+    expect(boldDifferences('mwana wa', 'mwana')).toBe('mwana *wa*');
+    expect(boldDifferences('same words', 'same words')).toBe('same words');
+  });
+
+  it('keeps accents intact and bolds both neighbours when only a space differs', () => {
+    expect(boldDifferences('mwâna wa', 'mwâna wa')).toBe('mwâna wa');
+    expect(boldDifferences('mwana wa', 'mwanawa')).toBe('*mwana* *wa*');
   });
 });

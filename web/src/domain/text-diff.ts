@@ -58,3 +58,32 @@ export function diffText(first: string, second: string): TextDiff {
     similarity: total === 0 ? 100 : Math.round((2 * common * 100) / total),
   };
 }
+
+/**
+ * The text with every word that differs from `other` wrapped in *stars*, which WhatsApp shows in bold.
+ * Whole words are marked (WhatsApp does not bold part of a word). When only a space differs
+ * ("mwana wa" against "mwanawa"), the words on both sides of that space are marked.
+ */
+export function boldDifferences(text: string, other: string): string {
+  const chars = diffText(text, other).left.flatMap((part) => Array.from(part.text).map((char) => ({ char, changed: part.kind === 'changed' })));
+  type Token = { text: string; space: boolean; changed: boolean; whole: boolean };
+  const tokens: Token[] = [];
+  for (const { char, changed } of chars) {
+    const space = /\s/u.test(char);
+    const last = tokens[tokens.length - 1];
+    if (last && last.space === space && !space) {
+      last.text += char;
+      last.changed ||= changed;
+      last.whole &&= changed;
+    } else {
+      tokens.push({ text: char, space, changed, whole: changed });
+    }
+  }
+  tokens.forEach((token, index) => {
+    if (!token.space || !token.changed) return;
+    const before = tokens[index - 1];
+    const after = tokens[index + 1];
+    if (before && after && !before.space && !after.space && !before.whole && !after.whole) { before.changed = true; after.changed = true; }
+  });
+  return tokens.map((token) => (!token.space && token.changed ? `*${token.text}*` : token.text)).join('');
+}
