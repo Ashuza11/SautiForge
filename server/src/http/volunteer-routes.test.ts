@@ -70,7 +70,12 @@ describe('volunteer routes', () => {
     expect((await post('join', { link, pseudonym: '  Mama   Neema ' })).status).toBe(201);
     expect(volunteer.join).toHaveBeenCalledWith(link, 'Mama Neema');
     await post('submit', { link, contributor, clipId, text: ' mwana\n wa   Mashi\t' });
-    expect(volunteer.submit).toHaveBeenCalledWith(link, contributor, clipId, 'mwana wa Mashi');
+    expect(volunteer.submit).toHaveBeenCalledWith(link, contributor, clipId, 'mwana wa Mashi', undefined);
+    await post('submit', { link, contributor, clipId, text: 'afusire', correction: '  âfusire  ' });
+    expect(volunteer.submit).toHaveBeenLastCalledWith(link, contributor, clipId, 'afusire', 'âfusire');
+    await post('submit', { link, contributor, clipId, text: 'afusire', correction: '   ' });
+    expect(volunteer.submit).toHaveBeenLastCalledWith(link, contributor, clipId, 'afusire', undefined);
+    expect((await post('submit', { link, contributor, clipId, text: 'a', correction: 'b'.repeat(1001) })).status).toBe(400);
     expect((await post('skip', { link, contributor, clipId })).status).toBe(200);
   });
 

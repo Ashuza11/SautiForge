@@ -18,7 +18,7 @@ const batch = (n: number, status: 'open' | 'closed', createdAt: string): Batch =
 });
 const clip = (clipId: string, key: string, status = 'published'): ClipWithFiles => ({ clip: { id: clipId, clipKey: key, durationMs: 3000, status } as Clip, files: [] });
 const answer = (n: number, batchId: string, clipId: string, who: string, kind: 'transcript' | 'skip', text: string | null): SubmissionRecord => ({
-  id: id(70 + n), clipId, batchId, contributorId: `person-${who}`, pseudonym: who, kind, text, createdAt: `2026-11-10T10:0${n}:00.000Z`,
+  id: id(70 + n), clipId, batchId, contributorId: `person-${who}`, pseudonym: who, kind, text, correction: kind === 'transcript' && text === 'mwana' ? 'mwâna' : null, createdAt: `2026-11-10T10:0${n}:00.000Z`,
 });
 
 function setup(submissions: SubmissionRecord[]) {
@@ -52,6 +52,7 @@ describe('ResultsService', () => {
     expect(older.token).toBe(`code-for-${first.id}`);
     expect(older.clips.map((item) => [item.clipKey, item.position])).toEqual([['c001', 1], ['c002', 2]]);
     expect(older.clips[0]?.transcripts.map((item) => `${item.pseudonym}:${item.text}`)).toEqual(['Neema:mwana', 'Baraka:mwana wa']);
+    expect(older.clips[0]?.transcripts.map((item) => item.correction)).toEqual(['mwâna', null]);
     expect(older.clips[1]).toMatchObject({ status: 'withdrawn', skips: 1, transcripts: [] });
   });
 

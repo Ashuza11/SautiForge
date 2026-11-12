@@ -11,9 +11,9 @@ export class NeonVolunteerRepository implements VolunteerRepository {
   async listSubmissionsForSource(sourceId: string): Promise<SubmissionRecord[]> {
     const rows = await this.database.query<{
       id: string; clip_id: string; batch_id: string; contributor_id: string; pseudonym: string;
-      kind: string; transcript_text: string | null; created_at: Timestamp;
+      kind: string; transcript_text: string | null; correction_text: string | null; created_at: Timestamp;
     }>(`
-      SELECT s.id, s.clip_id, s.batch_id, s.contributor_id, k.pseudonym, s.kind, s.transcript_text, s.created_at
+      SELECT s.id, s.clip_id, s.batch_id, s.contributor_id, k.pseudonym, s.kind, s.transcript_text, s.correction_text, s.created_at
       FROM submissions s
       JOIN batches b ON b.id = s.batch_id
       JOIN contributors k ON k.id = s.contributor_id
@@ -28,6 +28,7 @@ export class NeonVolunteerRepository implements VolunteerRepository {
       pseudonym: row.pseudonym,
       kind: row.kind === 'skip' ? 'skip' : 'transcript',
       text: row.transcript_text,
+      correction: row.correction_text,
       createdAt: iso(row.created_at),
     }));
   }
@@ -87,8 +88,8 @@ export class NeonVolunteerRepository implements VolunteerRepository {
 
   async appendSubmission(submission: Submission): Promise<'recorded' | 'already_answered' | 'unavailable'> {
     const inserted = await this.database.query(`
-      INSERT INTO submissions (id, clip_id, batch_id, contributor_id, kind, transcript_text, created_at)
-      SELECT $1, $2, $3, $4, $5, $6, $7
+      INSERT INTO submissions (id, clip_id, batch_id, contributor_id, kind, transcript_text, correction_text, created_at)
+      SELECT $1, $2, $3, $4, $5, $6, $7, $8
       FROM batch_clips bc
       JOIN batches b ON b.id = bc.batch_id
       JOIN clips c ON c.id = bc.clip_id
@@ -101,7 +102,7 @@ export class NeonVolunteerRepository implements VolunteerRepository {
         AND r.decision = 'approved' AND r.allow_volunteer_access = TRUE AND r.allow_transcription = TRUE
       ON CONFLICT (clip_id, contributor_id) DO NOTHING
       RETURNING id
-    `, [submission.id, submission.clipId, submission.batchId, submission.contributorId, submission.kind, submission.text, submission.createdAt]);
+    `, [submission.id, submission.clipId, submission.batchId, submission.contributorId, submission.kind, submission.text, submission.correction ?? null, submission.createdAt]);
     if (inserted.length === 1) return 'recorded';
     const existing = await this.database.query(
       'SELECT 1 FROM submissions WHERE clip_id = $1 AND contributor_id = $2', [submission.clipId, submission.contributorId],

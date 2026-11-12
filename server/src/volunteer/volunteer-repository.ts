@@ -10,6 +10,7 @@ export type SubmissionRecord = {
   pseudonym: string;
   kind: 'transcript' | 'skip';
   text: string | null;
+  correction: string | null;
   createdAt: string;
 };
 

@@ -190,11 +190,11 @@ describe('local mode (real SQL on PGlite, audio on disk)', () => {
     expect(heard.headers.get('content-type')).toBe('audio/flac');
     expect(JSON.stringify(offered)).not.toContain('transcript');
 
-    const send = (contributor: string, clipId: string, text: string) => call('submit', { link, contributor, clipId, text });
+    const send = (contributor: string, clipId: string, text: string, correction?: string) => call('submit', { link, contributor, clipId, text, correction });
     expect((await send(one, a, 'first words')).status).toBe(200);
     expect((await send(one, a, 'changed my mind')).status).toBe(200); // a retry is harmless, never an edit
     expect((await next(two)).clip?.clipId).toBe(a); // still needs a second, independent person
-    expect((await send(two, a, 'second words')).status).toBe(200);
+    expect((await send(two, a, 'second words', ' second   words fixed ')).status).toBe(200);
     expect((await next(three)).clip?.clipId).toBe(b); // clip a already has its two transcripts
     expect((await call('skip', { link, contributor: three, clipId: b })).status).toBe(200);
     expect(await next(three)).toEqual({ clip: null, progress: { total: 1, answered: 1 } });
@@ -206,7 +206,7 @@ describe('local mode (real SQL on PGlite, audio on disk)', () => {
     // the admin sees every answer, grouped by batch and clip, with the nicknames
     const results = await (await api(`/v1/admin/sources/${sourceId}/results`)).json() as {
       required: number; volunteers: number;
-      batches: { batch: { id: string }; volunteers: number; clips: { clipId: string; clipKey: string; position: number; skips: number; transcripts: { pseudonym: string; text: string }[] }[] }[];
+      batches: { batch: { id: string }; volunteers: number; clips: { clipId: string; clipKey: string; position: number; skips: number; transcripts: { pseudonym: string; text: string; correction: string | null }[] }[] }[];
     };
     expect(results.required).toBe(2);
     const mine = results.batches.find((item) => item.batch.id === batch.batch.id)!;
@@ -214,6 +214,8 @@ describe('local mode (real SQL on PGlite, audio on disk)', () => {
     expect(mine.clips.map((item) => item.clipKey)).toEqual(['v001', 'v002']);
     expect(mine.clips[0]?.transcripts.map((item) => `${item.pseudonym}: ${item.text}`).sort()).toEqual(['Baraka: second words', 'Neema: first words']);
     expect(mine.clips[1]).toMatchObject({ skips: 1, transcripts: [] });
+    // what was heard and the suggested correct form are kept apart
+    expect(mine.clips[0]?.transcripts.map((item) => `${item.text} | ${item.correction}`).sort()).toEqual(['first words | null', 'second words | second words fixed']);
     expect((await server.app.request(`${base}/v1/admin/sources/${sourceId}/results`)).status).toBe(401);
 
     // the database itself refuses to change or remove an answer

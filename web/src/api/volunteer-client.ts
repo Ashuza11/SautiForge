@@ -47,8 +47,9 @@ export class VolunteerClient {
     return this.post('next', { link: this.link, contributor });
   }
 
-  async submit(contributor: string, clipId: string, text: string): Promise<void> {
-    await this.post('submit', { link: this.link, contributor, clipId, text });
+  async submit(contributor: string, clipId: string, text: string, correction = ''): Promise<void> {
+    // The note is optional: it is only sent when the person wrote one.
+    await this.post('submit', { link: this.link, contributor, clipId, text, ...(correction.trim() === '' ? {} : { correction }) });
   }
 
   async skip(contributor: string, clipId: string): Promise<void> {

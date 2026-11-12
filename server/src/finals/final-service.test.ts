@@ -46,7 +46,7 @@ const entry = (clipId: string, key: string, status = 'published', durationMs = 3
   files: [master(clipId)],
 });
 const answer = (n: number, clipId: string, who: string): SubmissionRecord => ({
-  id: id(40 + n), clipId, batchId: id(60), contributorId: who, pseudonym: who, kind: 'transcript', text: 't', createdAt: '2026-11-10T10:00:00.000Z',
+  id: id(40 + n), clipId, batchId: id(60), contributorId: who, pseudonym: who, kind: 'transcript', text: 't', correction: null, createdAt: '2026-11-10T10:00:00.000Z',
 });
 
 function setup() {

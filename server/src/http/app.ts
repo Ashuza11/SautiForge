@@ -156,7 +156,7 @@ export function createServerApp(dependencies: AppDependencies): Hono {
   app.post('/v1/volunteer/submit', volunteerLimit, async (context) => {
     const input = await parseValidatedBody(context, submitSchema);
     if (!input.success) return input.response;
-    return context.json({ status: await dependencies.volunteer.submit(input.data.link, input.data.contributor, input.data.clipId, input.data.text) });
+    return context.json({ status: await dependencies.volunteer.submit(input.data.link, input.data.contributor, input.data.clipId, input.data.text, input.data.correction) });
   });
   app.post('/v1/volunteer/skip', volunteerLimit, async (context) => {
     const input = await parseValidatedBody(context, skipSchema);

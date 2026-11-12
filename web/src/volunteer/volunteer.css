@@ -31,3 +31,4 @@
 .vo-count { text-align: center; font-size: 14px; }
 .vo-done { text-align: center; justify-items: center; }
 .vo-check { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; color: #fff; background: var(--green); font-size: 38px; font-weight: 900; }
+.vo-field > span small { font-weight: 400; color: var(--muted, #5a6b62); }

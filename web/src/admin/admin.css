@@ -164,3 +164,4 @@
 .ad-state-excluded { color: #4b5a52; background: #e6ebe8; text-decoration: line-through; }
 .ad-dataset { display: grid; gap: 12px; margin-top: 28px; }
 .ad-dataset h2 { margin: 0; }
+.ad-note { display: block; color: var(--muted); font-size: 13px; }

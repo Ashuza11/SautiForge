@@ -4,7 +4,7 @@ import type { BatchService } from '../batches/batch-service';
 import type { ClipService } from '../clips/clip-service';
 import type { ProjectService } from '../projects/project-service';
 import type { SourceService } from '../sources/source-service';
-import { REQUIRED_TRANSCRIPTS, pseudonymSchema, transcriptTextSchema, type Contributor } from './volunteer';
+import { REQUIRED_TRANSCRIPTS, correctionTextSchema, pseudonymSchema, transcriptTextSchema, type Contributor } from './volunteer';
 import type { BatchProgress, VolunteerRepository } from './volunteer-repository';
 
 export class VolunteerError extends Error {
@@ -101,15 +101,15 @@ export class VolunteerService {
     return { position: index + 1, clipCount: found.clipIds.length, audioUrl: await this.clips.createListeningUrl(clipId) };
   }
 
-  async submit(link: string, token: string, clipId: string, text: string): Promise<'recorded' | 'already_answered'> {
-    return this.answer(link, token, clipId, 'transcript', transcriptTextSchema.parse(text));
+  async submit(link: string, token: string, clipId: string, text: string, correction?: string): Promise<'recorded' | 'already_answered'> {
+    return this.answer(link, token, clipId, 'transcript', transcriptTextSchema.parse(text), correction === undefined ? undefined : correctionTextSchema.parse(correction));
   }
 
   async skip(link: string, token: string, clipId: string): Promise<'recorded' | 'already_answered'> {
-    return this.answer(link, token, clipId, 'skip', null);
+    return this.answer(link, token, clipId, 'skip', null, undefined);
   }
 
-  private async answer(link: string, token: string, clipId: string, kind: 'transcript' | 'skip', text: string | null) {
+  private async answer(link: string, token: string, clipId: string, kind: 'transcript' | 'skip', text: string | null, correction: string | undefined) {
     const { found, contributor } = await this.authenticate(link, token);
     if (!found.clipIds.includes(clipId)) throw new VolunteerError('clip_unavailable', 'This clip is not part of the batch.');
     const result = await this.repo.appendSubmission({
@@ -119,6 +119,7 @@ export class VolunteerService {
       contributorId: contributor.id,
       kind,
       text,
+      correction: correction ?? null,
       createdAt: this.now().toISOString(),
     });
     if (result === 'unavailable') throw new VolunteerError('clip_unavailable', 'This clip is no longer available.');

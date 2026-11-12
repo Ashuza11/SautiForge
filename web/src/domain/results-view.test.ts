@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { approvedCount, batchProgress, clipBadge, clipDifferenceBlock, clipDifferencesMessage, clipState, differencesMessage, firstDifference, needsDecision, percent, stateLabel, summarize, versions, type BatchResult, type ClipResult } from './results-view';
 
-const t = (who: string, text: string) => ({ id: who + text, contributorId: who, pseudonym: who, text, createdAt: '2026-11-10T10:00:00.000Z' });
+const t = (who: string, text: string) => ({ id: who + text, contributorId: who, pseudonym: who, text, correction: null, createdAt: '2026-11-10T10:00:00.000Z' });
 const clip = (key: string, texts: [string, string][], status = 'published'): ClipResult => ({
   clipId: key, clipKey: key, durationMs: 3000, position: 1, status, transcripts: texts.map(([who, text]) => t(who, text)), skips: 0, final: null,
 });

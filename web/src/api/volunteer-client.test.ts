@@ -17,6 +17,8 @@ describe('VolunteerClient', () => {
     const client = new VolunteerClient(link, 'https://api.example.org', fetcher);
     await client.submit('tok', 'clip', 'mwana');
     expect(fetcher).toHaveBeenLastCalledWith('https://api.example.org/v1/volunteer/submit', expect.objectContaining({ body: JSON.stringify({ link, contributor: 'tok', clipId: 'clip', text: 'mwana' }) }));
+    await client.submit('tok', 'clip', 'afusire', ' âfusire ');
+    expect(fetcher).toHaveBeenLastCalledWith('https://api.example.org/v1/volunteer/submit', expect.objectContaining({ body: JSON.stringify({ link, contributor: 'tok', clipId: 'clip', text: 'afusire', correction: ' âfusire ' }) }));
     await client.skip('tok', 'clip');
     expect(fetcher).toHaveBeenLastCalledWith('https://api.example.org/v1/volunteer/skip', expect.anything());
   });

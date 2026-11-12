@@ -123,4 +123,11 @@ describe('community service database migrations', () => {
     expect(statements.filter((statement) => statement.includes('RAISE EXCEPTION'))).toHaveLength(1);
     expect(sql).not.toMatch(/ALTER TABLE submissions/);
   });
+
+  it('adds an optional correction note beside the heard text, never in place of it', async () => {
+    const sql = await readFile(new URL('./0010_submission_corrections.sql', import.meta.url), 'utf8');
+    expect(sql).toContain('ALTER TABLE submissions ADD COLUMN correction_text');
+    expect(sql).toContain("kind = 'transcript'");
+    expect(sql).not.toMatch(/ALTER COLUMN transcript_text|DROP|UPDATE submissions/i);
+  });
 });

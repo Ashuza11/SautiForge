@@ -17,11 +17,18 @@ export const transcriptTextSchema = z.string()
   .transform((value) => value.normalize('NFC').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim())
   .pipe(z.string().min(1, 'Write what you hear first.').max(MAX_TRANSCRIPT_LENGTH, `Please keep it under ${MAX_TRANSCRIPT_LENGTH} characters.`));
 
+/** The optional note: the form the volunteer thinks is correct. Empty means none. */
+export const correctionTextSchema = z.string()
+  // eslint-disable-next-line no-control-regex
+  .transform((value) => value.normalize('NFC').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim())
+  .pipe(z.string().max(MAX_TRANSCRIPT_LENGTH, `Please keep it under ${MAX_TRANSCRIPT_LENGTH} characters.`))
+  .transform((value) => (value === '' ? undefined : value));
+
 export const joinSchema = z.object({ link: linkSchema, pseudonym: pseudonymSchema }).strict();
 export const sessionSchema = z.object({ link: linkSchema, contributor: contributorTokenSchema }).strict();
 export const infoSchema = z.object({ link: linkSchema }).strict();
 export const listenSchema = z.object({ link: linkSchema, clipId: z.string().uuid() }).strict();
-export const submitSchema = sessionSchema.extend({ clipId: z.string().uuid(), text: transcriptTextSchema }).strict();
+export const submitSchema = sessionSchema.extend({ clipId: z.string().uuid(), text: transcriptTextSchema, correction: correctionTextSchema.optional() }).strict();
 export const skipSchema = sessionSchema.extend({ clipId: z.string().uuid() }).strict();
 
 export type Contributor = { id: string; projectId: string; pseudonym: string; createdAt: string };
@@ -32,6 +39,8 @@ export type Submission = {
   contributorId: string;
   kind: 'transcript' | 'skip';
   text: string | null;
+  /** What the volunteer thinks the correct form is, kept apart from what they heard. */
+  correction?: string | null;
   createdAt: string;
 };
 export type NextClip = { clipId: string; position: number; durationMs: number };

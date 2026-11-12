@@ -1,6 +1,6 @@
 import { boldDifferences, diffText } from './text-diff';
 
-export type Transcript = { id: string; contributorId: string; pseudonym: string; text: string; createdAt: string };
+export type Transcript = { id: string; contributorId: string; pseudonym: string; text: string; correction: string | null; createdAt: string };
 export type FinalView = { version: number; decision: 'approved' | 'excluded'; text: string | null; note: string; createdAt: string };
 export type ClipResult = {
   clipId: string; clipKey: string; durationMs: number; position: number; status: string; transcripts: Transcript[]; skips: number;

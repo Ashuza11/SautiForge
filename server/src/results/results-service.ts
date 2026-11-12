@@ -4,7 +4,7 @@ import { REQUIRED_TRANSCRIPTS } from '../volunteer/volunteer';
 import type { FinalRepository } from '../finals/final-repository';
 import type { VolunteerRepository } from '../volunteer/volunteer-repository';
 
-export type TranscriptView = { id: string; contributorId: string; pseudonym: string; text: string; createdAt: string };
+export type TranscriptView = { id: string; contributorId: string; pseudonym: string; text: string; /** The form this person thinks is correct, if they wrote one. */ correction: string | null; createdAt: string };
 
 export type ClipResult = {
   clipId: string;
@@ -70,7 +70,7 @@ export class ResultsService {
             status: clip?.status ?? 'unknown',
             transcripts: mine
               .filter((submission) => submission.kind === 'transcript' && submission.text !== null)
-              .map((submission) => ({ id: submission.id, contributorId: submission.contributorId, pseudonym: submission.pseudonym, text: submission.text ?? '', createdAt: submission.createdAt })),
+              .map((submission) => ({ id: submission.id, contributorId: submission.contributorId, pseudonym: submission.pseudonym, text: submission.text ?? '', correction: submission.correction, createdAt: submission.createdAt })),
             skips: mine.filter((submission) => submission.kind === 'skip').length,
             final: (() => {
               const record = finalByClip.get(clipId);

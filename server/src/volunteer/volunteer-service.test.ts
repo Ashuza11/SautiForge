@@ -108,6 +108,17 @@ describe('VolunteerService', () => {
     await expect(service.next(`${batchId}.${'x'.repeat(24)}`, token)).rejects.toMatchObject({ code: 'link_invalid' });
   });
 
+  it('keeps what was heard and the correct form the volunteer suggests as two separate texts', async () => {
+    const { service, repo } = setup();
+    const one = await join(service, 'Neema');
+    const two = await join(service, 'Baraka');
+    await service.submit(link, one, clipA, ' afusire ', '  âfusire ');
+    await service.submit(link, two, clipA, 'afusire', '   ');
+    await service.submit(link, two, clipB, 'afusire');
+    const stored = repo.submissions.filter((item) => item.kind === 'transcript').map((item) => [item.text, item.correction]);
+    expect(stored).toEqual([['afusire', 'âfusire'], ['afusire', null], ['afusire', null]]);
+  });
+
   it('lets anyone with the batch link hear one of its clips, and nothing else', async () => {
     const { service, clips } = setup();
     expect(await service.listen(link, clipB)).toEqual({ position: 2, clipCount: 2, audioUrl: `https://storage.example/${clipB}` });

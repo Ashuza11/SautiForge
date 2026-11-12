@@ -111,9 +111,13 @@ function Welcome({ info, client, onJoined }: { info: BatchInfo; client: Voluntee
   );
 }
 
+/** Drafts of the optional note live beside the main draft of the same clip. */
+const noteKey = (clipId: string) => `${clipId}.note`;
+
 function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: SavedContributor; onSignedOut: () => void }) {
   const [state, setState] = useState<NextResult | null>(null);
   const [text, setText] = useState('');
+  const [correction, setCorrection] = useState('');
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState<{ kind: 'error' | 'ok'; text: string } | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -133,6 +137,7 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
       refetched.current = false;
       setState(result);
       setText(result.clip ? loadDraft(result.clip.clipId) : '');
+      setCorrection(result.clip ? loadDraft(noteKey(result.clip.clipId)) : '');
     } catch (cause) {
       fail(cause);
     }
@@ -176,13 +181,19 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
     if (clip) saveDraft(clip.clipId, value);
   };
 
+  const changeCorrection = (value: string) => {
+    setCorrection(value);
+    if (clip) saveDraft(noteKey(clip.clipId), value);
+  };
+
   const send = async () => {
     if (!clip || text.trim() === '') return;
     setSending(true);
     setMessage(null);
     try {
-      await client.submit(me.token, clip.clipId, text);
+      await client.submit(me.token, clip.clipId, text, correction);
       clearDraft(clip.clipId);
+      clearDraft(noteKey(clip.clipId));
       setSentCount((count) => count + 1);
       setMessage({ kind: 'ok', text: 'Envoyé. Merci !' });
       await load();
@@ -200,6 +211,7 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
     try {
       await client.skip(me.token, clip.clipId);
       clearDraft(clip.clipId);
+      clearDraft(noteKey(clip.clipId));
       await load();
     } catch (cause) {
       fail(cause);
@@ -249,7 +261,7 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
       </div>
 
       <label className="vo-field">
-        <span>Écrivez ce que vous entendez</span>
+        <span>Écrivez exactement ce que vous entendez</span>
         <textarea
           rows={4}
           value={text}
@@ -261,7 +273,21 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
           placeholder="Écrivez ici…"
         />
       </label>
-      <p className="vo-hint">Écrivez les mots exactement comme vous les entendez. Votre texte est gardé sur ce téléphone pendant que vous écrivez.</p>
+      <p className="vo-hint">Écrivez ce que la personne dit vraiment, même si un mot est mal prononcé. Ne le corrigez pas ici : pour l’IA, ce qui est dit compte plus que ce qui est attendu.</p>
+
+      <label className="vo-field">
+        <span>Forme correcte, si vous la connaissez <small>(facultatif)</small></span>
+        <input
+          value={correction}
+          onChange={(event) => changeCorrection(event.target.value)}
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="off"
+          autoComplete="off"
+          placeholder="Par exemple : âfusire"
+        />
+      </label>
+      <p className="vo-hint">Si le mot entendu n’est pas la bonne forme, écrivez ici celle que vous pensez juste. Votre texte est gardé sur ce téléphone pendant que vous écrivez.</p>
 
       <div aria-live="polite">
         {message ? <p className={message.kind === 'error' ? 'vo-error' : 'vo-ok'} role={message.kind === 'error' ? 'alert' : 'status'}>{message.text}</p> : null}

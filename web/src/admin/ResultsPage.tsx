@@ -214,7 +214,7 @@ function ClipRow({ client, onSaved, clip, required, open, playing, copied, onTog
           {clip.transcripts.length === 0 ? <p className="ad-muted">Nobody has written this clip yet.</p> : (
             <ul className="ad-transcripts">
               {clip.transcripts.map((item) => (
-                <li key={item.id}><span className="ad-who">{item.pseudonym}</span><span className="ad-text" lang="und">{item.text}</span></li>
+                <li key={item.id}><span className="ad-who">{item.pseudonym}</span><span className="ad-text" lang="und">{item.text}{item.correction ? <small className="ad-note"> Forme proposée : <span lang="und">{item.correction}</span></small> : null}</span></li>
               ))}
             </ul>
           )}
