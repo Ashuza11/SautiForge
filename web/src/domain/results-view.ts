@@ -6,7 +6,7 @@ export type ClipResult = {
   clipId: string; clipKey: string; durationMs: number; position: number; status: string; transcripts: Transcript[]; skips: number;
   final: FinalView | null;
 };
-export type BatchResult = { batch: { id: string; title: string; status: 'open' | 'closed'; createdAt: string }; clips: ClipResult[]; volunteers: number };
+export type BatchResult = { batch: { id: string; title: string; status: 'open' | 'closed'; createdAt: string }; token: string; clips: ClipResult[]; volunteers: number };
 export type SourceResults = { required: number; volunteers: number; batches: BatchResult[] };
 
 export type ClipState = 'waiting' | 'partial' | 'agree' | 'differ';
@@ -83,25 +83,26 @@ export function versions(clip: ClipResult): { label: string; text: string }[] {
 }
 
 /** One clip for WhatsApp: each version labelled A, B, C, with the words that differ in bold. */
-export function clipDifferenceBlock(clip: ClipResult): string {
+export function clipDifferenceBlock(clip: ClipResult, listenLink?: (clipId: string) => string): string {
   const all = versions(clip);
   const lines = all.map((version, index) => {
     const compared = all[index === 0 ? 1 : 0]?.text ?? '';
     return `${version.label}) ${boldDifferences(version.text, compared)}`;
   });
-  return [`Extrait ${clip.clipKey}`, ...lines].join('\n');
+  const listen = listenLink ? [`🔊 Écouter : ${listenLink(clip.clipId)}`] : [];
+  return [`Extrait ${clip.clipKey}`, ...listen, ...lines].join('\n');
 }
 
 const DIFFERENCES_HELP = 'Les mots en *gras* sont ceux qui diffèrent.';
 const DIFFERENCES_ASK = 'Répondez avec la lettre qui est juste, ou écrivez les bons mots. Merci !';
 
 /** One clip, ready to post in the community group. */
-export function clipDifferencesMessage(clip: ClipResult): string {
-  return ['Quels mots sont justes ? 🤔', DIFFERENCES_HELP, '', clipDifferenceBlock(clip), '', DIFFERENCES_ASK].join('\n');
+export function clipDifferencesMessage(clip: ClipResult, listenLink?: (clipId: string) => string): string {
+  return ['Quels mots sont justes ? 🤔', DIFFERENCES_HELP, '', clipDifferenceBlock(clip, listenLink), '', DIFFERENCES_ASK].join('\n');
 }
 
 /** A message for the community group asking which version is right. */
-export function differencesMessage(clips: ClipResult[], required: number): string | null {
+export function differencesMessage(clips: ClipResult[], required: number, listenLink?: (clipId: string) => string): string | null {
   const differing = clips.filter((clip) => needsDecision(clip, required));
   if (differing.length === 0) return null;
   return [
@@ -109,7 +110,7 @@ export function differencesMessage(clips: ClipResult[], required: number): strin
     differing.length === 1 ? 'Nous avons entendu deux versions différentes d’un extrait.' : `Nous avons entendu des versions différentes pour ${differing.length} extraits.`,
     DIFFERENCES_HELP,
     '',
-    differing.map(clipDifferenceBlock).join('\n\n'),
+    differing.map((clip) => clipDifferenceBlock(clip, listenLink)).join('\n\n'),
     '',
     DIFFERENCES_ASK,
   ].join('\n');

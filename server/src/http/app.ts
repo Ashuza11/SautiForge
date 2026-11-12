@@ -16,7 +16,7 @@ import { finalDraftSchema } from '../finals/final';
 import { FinalError, type FinalService } from '../finals/final-service';
 import type { ResultsService } from '../results/results-service';
 import { createRateLimiter, visitorKey } from './rate-limit';
-import { infoSchema, joinSchema, sessionSchema, skipSchema, submitSchema } from '../volunteer/volunteer';
+import { infoSchema, joinSchema, listenSchema, sessionSchema, skipSchema, submitSchema } from '../volunteer/volunteer';
 import { VolunteerError, type VolunteerService } from '../volunteer/volunteer-service';
 import { sourceMediaUploadDraftSchema } from '../media/source-media';
 import { SourceMediaLifecycleError, type SourceMediaService } from '../media/source-media-service';
@@ -137,6 +137,11 @@ export function createServerApp(dependencies: AppDependencies): Hono {
     const input = await parseValidatedBody(context, infoSchema);
     if (!input.success) return input.response;
     return context.json(await dependencies.volunteer.info(input.data.link));
+  });
+  app.post('/v1/volunteer/listen', volunteerLimit, async (context) => {
+    const input = await parseValidatedBody(context, listenSchema);
+    if (!input.success) return input.response;
+    return context.json(await dependencies.volunteer.listen(input.data.link, input.data.clipId));
   });
   app.post('/v1/volunteer/join', volunteerLimit, async (context) => {
     const input = await parseValidatedBody(context, joinSchema);

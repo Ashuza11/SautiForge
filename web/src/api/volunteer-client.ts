@@ -6,6 +6,7 @@ export class VolunteerApiError extends Error {
 
 export type BatchInfo = { title: string; clipCount: number; language: string };
 export type ClipOffer = { clipId: string; position: number; durationMs: number; audioUrl: string };
+export type ListenResult = { position: number; clipCount: number; audioUrl: string };
 export type NextResult = { clip: ClipOffer | null; progress: { total: number; answered: number } };
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
@@ -32,6 +33,10 @@ export class VolunteerClient {
 
   info(): Promise<BatchInfo> {
     return this.post('info', { link: this.link });
+  }
+
+  listen(clipId: string): Promise<ListenResult> {
+    return this.post('listen', { link: this.link, clipId });
   }
 
   join(pseudonym: string): Promise<{ contributor: { id: string; pseudonym: string }; token: string }> {

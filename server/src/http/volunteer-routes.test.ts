@@ -22,6 +22,7 @@ function volunteerApp(volunteerRateLimit?: { allow(key: string): boolean }) {
     next: vi.fn().mockResolvedValue({ clip: null, progress: { total: 5, answered: 5 } }),
     submit: vi.fn().mockResolvedValue('recorded'),
     skip: vi.fn().mockResolvedValue('recorded'),
+    listen: vi.fn().mockResolvedValue({ position: 1, clipCount: 5, audioUrl: 'https://storage.example/a' }),
   } as unknown as VolunteerService;
   const app = createServerApp({
     projects: {} as ProjectService, sources: {} as SourceService, media: {} as SourceMediaService, clips: {} as ClipService,
@@ -51,6 +52,17 @@ describe('volunteer routes', () => {
     expect((await post('submit', { link, contributor, clipId: 'nope', text: 'a' })).status).toBe(400);
     expect((await post('submit', { link, contributor, clipId, text: 'a'.repeat(1001) })).status).toBe(400);
     expect(volunteer.submit).not.toHaveBeenCalled();
+  });
+
+  it('lets a visitor hear one clip with the batch link alone, and validates the body', async () => {
+    const { post, volunteer } = volunteerApp();
+    const response = await post('listen', { link, clipId });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ position: 1, clipCount: 5, audioUrl: 'https://storage.example/a' });
+    expect((await post('listen', { link, clipId: 'nope' })).status).toBe(400);
+    expect((await post('listen', { link })).status).toBe(400);
+    vi.mocked(volunteer.listen).mockRejectedValueOnce(new VolunteerError('link_invalid', 'closed'));
+    expect((await post('listen', { link, clipId })).status).toBe(404);
   });
 
   it('cleans the text and the nickname before they reach the service', async () => {

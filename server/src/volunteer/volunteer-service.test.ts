@@ -108,6 +108,14 @@ describe('VolunteerService', () => {
     await expect(service.next(`${batchId}.${'x'.repeat(24)}`, token)).rejects.toMatchObject({ code: 'link_invalid' });
   });
 
+  it('lets anyone with the batch link hear one of its clips, and nothing else', async () => {
+    const { service, clips } = setup();
+    expect(await service.listen(link, clipB)).toEqual({ position: 2, clipCount: 2, audioUrl: `https://storage.example/${clipB}` });
+    expect(clips.createListeningUrl).toHaveBeenCalledWith(clipB);
+    await expect(service.listen(link, '00000000-0000-4000-8000-0000000009ff')).rejects.toMatchObject({ code: 'clip_unavailable' });
+    await expect(service.listen(`${batchId}.${'x'.repeat(24)}`, clipA)).rejects.toMatchObject({ code: 'link_invalid' });
+  });
+
   it('offers one clip at a time with a signed audio link and the person\'s own progress', async () => {
     const { service, clips } = setup();
     const token = await join(service);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  clearContributor, clearDraft, loadContributor, loadDraft, nextSpeed, nicknameProblem, parseBatchHash, progressPercent,
+  clearContributor, clipLink, parseClipHash, clearDraft, loadContributor, loadDraft, nextSpeed, nicknameProblem, parseBatchHash, progressPercent,
   saveContributor, saveDraft, speedLabel, type StorageLike,
 } from './volunteer-view';
 
@@ -67,5 +67,23 @@ describe('volunteer helpers', () => {
     expect(nicknameProblem('+243 970 123 456')).toMatch(/téléphone/);
     expect(nicknameProblem('me@mail.com')).toMatch(/e-mail/);
     expect(nicknameProblem('x'.repeat(41))).toMatch(/plus court/);
+  });
+});
+
+describe('clip links', () => {
+  const batchId = '00000000-0000-4000-8000-000000000901';
+  const code = 'c'.repeat(24);
+  const clipId = '00000000-0000-4000-8000-000000000401';
+
+  it('builds a link to one clip and reads it back', () => {
+    const url = clipLink('https://site.example/', batchId, code, clipId);
+    expect(url).toBe(`https://site.example/#/c/${batchId}.${code}/${clipId}`);
+    expect(parseClipHash(url.slice(url.indexOf('#')))).toEqual({ link: `${batchId}.${code}`, clipId });
+  });
+
+  it('rejects anything that is not a clip link', () => {
+    expect(parseClipHash('#/c/nope')).toBeNull();
+    expect(parseClipHash(`#/b/${batchId}.${code}`)).toBeNull();
+    expect(parseClipHash(`#/c/${batchId}.${code}/${clipId}/extra`)).toBeNull();
   });
 });

@@ -20,6 +20,7 @@ export const transcriptTextSchema = z.string()
 export const joinSchema = z.object({ link: linkSchema, pseudonym: pseudonymSchema }).strict();
 export const sessionSchema = z.object({ link: linkSchema, contributor: contributorTokenSchema }).strict();
 export const infoSchema = z.object({ link: linkSchema }).strict();
+export const listenSchema = z.object({ link: linkSchema, clipId: z.string().uuid() }).strict();
 export const submitSchema = sessionSchema.extend({ clipId: z.string().uuid(), text: transcriptTextSchema }).strict();
 export const skipSchema = sessionSchema.extend({ clipId: z.string().uuid() }).strict();
 

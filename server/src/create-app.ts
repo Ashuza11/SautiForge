@@ -51,7 +51,7 @@ export function createAppFromEnvironment(environment: NodeJS.ProcessEnv) {
     ),
     clips: clipService,
     batches: batchService,
-    results: new ResultsService(batchRepository, clipRepository, volunteerRepository, finalRepository),
+    results: new ResultsService(batchRepository, clipRepository, volunteerRepository, finalRepository, (batchId) => batchService.tokenFor(batchId)),
     finals: new FinalService(finalRepository, clipRepository, volunteerRepository, sourceService, projectService, objectStore),
     volunteer: new VolunteerService(volunteerRepository, batchService, clipService, projectService, sourceService, { linkSecret }),
     readiness: new ReadinessService(projectRepository, objectStore),

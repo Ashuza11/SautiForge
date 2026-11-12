@@ -76,7 +76,7 @@ export async function createLocalServer(options: LocalServerOptions): Promise<Lo
     media: new SourceMediaService(new NeonSourceMediaRepository(executor), sources, objectStore),
     clips: clipService,
     batches: batchService,
-    results: new ResultsService(batchRepository, clipRepository, volunteerRepository, finalRepository),
+    results: new ResultsService(batchRepository, clipRepository, volunteerRepository, finalRepository, (batchId) => batchService.tokenFor(batchId)),
     finals: new FinalService(finalRepository, clipRepository, volunteerRepository, sources, projects, objectStore),
     volunteer: new VolunteerService(volunteerRepository, batchService, clipService, projects, sources, { linkSecret: options.sessionSecret }),
     readiness: new ReadinessService(projectRepository, objectStore),

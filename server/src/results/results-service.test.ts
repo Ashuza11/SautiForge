@@ -30,6 +30,7 @@ function setup(submissions: SubmissionRecord[]) {
     { listForSource: async () => [clip(clipA, 'c001'), clip(clipB, 'c002', 'withdrawn'), clip(clipC, 'c003')] } as unknown as ClipRepository,
     { listSubmissionsForSource: async () => submissions } as unknown as VolunteerRepository,
     { latestForSource: async () => [] } as unknown as FinalRepository,
+    (batchId) => `code-for-${batchId}`,
   );
   return { service, first, second };
 }
@@ -48,6 +49,7 @@ describe('ResultsService', () => {
     expect(results.batches.map((item) => item.batch.id)).toEqual([second.id, first.id]);
     const older = results.batches[1]!;
     expect(older.volunteers).toBe(2);
+    expect(older.token).toBe(`code-for-${first.id}`);
     expect(older.clips.map((item) => [item.clipKey, item.position])).toEqual([['c001', 1], ['c002', 2]]);
     expect(older.clips[0]?.transcripts.map((item) => `${item.pseudonym}:${item.text}`)).toEqual(['Neema:mwana', 'Baraka:mwana wa']);
     expect(older.clips[1]).toMatchObject({ status: 'withdrawn', skips: 1, transcripts: [] });

@@ -6,7 +6,7 @@ const t = (who: string, text: string) => ({ id: who + text, contributorId: who, 
 const clip = (key: string, texts: [string, string][], status = 'published'): ClipResult => ({
   clipId: key, clipKey: key, durationMs: 3000, position: 1, status, transcripts: texts.map(([who, text]) => t(who, text)), skips: 0, final: null,
 });
-const batch = (clips: ClipResult[]): BatchResult => ({ batch: { id: 'b', title: 'Batch 1', status: 'open', createdAt: '2026-11-10T10:00:00.000Z' }, clips, volunteers: 2 });
+const batch = (clips: ClipResult[]): BatchResult => ({ batch: { id: 'b', title: 'Batch 1', status: 'open', createdAt: '2026-11-10T10:00:00.000Z' }, token: 'code', clips, volunteers: 2 });
 
 describe('results helpers', () => {
   it('names the state of each clip', () => {
@@ -57,6 +57,9 @@ describe('results helpers', () => {
   it('puts the words that differ in bold for WhatsApp, in French', () => {
     const block = clipDifferenceBlock(clip('c005', [['N', 'bantu ba mashi'], ['B', 'bantu ba mashe']]));
     expect(block).toBe('Extrait c005\nA) bantu ba *mashi*\nB) bantu ba *mashe*');
+    const link = (id: string) => `https://site/#/c/${id}`;
+    expect(clipDifferenceBlock(clip('c005', [['N', 'x'], ['B', 'y']]), link)).toContain('🔊 Écouter : https://site/#/c/c005');
+    expect(differencesMessage([clip('c005', [['N', 'x'], ['B', 'y']])], 2, link)).toContain('🔊 Écouter');
     const message = clipDifferencesMessage(clip('c005', [['N', 'a b'], ['B', 'a c']]));
     expect(message).toContain('Quels mots sont justes ?');
     expect(message).toContain('en *gras*');

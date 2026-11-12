@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client';
 
 import { App } from './App';
 import { AdminApp } from './admin/AdminApp';
-import { parseBatchHash } from './domain/volunteer-view';
+import { parseBatchHash, parseClipHash } from './domain/volunteer-view';
+import { ListenApp } from './volunteer/ListenApp';
 import { VolunteerApp } from './volunteer/VolunteerApp';
 import './styles.css';
 import './admin/admin.css';
@@ -17,6 +18,11 @@ function Root() {
     window.addEventListener('hashchange', onChange);
     return () => window.removeEventListener('hashchange', onChange);
   }, []);
+  if (hash.startsWith('#/c/')) {
+    const target = parseClipHash(hash);
+    if (target) return <ListenApp link={target.link} clipId={target.clipId} />;
+    return <main className="ad-center"><div className="ad-card"><h1>Ce lien ne fonctionne pas</h1><p className="ad-muted">Il semble incomplet. Demandez de nouveau le lien.</p></div></main>;
+  }
   if (hash.startsWith('#/b/')) {
     const link = parseBatchHash(hash);
     if (link) return <VolunteerApp link={link} />;

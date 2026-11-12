@@ -21,6 +21,8 @@ export type ClipResult = {
 
 export type BatchResult = {
   batch: { id: string; title: string; status: 'open' | 'closed'; createdAt: string };
+  /** The code at the end of the batch link, so the admin can build links to single clips. */
+  token: string;
   clips: ClipResult[];
   /** Distinct people who answered anything in this batch. */
   volunteers: number;
@@ -35,6 +37,7 @@ export class ResultsService {
     private readonly clips: ClipRepository,
     private readonly volunteer: VolunteerRepository,
     private readonly finals: FinalRepository,
+    private readonly tokenFor: (batchId: string) => string = () => '',
   ) {}
 
   async forSource(sourceId: string): Promise<SourceResults> {
@@ -54,6 +57,7 @@ export class ResultsService {
       people.forEach((id) => everyone.add(id));
       return {
         batch: { id: batch.id, title: batch.title, status: batch.status, createdAt: batch.createdAt },
+        token: this.tokenFor(batch.id),
         volunteers: people.size,
         clips: clipIds.map((clipId, index): ClipResult => {
           const clip = clipById.get(clipId);

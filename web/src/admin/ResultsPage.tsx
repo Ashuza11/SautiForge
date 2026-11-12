@@ -9,6 +9,7 @@ import {
   approvedCount, batchProgress, clipBadge, clipDifferencesMessage, differencesMessage, firstDifference, percent, summarize, versions,
   type BatchResult, type ClipResult, type SourceResults,
 } from '../domain/results-view';
+import { clipLink } from '../domain/volunteer-view';
 import type { DiffPart } from '../domain/text-diff';
 
 type Props = { client: ApiClient; project: Project; source: Source; onSignedOut: () => void; onGoBatches: () => void };
@@ -135,7 +136,9 @@ function BatchSection({ client, onSaved, item, required, open, openClip, playing
   onCopy: (key: string, text: string) => void;
 }) {
   const progress = batchProgress(item, required);
-  const message = differencesMessage(item.clips, required);
+  // A closed batch no longer opens, so its clips get no listening link.
+  const listenLink = item.batch.status === 'open' ? (clipId: string) => clipLink(window.location.origin, item.batch.id, item.token, clipId) : undefined;
+  const message = differencesMessage(item.clips, required, listenLink);
   return (
     <li className="ad-batch">
       <button className="ad-batch-head" aria-expanded={open} onClick={onToggle}>
@@ -165,6 +168,7 @@ function BatchSection({ client, onSaved, item, required, open, openClip, playing
                 onToggle={() => onOpenClip(clip.clipId)}
                 onPlay={() => onPlay(clip)}
                 onCopy={onCopy}
+                listenLink={listenLink}
               />
             ))}
           </ul>
@@ -179,7 +183,7 @@ function BatchSection({ client, onSaved, item, required, open, openClip, playing
   );
 }
 
-function ClipRow({ client, onSaved, clip, required, open, playing, copied, onToggle, onPlay, onCopy }: {
+function ClipRow({ client, onSaved, clip, required, open, playing, copied, onToggle, onPlay, onCopy, listenLink }: {
   client: ApiClient;
   onSaved: () => Promise<void>;
   clip: ClipResult;
@@ -190,6 +194,7 @@ function ClipRow({ client, onSaved, clip, required, open, playing, copied, onTog
   onToggle: () => void;
   onPlay: () => void;
   onCopy: (key: string, text: string) => void;
+  listenLink?: (clipId: string) => string;
 }) {
   const badge = clipBadge(clip, required);
   const state = badge.kind;
@@ -218,7 +223,7 @@ function ClipRow({ client, onSaved, clip, required, open, playing, copied, onTog
               <p className="ad-diff-title">Differences <small>{difference.diff.similarity}% alike</small></p>
               <p className="ad-diff-line"><span className="ad-who">{difference.first.pseudonym}</span><Marked parts={difference.diff.left} /></p>
               <p className="ad-diff-line"><span className="ad-who">{difference.other.pseudonym}</span><Marked parts={difference.diff.right} /></p>
-              <button className="secondary ad-small" onClick={() => onCopy(`clip-${clip.clipId}`, clipDifferencesMessage(clip))}>
+              <button className="secondary ad-small" onClick={() => onCopy(`clip-${clip.clipId}`, clipDifferencesMessage(clip, listenLink))}>
                 {copied === `clip-${clip.clipId}` ? 'Copied ✓' : `Copy for WhatsApp (${versions(clip).length} versions)`}
               </button>
             </div>

@@ -9,6 +9,17 @@ export function parseBatchHash(hash: string): string | null {
   return match ? match[1] ?? null : null;
 }
 
+/** `#/c/<batch id>.<code>/<clip id>` -> the batch link and the clip, or null for anything else. */
+export function parseClipHash(hash: string): { link: string; clipId: string } | null {
+  const match = /^#\/c\/([0-9a-f-]{36}\.[A-Za-z0-9_-]{24})\/([0-9a-f-]{36})$/.exec(hash);
+  return match && match[1] && match[2] ? { link: match[1], clipId: match[2] } : null;
+}
+
+/** The link that opens one clip of a batch, for talking about it in the community. */
+export function clipLink(origin: string, batchId: string, token: string, clipId: string): string {
+  return `${origin.replace(/\/$/, '')}/#/c/${batchId}.${token}/${clipId}`;
+}
+
 export type SavedContributor = { token: string; pseudonym: string };
 
 function browserStorage(): StorageLike | null {

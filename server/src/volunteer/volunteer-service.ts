@@ -23,6 +23,8 @@ export type VolunteerServiceOptions = { linkSecret: string; idFactory?: () => st
 
 export type BatchInfo = { title: string; clipCount: number; language: string };
 export type ClipOffer = { clipId: string; position: number; durationMs: number; audioUrl: string };
+/** One clip opened from a shared link, for talking about it in the community. */
+export type ListenResult = { position: number; clipCount: number; audioUrl: string };
 export type NextResult = { clip: ClipOffer | null; progress: BatchProgress };
 
 /**
@@ -88,6 +90,15 @@ export class VolunteerService {
     const clip = await this.repo.nextClip(found.batch.id, contributor.id, REQUIRED_TRANSCRIPTS);
     if (!clip) return { clip: null, progress };
     return { clip: { ...clip, audioUrl: await this.clips.createListeningUrl(clip.clipId) }, progress };
+  }
+
+  /** Hear one clip of an open batch. The batch link is the permission, as for every volunteer. */
+  async listen(link: string, clipId: string): Promise<ListenResult> {
+    const found = await this.openBatch(link);
+    await this.assertAllowed(found.batch.sourceId);
+    const index = found.clipIds.indexOf(clipId);
+    if (index < 0) throw new VolunteerError('clip_unavailable', 'This clip is not part of the batch.');
+    return { position: index + 1, clipCount: found.clipIds.length, audioUrl: await this.clips.createListeningUrl(clipId) };
   }
 
   async submit(link: string, token: string, clipId: string, text: string): Promise<'recorded' | 'already_answered'> {
