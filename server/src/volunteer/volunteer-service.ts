@@ -4,16 +4,23 @@ import type { BatchService } from '../batches/batch-service';
 import type { ClipService } from '../clips/clip-service';
 import type { ProjectService } from '../projects/project-service';
 import type { SourceService } from '../sources/source-service';
-import { REQUIRED_TRANSCRIPTS, correctionTextSchema, pseudonymSchema, transcriptTextSchema, type Contributor } from './volunteer';
+import { MAX_TRANSCRIPTS_PER_CLIP, correctionTextSchema, pseudonymSchema, transcriptTextSchema, type Contributor } from './volunteer';
 import type { BatchProgress, VolunteerRepository } from './volunteer-repository';
 
 export class VolunteerError extends Error {
   constructor(
-    readonly code: 'link_invalid' | 'contributor_invalid' | 'clip_unavailable' | 'too_many_joins',
+    readonly code: 'link_invalid' | 'contributor_invalid' | 'clip_unavailable' | 'too_many_joins' | 'nickname_taken',
     message: string,
+    /** For `nickname_taken`: the nickname that already exists, so the page can ask "is this you?". */
+    readonly existing?: string,
   ) {
     super(message);
   }
+}
+
+/** Nicknames that differ only by capitals, accents, spaces or dashes count as the same one. */
+export function nicknameKey(value: string): string {
+  return value.normalize('NFD').replace(/\p{M}+/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
 }
 
 /** New volunteers allowed per project per hour. Generous for a community launch, small enough to stop abuse. */
@@ -66,9 +73,16 @@ export class VolunteerService {
     return { title: found.batch.title, clipCount: found.clipIds.length, language: project?.languageVariety || project?.targetLanguage || '' };
   }
 
-  async join(link: string, pseudonym: string): Promise<{ contributor: { id: string; pseudonym: string }; token: string }> {
+  async join(link: string, pseudonym: string, sameAsExisting = false): Promise<{ contributor: { id: string; pseudonym: string }; token: string }> {
     const found = await this.openBatch(link);
     await this.assertAllowed(found.batch.sourceId);
+    const nickname = pseudonymSchema.parse(pseudonym);
+    // A nickname that already exists is not taken silently: the person is asked whether it is them. Saying yes
+    // brings them back as the same person on any phone and in any batch, so one person is never counted twice.
+    const key = nicknameKey(nickname);
+    const known = (await this.repo.listContributors(found.batch.projectId)).find((item) => nicknameKey(item.pseudonym) === key);
+    if (known && !sameAsExisting) throw new VolunteerError('nickname_taken', `The nickname ${known.pseudonym} already exists.`, known.pseudonym);
+    if (known) return { contributor: { id: known.id, pseudonym: known.pseudonym }, token: this.contributorToken(known.id) };
     const since = new Date(this.now().getTime() - 60 * 60 * 1000).toISOString();
     if (await this.repo.countContributorsSince(found.batch.projectId, since) >= (this.options.maxJoinsPerHour ?? MAX_JOINS_PER_HOUR)) {
       throw new VolunteerError('too_many_joins', 'Many people are joining right now. Please try again in a few minutes.');
@@ -76,7 +90,7 @@ export class VolunteerService {
     const contributor: Contributor = {
       id: this.idFactory(),
       projectId: found.batch.projectId,
-      pseudonym: pseudonymSchema.parse(pseudonym),
+      pseudonym: nickname,
       createdAt: this.now().toISOString(),
     };
     await this.repo.createContributor(contributor);
@@ -86,8 +100,8 @@ export class VolunteerService {
   async next(link: string, token: string): Promise<NextResult> {
     const { found, contributor } = await this.authenticate(link, token);
     await this.assertAllowed(found.batch.sourceId);
-    const progress = await this.repo.progress(found.batch.id, contributor.id, REQUIRED_TRANSCRIPTS);
-    const clip = await this.repo.nextClip(found.batch.id, contributor.id, REQUIRED_TRANSCRIPTS);
+    const progress = await this.repo.progress(found.batch.id, contributor.id, MAX_TRANSCRIPTS_PER_CLIP);
+    const clip = await this.repo.nextClip(found.batch.id, contributor.id, MAX_TRANSCRIPTS_PER_CLIP);
     if (!clip) return { clip: null, progress };
     return { clip: { ...clip, audioUrl: await this.clips.createListeningUrl(clip.clipId) }, progress };
   }
@@ -121,7 +135,7 @@ export class VolunteerService {
       text,
       correction: correction ?? null,
       createdAt: this.now().toISOString(),
-    });
+    }, MAX_TRANSCRIPTS_PER_CLIP);
     if (result === 'unavailable') throw new VolunteerError('clip_unavailable', 'This clip is no longer available.');
     return result;
   }

@@ -181,6 +181,12 @@ describe('local mode (real SQL on PGlite, audio on disk)', () => {
 
     expect(await (await call('info', { link })).json()).toMatchObject({ clipCount: 2 });
     const [one, two, three] = [await join('Neema'), await join('Baraka'), await join('Cirhuza')];
+    // an existing nickname is not taken silently: the person is asked, and "yes, it is me" brings the same person back
+    const taken = await call('join', { link, pseudonym: ' neema ' });
+    expect(taken.status).toBe(409);
+    expect(await taken.json()).toMatchObject({ error: 'nickname_taken', pseudonym: 'Neema' });
+    const back = await call('join', { link, pseudonym: ' neema ', sameAsExisting: true });
+    expect(((await back.json()) as { token: string }).token).toBe(one);
 
     const offered = await next(one);
     expect(offered.clip?.clipId).toBe(a);
@@ -193,11 +199,12 @@ describe('local mode (real SQL on PGlite, audio on disk)', () => {
     const send = (contributor: string, clipId: string, text: string, correction?: string) => call('submit', { link, contributor, clipId, text, correction });
     expect((await send(one, a, 'first words')).status).toBe(200);
     expect((await send(one, a, 'changed my mind')).status).toBe(200); // a retry is harmless, never an edit
-    expect((await next(two)).clip?.clipId).toBe(a); // still needs a second, independent person
+    expect((await next(two)).clip?.clipId).toBe(b); // the clip with the fewest versions comes first
     expect((await send(two, a, 'second words', ' second   words fixed ')).status).toBe(200);
-    expect((await next(three)).clip?.clipId).toBe(b); // clip a already has its two transcripts
+    expect((await next(three)).clip?.clipId).toBe(b);
     expect((await call('skip', { link, contributor: three, clipId: b })).status).toBe(200);
-    expect(await next(three)).toEqual({ clip: null, progress: { total: 1, answered: 1 } });
+    // clip a has two versions but is neither decided nor at five, so a late volunteer can still add theirs
+    expect(await next(three)).toMatchObject({ clip: { clipId: a }, progress: { total: 2, answered: 1 } });
 
     const rows = (await server.database.query('SELECT transcript_text, kind FROM submissions ORDER BY created_at, id')).rows as { transcript_text: string | null; kind: string }[];
     expect(rows.filter((row) => row.kind === 'transcript').map((row) => row.transcript_text).sort()).toEqual(['first words', 'second words']);
@@ -245,7 +252,7 @@ describe('local mode (real SQL on PGlite, audio on disk)', () => {
     const batch = await (await api(`/v1/admin/sources/${sourceId}/batches`, 'POST', { clipIds: [a, b, c] })).json() as { batch: { id: string }; token: string };
     const link = `${batch.batch.id}.${batch.token}`;
     const call = (path: string, body: unknown) => server.app.request(`${base}/v1/volunteer/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const contributor = ((await (await call('join', { link, pseudonym: 'Neema' })).json()) as { token: string }).token;
+    const contributor = ((await (await call('join', { link, pseudonym: 'Neema', sameAsExisting: true })).json()) as { token: string }).token;
     const first = await (await call('next', { link, contributor })).json() as { clip: { clipId: string } };
     await call('submit', { link, contributor, clipId: first.clip.clipId, text: 'volunteer words' });
     const submissionId = ((await server.database.query('SELECT id FROM submissions WHERE clip_id = $1', [first.clip.clipId])).rows[0] as { id: string }).id;
@@ -259,6 +266,12 @@ describe('local mode (real SQL on PGlite, audio on disk)', () => {
     expect(v2.final.version).toBe(2);
     const history = await (await api(`/v1/admin/clips/${first.clip.clipId}/final`)).json() as { history: { version: number; text: string }[] };
     expect(history.history.map((row) => [row.version, row.text])).toEqual([[1, 'volunteer words'], [2, 'corrected words']]);
+
+    // once the admin has chosen the best version, the clip is closed to volunteers
+    const late = ((await (await call('join', { link, pseudonym: 'Albin' })).json()) as { token: string }).token;
+    const offeredLate = await (await call('next', { link, contributor: late })).json() as { clip: { clipId: string } | null };
+    expect(offeredLate.clip?.clipId).not.toBe(first.clip.clipId);
+    expect((await call('submit', { link, contributor: late, clipId: first.clip.clipId, text: 'too late' })).status).toBe(409);
 
     // a clip outside any batch, an answer from another clip, and an unknown clip are refused
     const lone = await upload('f099', flacFor(9));

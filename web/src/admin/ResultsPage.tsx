@@ -153,7 +153,7 @@ function BatchSection({ client, onSaved, item, required, open, openClip, playing
       </div>
       {open ? (
         <div className="ad-batch-body">
-          <p className="ad-hint">{progress.answers} of {progress.needed} answers received. Each clip needs {required} different people.</p>
+          <p className="ad-hint">{progress.answers} of {progress.needed} answers received. Each clip needs at least {required} different people. Up to 5 can write it, and it closes when you choose the final text.</p>
           <ul className="ad-results">
             {item.clips.map((clip) => (
               <ClipRow

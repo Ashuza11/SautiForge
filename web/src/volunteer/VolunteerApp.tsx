@@ -75,24 +75,38 @@ function Welcome({ info, client, onJoined }: { info: BatchInfo; client: Voluntee
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The nickname that already exists, while we ask the person whether it is them. */
+  const [taken, setTaken] = useState<string | null>(null);
 
-  const submit = async () => {
+  const submit = async (sameAsExisting = false) => {
     const problem = nicknameProblem(name);
     if (problem) { setError(problem); return; }
     setBusy(true);
     setError(null);
     try {
-      const joined = await client.join(name);
+      const joined = await client.join(name, sameAsExisting);
       onJoined({ token: joined.token, pseudonym: joined.contributor.pseudonym });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Une erreur est survenue.');
+      if (cause instanceof VolunteerApiError && cause.code === 'nickname_taken') setTaken(cause.existing ?? name.trim());
+      else setError(cause instanceof Error ? cause.message : 'Une erreur est survenue.');
     } finally {
       setBusy(false);
     }
   };
 
+  if (taken) {
+    return (
+      <section className="vo-card" role="alertdialog" aria-labelledby="taken-title">
+        <h1 id="taken-title">Ce pseudo existe déjà</h1>
+        <p className="vo-muted">Une personne utilise déjà le pseudo « {taken} ». Est-ce vous ? Si oui, vous retrouvez votre travail. Sinon, choisissez un autre pseudo.</p>
+        <button className="vo-primary" disabled={busy} onClick={() => void submit(true)}>{busy ? 'Un instant…' : `Oui, c’est moi (${taken})`}</button>
+        <button className="vo-quiet" disabled={busy} onClick={() => { setTaken(null); setName(''); }}>Non, choisir un autre pseudo</button>
+      </section>
+    );
+  }
+
   return (
-    <form className="vo-card" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+    <form className="vo-card" onSubmit={(event) => { event.preventDefault(); void submit(false); }}>
       <h1>Musingo !</h1>
       <p className="vo-lead">Construisons ensemble : faisons parler l’IA dans notre langue.</p>
       <ol className="vo-steps">
@@ -226,11 +240,17 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
     return (
       <section className="vo-card vo-done">
         <div className="vo-check" aria-hidden="true">✓</div>
-        <h1>Merci, {me.pseudonym} !</h1>
-        <p className="vo-muted">
-          {state.progress.answered > 0 ? `Vous avez répondu à ${state.progress.answered} extrait${state.progress.answered > 1 ? 's' : ''} sur ${state.progress.total}. ` : ''}
-          Il n’y a plus d’extraits pour vous dans ce lot. D’autres arriveront bientôt. Partagez le lien avec quelqu’un qui parle la langue.
-        </p>
+        <h1>{state.progress.answered > 0 ? `Merci, ${me.pseudonym} !` : 'Ce lot est déjà complet'}</h1>
+        {state.progress.answered > 0 ? (
+          <p className="vo-muted">
+            {`Vous avez répondu à ${state.progress.answered} extrait${state.progress.answered > 1 ? 's' : ''} sur ${state.progress.total}. `}
+            Il n’y a plus d’extraits pour vous dans ce lot. D’autres arriveront bientôt. Partagez le lien avec quelqu’un qui parle la langue.
+          </p>
+        ) : (
+          <p className="vo-muted">
+            Merci, {me.pseudonym} ! D’autres volontaires ont déjà écrit tous les extraits de ce lot. Un nouveau lot arrive bientôt : gardez ce téléphone, votre pseudo sera reconnu.
+          </p>
+        )}
       </section>
     );
   }

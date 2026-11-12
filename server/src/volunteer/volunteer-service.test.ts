@@ -24,26 +24,27 @@ class MemoryVolunteers implements VolunteerRepository {
   joinsInLastHour = 0;
   async countContributorsSince() { return this.joinsInLastHour; }
   async createContributor(c: Contributor) { this.contributors.set(c.id, c); return c; }
+  async listContributors(projectId: string) { return [...this.contributors.values()].filter((c) => c.projectId === projectId); }
   async getContributor(id: string) { return this.contributors.get(id) ?? null; }
-  async nextClip(_batch: string, contributorId: string, required: number): Promise<NextClip | null> {
-    for (const [index, clipId] of [clipA, clipB].entries()) {
-      const mine = this.submissions.some((s) => s.clipId === clipId && s.contributorId === contributorId);
-      const transcripts = this.submissions.filter((s) => s.clipId === clipId && s.kind === 'transcript').length;
-      if (!mine && transcripts < required) return { clipId, position: index + 1, durationMs: 3000 };
-    }
-    return null;
+  decided = new Set<string>();
+  private versions(clipId: string) { return this.submissions.filter((s) => s.clipId === clipId && s.kind === 'transcript').length; }
+  private open(clipId: string, contributorId: string, max: number) {
+    return !this.submissions.some((s) => s.clipId === clipId && s.contributorId === contributorId) && !this.decided.has(clipId) && this.versions(clipId) < max;
   }
-  async progress(_batch: string, contributorId: string, required: number) {
+  async nextClip(_batch: string, contributorId: string, max: number): Promise<NextClip | null> {
+    const open = [clipA, clipB].map((clipId, index) => ({ clipId, index })).filter((item) => this.open(item.clipId, contributorId, max));
+    open.sort((x, y) => this.versions(x.clipId) - this.versions(y.clipId) || x.index - y.index);
+    const first = open[0];
+    return first ? { clipId: first.clipId, position: first.index + 1, durationMs: 3000 } : null;
+  }
+  async progress(_batch: string, contributorId: string, max: number) {
     const answered = this.submissions.filter((s) => s.contributorId === contributorId).length;
-    const remaining = [clipA, clipB].filter((clipId) => (
-      !this.submissions.some((s) => s.clipId === clipId && s.contributorId === contributorId)
-      && this.submissions.filter((s) => s.clipId === clipId && s.kind === 'transcript').length < required
-    )).length;
-    return { total: answered + remaining, answered };
+    return { total: answered + [clipA, clipB].filter((clipId) => this.open(clipId, contributorId, max)).length, answered };
   }
-  async appendSubmission(s: Submission) {
+  async appendSubmission(s: Submission, max: number) {
     if (this.result === 'unavailable') return 'unavailable' as const;
     if (this.submissions.some((x) => x.clipId === s.clipId && x.contributorId === s.contributorId)) return 'already_answered' as const;
+    if (this.decided.has(s.clipId) || this.versions(s.clipId) >= max) return 'unavailable' as const;
     this.submissions.push(s);
     return 'recorded' as const;
   }
@@ -88,6 +89,20 @@ describe('VolunteerService', () => {
     expect(joined.token.startsWith(`${joined.contributor.id}.`)).toBe(true);
     expect(sources.assertUseAuthorized).toHaveBeenCalledWith(sourceId, 'volunteerAccess');
     await expect(service.join(link, 'x')).rejects.toThrow();
+  });
+
+  it('tells a person when their nickname already exists, and only reuses it when they say it is them', async () => {
+    const { service, repo } = setup();
+    const first = await service.join(link, 'Yûbaka');
+    // capitals, accents and spaces do not make a different nickname
+    await expect(service.join(link, ' yubaka ')).rejects.toMatchObject({ code: 'nickname_taken', existing: 'Yûbaka' });
+    expect(repo.contributors.size).toBe(1);
+    const back = await service.join(link, 'yubaka', true);
+    expect(back.contributor.id).toBe(first.contributor.id);
+    expect(back.token).toBe(first.token);
+    expect(repo.contributors.size).toBe(1);
+    expect((await service.join(link, 'Yûbaka2')).contributor.id).not.toBe(first.contributor.id);
+    expect(repo.contributors.size).toBe(2);
   });
 
   it('stops new volunteers from joining when too many joined within the hour', async () => {
@@ -141,24 +156,43 @@ describe('VolunteerService', () => {
     expect(await service.next(link, token)).toEqual({ clip: null, progress: { total: 2, answered: 2 } });
   });
 
-  it('counts only the clips a person can still do, so "of N" never promises work that is full', async () => {
-    const { service } = setup();
+  it('counts only the clips a person can still do, so "of N" never promises work that is closed', async () => {
+    const { service, repo } = setup();
     const [one, two, three] = [await join(service, 'One'), await join(service, 'Two'), await join(service, 'Three')];
     await service.submit(link, one, clipA, 'a');
     await service.submit(link, two, clipA, 'b');
+    expect((await service.next(link, three)).progress).toEqual({ total: 2, answered: 0 }); // still open to a third version
+    repo.decided.add(clipA);
     expect((await service.next(link, three)).progress).toEqual({ total: 1, answered: 0 });
   });
 
-  it('never shows anyone else\'s text, and stops offering a clip after two different people wrote it', async () => {
+  it('never shows anyone else\'s text, and offers the clip with the fewest versions first', async () => {
     const { service, repo } = setup();
     const [one, two, three] = [await join(service, 'One'), await join(service, 'Two'), await join(service, 'Three')];
     await service.submit(link, one, clipA, 'first text');
     const offerToTwo = await service.next(link, two);
-    expect(offerToTwo.clip?.clipId).toBe(clipA);
+    expect(offerToTwo.clip?.clipId).toBe(clipB); // clip B has no version yet, so it comes first
     expect(JSON.stringify(offerToTwo)).not.toContain('first text');
     await service.submit(link, two, clipA, 'second text');
-    expect((await service.next(link, three)).clip?.clipId).toBe(clipB);
-    expect(repo.submissions.map((s) => s.text)).toEqual(['first text', 'second text']);
+    await service.submit(link, three, clipA, 'third text'); // a third version is welcome
+    expect(repo.submissions.map((s) => s.text)).toEqual(['first text', 'second text', 'third text']);
+  });
+
+  it('keeps a clip open for late volunteers until it has five versions or the admin decided it', async () => {
+    const { service, repo } = setup();
+    const names = ['One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+    const tokens: string[] = [];
+    for (const name of names) tokens.push(await join(service, name));
+    for (const token of tokens.slice(0, 4)) await service.submit(link, token, clipA, `text ${token.slice(-4)}`);
+    expect((await service.next(link, tokens[4]!)).clip?.clipId).toBe(clipB); // B has fewer versions
+    await service.skip(link, tokens[4]!, clipB);
+    expect((await service.next(link, tokens[4]!)).clip?.clipId).toBe(clipA); // still open: only four versions
+    await service.submit(link, tokens[4]!, clipA, 'fifth');
+    expect((await service.next(link, tokens[5]!)).clip?.clipId).toBe(clipB);
+    await expect(service.submit(link, tokens[5]!, clipA, 'sixth')).rejects.toMatchObject({ code: 'clip_unavailable' }); // five versions: closed
+    repo.decided.add(clipB); // the admin chose the best version
+    expect((await service.next(link, tokens[5]!)).clip).toBeNull();
+    await expect(service.submit(link, tokens[5]!, clipB, 'too late')).rejects.toMatchObject({ code: 'clip_unavailable' });
   });
 
   it('keeps skips from counting as transcripts, so skipped clips still reach other people', async () => {

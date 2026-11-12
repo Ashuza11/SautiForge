@@ -68,7 +68,7 @@ describe('volunteer routes', () => {
   it('cleans the text and the nickname before they reach the service', async () => {
     const { post, volunteer } = volunteerApp();
     expect((await post('join', { link, pseudonym: '  Mama   Neema ' })).status).toBe(201);
-    expect(volunteer.join).toHaveBeenCalledWith(link, 'Mama Neema');
+    expect(volunteer.join).toHaveBeenCalledWith(link, 'Mama Neema', false);
     await post('submit', { link, contributor, clipId, text: ' mwana\n wa   Mashi\t' });
     expect(volunteer.submit).toHaveBeenCalledWith(link, contributor, clipId, 'mwana wa Mashi', undefined);
     await post('submit', { link, contributor, clipId, text: 'afusire', correction: '  âfusire  ' });
@@ -102,6 +102,16 @@ describe('volunteer routes', () => {
     expect(await blocked.json()).toEqual({ error: 'rate_limited' });
     expect((await send('203.0.113.7')).status).toBe(200);
     expect(seen).toEqual(['198.51.100.9', '203.0.113.7']);
+  });
+
+  it('asks \"is this you?\" when the nickname exists, with the existing nickname in the answer', async () => {
+    const { post, volunteer } = volunteerApp();
+    vi.mocked(volunteer.join).mockRejectedValueOnce(new VolunteerError('nickname_taken', 'exists', 'Marius'));
+    const response = await post('join', { link, pseudonym: 'marius' });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: 'nickname_taken', pseudonym: 'Marius' });
+    await post('join', { link, pseudonym: 'marius', sameAsExisting: true });
+    expect(volunteer.join).toHaveBeenLastCalledWith(link, 'marius', true);
   });
 
   it('answers 429 when too many volunteers are joining', async () => {

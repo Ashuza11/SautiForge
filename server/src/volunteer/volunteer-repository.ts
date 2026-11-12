@@ -20,18 +20,22 @@ export interface VolunteerRepository {
   createContributor(contributor: Contributor): Promise<Contributor>;
   /** How many volunteers joined the project since the given time (a brake on link abuse). */
   countContributorsSince(projectId: string, since: string): Promise<number>;
+  /** Everyone who joined the project, oldest first, to spot a nickname that is already taken. */
+  listContributors(projectId: string): Promise<Contributor[]>;
   getContributor(id: string): Promise<Contributor | null>;
   /**
-   * The first clip of the batch, in order, that this person has not answered and that still needs
-   * transcripts. Published clips only. Never returns anyone's text.
+   * The clip of the batch with the fewest versions (then in order) that this person has not answered and
+   * that is still open: fewer than `maxTranscripts` versions and no final decision yet. Published clips
+   * only. Never returns anyone's text.
    */
-  nextClip(batchId: string, contributorId: string, requiredTranscripts: number): Promise<NextClip | null>;
+  nextClip(batchId: string, contributorId: string, maxTranscripts: number): Promise<NextClip | null>;
   /** `total` is this person's answers plus the clips still open to them, so the count is never longer than their own work. */
-  progress(batchId: string, contributorId: string, requiredTranscripts: number): Promise<BatchProgress>;
+  progress(batchId: string, contributorId: string, maxTranscripts: number): Promise<BatchProgress>;
   /**
    * Appends an answer. Returns 'recorded', 'already_answered' when this person already answered the
    * clip (nothing changes), or 'unavailable' when the batch is closed, the clip is not in it or is no
-   * longer published, the person belongs to another project, or the source no longer allows it.
+   * longer published, the clip is already decided or has `maxTranscripts` versions, the person belongs
+   * to another project, or the source no longer allows it.
    */
-  appendSubmission(submission: Submission): Promise<'recorded' | 'already_answered' | 'unavailable'>;
+  appendSubmission(submission: Submission, maxTranscripts: number): Promise<'recorded' | 'already_answered' | 'unavailable'>;
 }

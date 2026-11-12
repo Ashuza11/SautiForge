@@ -146,7 +146,7 @@ export function createServerApp(dependencies: AppDependencies): Hono {
   app.post('/v1/volunteer/join', volunteerLimit, async (context) => {
     const input = await parseValidatedBody(context, joinSchema);
     if (!input.success) return input.response;
-    return context.json(await dependencies.volunteer.join(input.data.link, input.data.pseudonym), 201);
+    return context.json(await dependencies.volunteer.join(input.data.link, input.data.pseudonym, input.data.sameAsExisting === true), 201);
   });
   app.post('/v1/volunteer/next', volunteerLimit, async (context) => {
     const input = await parseValidatedBody(context, sessionSchema);
@@ -405,7 +405,7 @@ export function createServerApp(dependencies: AppDependencies): Hono {
     }
     if (error instanceof VolunteerError) {
       const status = error.code === 'link_invalid' ? 404 : error.code === 'contributor_invalid' ? 401 : error.code === 'too_many_joins' ? 429 : 409;
-      return context.json({ error: error.code, message: error.message }, status);
+      return context.json({ error: error.code, message: error.message, ...(error.existing ? { pseudonym: error.existing } : {}) }, status);
     }
     if (error instanceof BatchLifecycleError) {
       const status = ['source_not_found', 'batch_not_found'].includes(error.code) ? 404 : 409;

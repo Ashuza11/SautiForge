@@ -1,5 +1,5 @@
 export class VolunteerApiError extends Error {
-  constructor(readonly status: number, readonly code: string, message: string) {
+  constructor(readonly status: number, readonly code: string, message: string, readonly existing?: string) {
     super(message);
   }
 }
@@ -20,6 +20,7 @@ const MESSAGES: Record<string, string> = {
   use_not_authorized: 'Ce lot n’est pas ouvert aux volontaires pour le moment.',
   server_not_configured: 'Le service n’est pas encore prêt. Réessayez plus tard.',
   too_many_joins: 'Beaucoup de personnes se connectent en ce moment. Réessayez dans quelques minutes.',
+  nickname_taken: 'Ce pseudo existe déjà.',
   rate_limited: 'Doucement, réessayez dans un instant.',
 };
 
@@ -39,8 +40,9 @@ export class VolunteerClient {
     return this.post('listen', { link: this.link, clipId });
   }
 
-  join(pseudonym: string): Promise<{ contributor: { id: string; pseudonym: string }; token: string }> {
-    return this.post('join', { link: this.link, pseudonym });
+  /** `sameAsExisting` is the person confirming that a nickname that already exists is theirs. */
+  join(pseudonym: string, sameAsExisting = false): Promise<{ contributor: { id: string; pseudonym: string }; token: string }> {
+    return this.post('join', { link: this.link, pseudonym, ...(sameAsExisting ? { sameAsExisting: true } : {}) });
   }
 
   next(contributor: string): Promise<NextResult> {
@@ -67,10 +69,10 @@ export class VolunteerClient {
     } catch {
       throw new VolunteerApiError(0, 'network', 'Pas de connexion. Votre texte est gardé. Vérifiez le réseau et réessayez.');
     }
-    const payload = await response.json().catch(() => ({})) as { error?: string; message?: string };
+    const payload = await response.json().catch(() => ({})) as { error?: string; message?: string; pseudonym?: string };
     if (!response.ok) {
       const code = payload.error ?? 'error';
-      throw new VolunteerApiError(response.status, code, MESSAGES[code] ?? 'Une erreur est survenue. Réessayez.');
+      throw new VolunteerApiError(response.status, code, MESSAGES[code] ?? 'Une erreur est survenue. Réessayez.', payload.pseudonym);
     }
     return payload as T;
   }
