@@ -20,6 +20,11 @@ export function clipLink(origin: string, batchId: string, token: string, clipId:
   return `${origin.replace(/\/$/, '')}/#/c/${batchId}.${token}/${clipId}`;
 }
 
+/** "en Mashi", or a neutral phrase when the language is not known. */
+export function inLanguage(language: string): string {
+  return language.trim() ? `en ${language.trim()}` : 'dans la langue que vous entendez';
+}
+
 export type SavedContributor = { token: string; pseudonym: string };
 
 function browserStorage(): StorageLike | null {

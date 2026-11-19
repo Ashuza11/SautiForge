@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  clearContributor, clipLink, parseClipHash, clearDraft, loadContributor, loadDraft, nextSpeed, nicknameProblem, parseBatchHash, progressPercent,
+  clearContributor, clipLink, inLanguage, parseClipHash, clearDraft, loadContributor, loadDraft, nextSpeed, nicknameProblem, parseBatchHash, progressPercent,
   saveContributor, saveDraft, speedLabel, type StorageLike,
 } from './volunteer-view';
 
@@ -85,5 +85,13 @@ describe('clip links', () => {
     expect(parseClipHash('#/c/nope')).toBeNull();
     expect(parseClipHash(`#/b/${batchId}.${code}`)).toBeNull();
     expect(parseClipHash(`#/c/${batchId}.${code}/${clipId}/extra`)).toBeNull();
+  });
+});
+
+describe('inLanguage', () => {
+  it('names the language the volunteers must write in, or stays neutral', () => {
+    expect(inLanguage('Mashi')).toBe('en Mashi');
+    expect(inLanguage('  Swahili ')).toBe('en Swahili');
+    expect(inLanguage('')).toBe('dans la langue que vous entendez');
   });
 });

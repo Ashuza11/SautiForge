@@ -6,7 +6,7 @@ import { ApiClient, ApiError } from '../api/client';
 import { formatSeconds } from '../domain/clips-view';
 import { exportCommand, formatDuration, transcriptsCsv } from '../domain/export-view';
 import {
-  approvedCount, batchProgress, clipBadge, clipDifferencesMessage, differencesMessage, firstDifference, percent, summarize, versions,
+  approvedCount, batchProgress, clipBadge, clipDifferencesMessage, differencesMessage, versionDiffs, firstDifference, percent, summarize, versions,
   type BatchResult, type ClipResult, type SourceResults,
 } from '../domain/results-view';
 import { clipLink } from '../domain/volunteer-view';
@@ -220,9 +220,13 @@ function ClipRow({ client, onSaved, clip, required, open, playing, copied, onTog
           )}
           {difference ? (
             <div className="ad-diff" aria-label="Differences">
-              <p className="ad-diff-title">Differences <small>{difference.diff.similarity}% alike</small></p>
-              <p className="ad-diff-line"><span className="ad-who">{difference.first.pseudonym}</span><Marked parts={difference.diff.left} /></p>
-              <p className="ad-diff-line"><span className="ad-who">{difference.other.pseudonym}</span><Marked parts={difference.diff.right} /></p>
+              <p className="ad-diff-title">Differences <small>{versions(clip).length} versions</small></p>
+              {versionDiffs(clip).map((version) => (
+                <p className="ad-diff-line" key={version.label}>
+                  <span className="ad-who">{version.label} · {version.people.join(', ')}</span>
+                  <Marked parts={version.parts} />
+                </p>
+              ))}
               <button className="secondary ad-small" onClick={() => onCopy(`clip-${clip.clipId}`, clipDifferencesMessage(clip, listenLink))}>
                 {copied === `clip-${clip.clipId}` ? 'Copied ✓' : `Copy for WhatsApp (${versions(clip).length} versions)`}
               </button>

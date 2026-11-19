@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { approvedCount, batchProgress, clipBadge, clipDifferenceBlock, clipDifferencesMessage, clipState, differencesMessage, firstDifference, needsDecision, percent, stateLabel, summarize, versions, type BatchResult, type ClipResult } from './results-view';
+import { approvedCount, batchProgress, clipBadge, clipDifferenceBlock, clipDifferencesMessage, clipState, versionDetails, versionDiffs, differencesMessage, firstDifference, needsDecision, percent, stateLabel, summarize, versions, type BatchResult, type ClipResult } from './results-view';
 
 const t = (who: string, text: string) => ({ id: who + text, contributorId: who, pseudonym: who, text, correction: null, createdAt: '2026-11-10T10:00:00.000Z' });
 const clip = (key: string, texts: [string, string][], status = 'published'): ClipResult => ({
@@ -47,7 +47,7 @@ describe('results helpers', () => {
     expect(versions(clip('a', [['N', 'x'], ['B', 'y'], ['C', 'x']]))).toEqual([{ label: 'A', text: 'x' }, { label: 'B', text: 'y' }]);
     const message = differencesMessage([clip('c001', [['Neema', 'mwana'], ['Baraka', 'mwana wa']]), clip('c002', [['Neema', 'ok'], ['Baraka', 'ok']])], 2);
     expect(message).toContain('Extrait c001');
-    expect(message).toContain('A) mwana\nB) mwana *wa*');
+    expect(message).toContain('A) mwana (1 personne)\nB) mwana *wa* (1 personne)');
     expect(message).not.toContain('c002');
     expect(message).not.toMatch(/Neema|Baraka/);
     expect(differencesMessage([clip('a', [['N', 'x'], ['B', 'x']])], 2)).toBeNull();
@@ -56,7 +56,7 @@ describe('results helpers', () => {
 
   it('puts the words that differ in bold for WhatsApp, in French', () => {
     const block = clipDifferenceBlock(clip('c005', [['N', 'bantu ba mashi'], ['B', 'bantu ba mashe']]));
-    expect(block).toBe('Extrait c005\nA) bantu ba *mashi*\nB) bantu ba *mashe*');
+    expect(block).toBe('Extrait c005\nA) bantu ba *mashi* (1 personne)\nB) bantu ba *mashe* (1 personne)');
     const link = (id: string) => `https://site/#/c/${id}`;
     expect(clipDifferenceBlock(clip('c005', [['N', 'x'], ['B', 'y']]), link)).toContain('🔊 Écouter : https://site/#/c/c005');
     expect(differencesMessage([clip('c005', [['N', 'x'], ['B', 'y']])], 2, link)).toContain('🔊 Écouter');
@@ -64,6 +64,21 @@ describe('results helpers', () => {
     expect(message).toContain('Quels mots sont justes ?');
     expect(message).toContain('en *gras*');
     expect(message).toContain('Répondez avec la lettre');
+  });
+
+  it('lists every version, with how many people wrote it and the correct forms they suggested', () => {
+    const many = clip('c007', [['Neema', 'afusire'], ['Baraka', 'afusire'], ['Cirhuza', 'âfusire'], ['Dalia', 'afusiri'], ['Elie', 'afusire']]);
+    many.transcripts[2] = { ...many.transcripts[2]!, correction: 'âfusire' };
+    const details = versionDetails(many);
+    expect(details.map((item) => [item.label, item.text, item.people.length])).toEqual([['A', 'afusire', 3], ['B', 'âfusire', 1], ['C', 'afusiri', 1]]);
+    expect(versionDiffs(many).map((item) => item.label)).toEqual(['A', 'B', 'C']);
+    const block = clipDifferenceBlock(many);
+    expect(block).toContain('A) ');
+    expect(block).toContain('(3 personnes)');
+    expect(block).toContain('B) ');
+    expect(block).toContain('C) ');
+    expect(block).toContain('✍️ Forme proposée : âfusire');
+    expect(block).not.toMatch(/Neema|Baraka|Cirhuza|Dalia|Elie/);
   });
 
   it('shows the final decision before the volunteer state', () => {

@@ -1,4 +1,4 @@
-import { boldDifferences, diffText } from './text-diff';
+import { boldDifferences, diffText, type DiffPart } from './text-diff';
 
 export type Transcript = { id: string; contributorId: string; pseudonym: string; text: string; correction: string | null; createdAt: string };
 export type FinalView = { version: number; decision: 'approved' | 'excluded'; text: string | null; note: string; createdAt: string };
@@ -82,12 +82,39 @@ export function versions(clip: ClipResult): { label: string; text: string }[] {
   return distinct.map((text, index) => ({ label: LETTERS[index] ?? String(index + 1), text }));
 }
 
-/** One clip for WhatsApp: each version labelled A, B, C, with the words that differ in bold. */
-export function clipDifferenceBlock(clip: ClipResult, listenLink?: (clipId: string) => string): string {
-  const all = versions(clip);
-  const lines = all.map((version, index) => {
+export type VersionDetail = { label: string; text: string; people: string[]; corrections: string[] };
+
+/** Every distinct version of a clip with everyone who wrote it and the correct forms they suggested. */
+export function versionDetails(clip: ClipResult): VersionDetail[] {
+  return versions(clip).map((version) => {
+    const writers = clip.transcripts.filter((item) => item.text === version.text);
+    return {
+      ...version,
+      people: writers.map((item) => item.pseudonym),
+      corrections: [...new Set(writers.map((item) => item.correction).filter((item): item is string => Boolean(item)))],
+    };
+  });
+}
+
+/** Each version compared with the first one (the first with the second), for marking what differs on screen. */
+export function versionDiffs(clip: ClipResult): (VersionDetail & { parts: DiffPart[] })[] {
+  const all = versionDetails(clip);
+  return all.map((version, index) => {
     const compared = all[index === 0 ? 1 : 0]?.text ?? '';
-    return `${version.label}) ${boldDifferences(version.text, compared)}`;
+    const diff = diffText(version.text, compared);
+    return { ...version, parts: diff.left };
+  });
+}
+
+const peopleLabel = (count: number) => (count === 1 ? '1 personne' : `${count} personnes`);
+
+/** One clip for WhatsApp: every version labelled A, B, C… with the words that differ in bold and how many people wrote it. */
+export function clipDifferenceBlock(clip: ClipResult, listenLink?: (clipId: string) => string): string {
+  const all = versionDetails(clip);
+  const lines = all.flatMap((version, index) => {
+    const compared = all[index === 0 ? 1 : 0]?.text ?? '';
+    const proposed = version.corrections.length > 0 ? [`   ✍️ Forme proposée : ${version.corrections.join(' / ')}`] : [];
+    return [`${version.label}) ${boldDifferences(version.text, compared)} (${peopleLabel(version.people.length)})`, ...proposed];
   });
   const listen = listenLink ? [`🔊 Écouter : ${listenLink(clip.clipId)}`] : [];
   return [`Extrait ${clip.clipKey}`, ...listen, ...lines].join('\n');

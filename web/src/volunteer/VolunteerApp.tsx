@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { VolunteerApiError, VolunteerClient, type BatchInfo, type NextResult } from '../api/volunteer-client';
 import {
-  clearContributor, clearDraft, loadContributor, loadDraft, nextSpeed, nicknameProblem, progressPercent,
+  clearContributor, clearDraft, inLanguage, loadContributor, loadDraft, nextSpeed, nicknameProblem, progressPercent,
   saveContributor, saveDraft, speedLabel, type SavedContributor, type Speed,
 } from '../domain/volunteer-view';
 
@@ -54,7 +54,7 @@ export function VolunteerApp({ link }: { link: string }) {
           />
         ) : null}
         {phase.kind === 'working' ? (
-          <Listening client={client} me={phase.me} onSignedOut={() => { clearContributor(); void start(); }} />
+          <Listening client={client} me={phase.me} language={phase.info.language} onSignedOut={() => { clearContributor(); void start(); }} />
         ) : null}
       </main>
     </div>
@@ -111,7 +111,7 @@ function Welcome({ info, client, onJoined }: { info: BatchInfo; client: Voluntee
       <p className="vo-lead">Construisons ensemble : faisons parler l’IA dans notre langue.</p>
       <ol className="vo-steps">
         <li>Écoutez un court extrait.</li>
-        <li>Écrivez ce que vous entendez.</li>
+        <li>Écrivez ce que vous entendez, {inLanguage(info.language)}, pas en français.</li>
         <li>Envoyez. Il y a {info.clipCount} extraits, et vous pouvez vous arrêter à tout moment.</li>
       </ol>
       <label className="vo-field">
@@ -128,7 +128,7 @@ function Welcome({ info, client, onJoined }: { info: BatchInfo; client: Voluntee
 /** Drafts of the optional note live beside the main draft of the same clip. */
 const noteKey = (clipId: string) => `${clipId}.note`;
 
-function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: SavedContributor; onSignedOut: () => void }) {
+function Listening({ client, me, language, onSignedOut }: { client: VolunteerClient; me: SavedContributor; language: string; onSignedOut: () => void }) {
   const [state, setState] = useState<NextResult | null>(null);
   const [text, setText] = useState('');
   const [correction, setCorrection] = useState('');
@@ -281,7 +281,7 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
       </div>
 
       <label className="vo-field">
-        <span>Écrivez exactement ce que vous entendez</span>
+        <span>Écrivez exactement ce que vous entendez, {inLanguage(language)}</span>
         <textarea
           rows={4}
           value={text}
@@ -293,7 +293,7 @@ function Listening({ client, me, onSignedOut }: { client: VolunteerClient; me: S
           placeholder="Écrivez ici…"
         />
       </label>
-      <p className="vo-hint">Écrivez ce que la personne dit vraiment, même si un mot est mal prononcé. Ne le corrigez pas ici : pour l’IA, ce qui est dit compte plus que ce qui est attendu.</p>
+      <p className="vo-hint">Écrivez dans la langue de l’audio, pas en français : nous avons besoin du texte exact tel qu’il est dit. Écrivez ce que la personne dit vraiment, même si un mot est mal prononcé. Ne le corrigez pas ici : pour l’IA, ce qui est dit compte plus que ce qui est attendu.</p>
 
       <label className="vo-field">
         <span>Forme correcte, si vous la connaissez <small>(facultatif)</small></span>

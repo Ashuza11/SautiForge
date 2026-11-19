@@ -26,6 +26,7 @@ export function shareMessage(input: { language: string; count: number; link: str
     'Voici le challenge pour aujourd’hui.',
     '',
     `Écoutez ${clips} en ${input.language} et écrivez ce que vous entendez. Environ dix minutes, sans compte, depuis votre téléphone.`,
+    `⚠️ Important : écrivez en ${input.language}, pas en français. Nous avons besoin du texte exact en ${input.language}, tel que vous l’entendez.`,
     '',
     `👉 ${input.link}`,
     '',

@@ -33,6 +33,7 @@ describe('batch helpers', () => {
     expect(text).toContain('Mashi');
     expect(text).toContain('5 courts extraits');
     expect(text).toContain('https://x/#/b/1.t');
+    expect(text).toContain('écrivez en Mashi, pas en français');
     expect(shareMessage({ language: 'Mashi', count: 1, link: 'l' })).toContain('1 court extrait ');
   });
 
